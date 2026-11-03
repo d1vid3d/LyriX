@@ -23,6 +23,7 @@ Other scripts:
 npm run typecheck   # type-check main/preload and renderer
 npm run build       # bundle into out/
 npm start           # preview the production bundle
+npm test            # run the Vitest suite
 ```
 
 ## Project structure
@@ -55,6 +56,16 @@ npm start           # preview the production bundle
 | `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, scanning UI and UI-state persistence. |
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
+| `src/shared/lyrics/types.ts` | Lyric format, document, line, segment, metadata and parse-option types. |
+| `src/shared/lyrics/time.ts` | Timestamp token parsing, fraction handling and format-detection regexes. |
+| `src/shared/lyrics/parse.ts` | `parseLyrics` entry point, option defaults and the ordered parser registry. |
+| `src/shared/lyrics/parsers/shared.ts` | Header extraction, timed-line finalization, end estimation and offset shifting. |
+| `src/shared/lyrics/parsers/plain.ts` | Untimed plain-text parser. |
+| `src/shared/lyrics/parsers/lrc.ts` | Line-timed LRC parser with estimated line ends. |
+| `src/shared/lyrics/parsers/enhanced-lrc.ts` | Word-timed enhanced LRC parser with `vN:` singer prefixes. |
+| `src/shared/lyrics/sync.ts` | Active line/segment lookup and clamped progress helpers. |
+| `src/shared/lyrics/index.ts` | Public exports for the pure lyric core. |
+| `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
 
 ## How the library works
 
@@ -99,6 +110,25 @@ duration; it is virtualized, so only the visible rows plus a small overscan buff
 Clicking a track queues exactly the currently visible filtered and sorted list, and the playing row is
 highlighted.
 
+## Lyric core
+
+`src/shared/lyrics` is a pure module: it takes lyric text and returns a typed document, with no DOM,
+Electron, audio or filesystem APIs. Both processes can import it later.
+
+`parseLyrics(text, options?)` detects three formats with an ordered parser registry: enhanced LRC
+(line timestamps plus `<mm:ss.xxx>` word markers), line-level LRC, and plain untimed text. It reads
+`[ti:]`, `[ar:]`, `[al:]`, `[by:]` and `[offset:]` headers (keeping every tag in `metadata.raw`),
+supports several leading timestamps on one line, optional `vN:` singer labels, and 1+ digit
+fractions. Positive offsets move timestamps earlier; `applyOffset: false` keeps file times.
+
+Line-level ends come from the next timestamp, capped at 10 seconds by default; the last line gets
+five seconds. Enhanced lines use their final empty word marker as an exact end, otherwise estimate
+the same way. Skipped or odd input becomes a human-readable warning instead of an exception.
+
+`sync.ts` provides frame-friendly helpers: `findActiveLineIndex` (binary search that deliberately
+stays on the previous line during gaps), `findActiveLineIndexes` (all lines containing a time,
+including overlaps), `findActiveSegmentIndex`, and clamped `lineProgress` / `segmentProgress`.
+
 ## How local playback works
 
 The renderer never touches the filesystem. It receives `media://track/<id>` and
@@ -126,4 +156,5 @@ restored on the next launch.
 
 Shuffle, repeat modes, gapless playback, crossfade, a visible queue panel, queue editing, fuzzy
 search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
-virtualization, lyrics, tag editing and packaging are intentionally not implemented.
+virtualization, lyric UI/highlighting, loading lyrics from files or tags, serializing lyric documents,
+translations, TTML, tag editing and packaging are intentionally not implemented.
