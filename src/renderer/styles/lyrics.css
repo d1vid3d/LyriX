@@ -158,7 +158,9 @@
 }
 
 .lyric-seg--active {
-  color: transparent;
+  /* Keep color opaque: the gradient uses text-fill-color. Transitioning from `transparent`
+     here makes a just-sung syllable flash dark before settling on the sung color. */
+  color: var(--lyric-color-sung);
   background-image: linear-gradient(
     90deg,
     var(--lyric-color-sung) 0%,
@@ -169,6 +171,12 @@
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* The current line is already highlighted ahead of the sweep, so word lyrics stay bright
+   instead of turning grey except for the syllable being sung. */
+.lyric-line--current .lyric-seg--upcoming {
+  color: var(--lyric-color-active);
 }
 
 .lyric-lines--static {
