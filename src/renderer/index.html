@@ -132,17 +132,26 @@
           type="button"
           disabled
           aria-label="Previous track"
+          title="Previous track"
         >
-          Previous
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
+          </svg>
         </button>
         <button
           id="play-pause"
-          class="control-button play-pause"
+          class="control-button control-button--primary play-pause"
           type="button"
           disabled
           aria-label="Play"
+          title="Play"
         >
-          Play
+          <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
         </button>
         <button
           id="next"
@@ -150,8 +159,11 @@
           type="button"
           disabled
           aria-label="Next track"
+          title="Next track"
         >
-          Next
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+          </svg>
         </button>
         <span id="current-time" class="time">0:00</span>
         <input

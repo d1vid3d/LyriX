@@ -578,9 +578,13 @@ input:focus-visible {
 }
 
 .control-button {
+  display: inline-flex;
   flex: none;
-  min-width: 66px;
-  padding: 7px 12px;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: #26262a;
@@ -594,6 +598,35 @@ input:focus-visible {
 .control-button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.control-button .icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.control-button--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #10141c;
+}
+
+.control-button--primary:hover:not(:disabled) {
+  border-color: #8bbcff;
+  background: #8bbcff;
+}
+
+.play-pause .icon-pause {
+  display: none;
+}
+
+.play-pause[data-playing='true'] .icon-play {
+  display: none;
+}
+
+.play-pause[data-playing='true'] .icon-pause {
+  display: block;
 }
 
 .time {

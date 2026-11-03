@@ -589,8 +589,10 @@ function updateControls(): void {
   const hasCurrent = queue.current() !== null
   const playing = engine.isPlaying()
 
-  playPauseButton.textContent = playing ? 'Pause' : 'Play'
-  playPauseButton.setAttribute('aria-label', playing ? 'Pause' : 'Play')
+  const playLabel = playing ? 'Pause' : 'Play'
+  playPauseButton.dataset.playing = String(playing)
+  playPauseButton.setAttribute('aria-label', playLabel)
+  playPauseButton.title = playLabel
   playPauseButton.disabled = !hasCurrent
   previousButton.disabled = !hasCurrent
   nextButton.disabled = !queue.hasNext()
