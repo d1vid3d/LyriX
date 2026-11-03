@@ -1,5 +1,8 @@
 import './style.css'
 import type { Album, LibrarySnapshot, ScanProgress, Track } from '../../shared/types'
+import { HtmlAudioEngine } from '../player/engine'
+import type { PlaybackEngine } from '../player/engine'
+import { PlaybackQueue } from '../player/queue'
 
 function getElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id)
@@ -7,7 +10,9 @@ function getElement<T extends HTMLElement>(id: string): T {
   return element as T
 }
 
-const audio = getElement<HTMLAudioElement>('audio')
+const engine: PlaybackEngine = new HtmlAudioEngine(getElement<HTMLAudioElement>('audio'))
+const queue = new PlaybackQueue()
+
 const openFolderButton = getElement<HTMLButtonElement>('open-folder')
 const rescanButton = getElement<HTMLButtonElement>('rescan')
 const statusLabel = getElement<HTMLSpanElement>('status')
@@ -25,7 +30,9 @@ const detailArtist = getElement<HTMLParagraphElement>('detail-artist')
 const detailYear = getElement<HTMLParagraphElement>('detail-year')
 const trackList = getElement<HTMLOListElement>('track-list')
 
+const previousButton = getElement<HTMLButtonElement>('previous')
 const playPauseButton = getElement<HTMLButtonElement>('play-pause')
+const nextButton = getElement<HTMLButtonElement>('next')
 const currentTimeLabel = getElement<HTMLSpanElement>('current-time')
 const seekBar = getElement<HTMLInputElement>('seek')
 const durationLabel = getElement<HTMLSpanElement>('duration')
@@ -34,14 +41,18 @@ const nowCoverImage = getElement<HTMLImageElement>('now-cover')
 const nowTitle = getElement<HTMLSpanElement>('now-title')
 const nowArtist = getElement<HTMLSpanElement>('now-artist')
 
+interface PlaybackAttempt {
+  failed: boolean
+}
+
 let albums: Album[] = []
 let folderName: string | null = null
 let activeAlbumId: string | null = null
-let current: { track: Track; album: Album } | null = null
 let isSeeking = false
 let libraryEventReceived = false
+let activeAttempt: PlaybackAttempt | null = null
 
-audio.volume = Number(volumeSlider.value)
+engine.setVolume(Number(volumeSlider.value))
 
 for (const image of [detailCoverImage, nowCoverImage]) {
   image.addEventListener('error', () => {
@@ -113,6 +124,10 @@ function updateStatus(): void {
   statusLabel.textContent = `${folderName} · ${albumLabel} · ${trackLabel}`
 }
 
+function findAlbumForTrack(track: Track): Album | null {
+  return albums.find((album) => album.tracks.some((item) => item.id === track.id)) ?? null
+}
+
 function renderGrid(): void {
   albumGrid.replaceChildren()
 
@@ -176,6 +191,7 @@ function renderDetail(): void {
 function renderTrackList(album: Album): void {
   trackList.replaceChildren()
   const fragment = document.createDocumentFragment()
+  const currentId = queue.current()?.id ?? null
 
   for (const track of album.tracks) {
     const item = document.createElement('li')
@@ -184,7 +200,7 @@ function renderTrackList(album: Album): void {
     button.className = 'track'
     button.dataset.trackId = track.id
 
-    if (current?.track.id === track.id) {
+    if (currentId === track.id) {
       button.classList.add('playing')
       button.setAttribute('aria-current', 'true')
     }
@@ -203,9 +219,7 @@ function renderTrackList(album: Album): void {
 
     button.append(title, duration)
     button.prepend(number)
-    button.addEventListener('click', () => {
-      void playTrack(track, album)
-    })
+    button.addEventListener('click', () => playAlbumTrack(album, track))
 
     item.append(button)
     fragment.append(item)
@@ -215,8 +229,10 @@ function renderTrackList(album: Album): void {
 }
 
 function updateTrackHighlight(): void {
+  const currentId = queue.current()?.id ?? null
+
   for (const button of trackList.querySelectorAll<HTMLButtonElement>('.track')) {
-    const isCurrent = button.dataset.trackId === current?.track.id
+    const isCurrent = button.dataset.trackId === currentId
     button.classList.toggle('playing', isCurrent)
     if (isCurrent) {
       button.setAttribute('aria-current', 'true')
@@ -227,35 +243,41 @@ function updateTrackHighlight(): void {
 }
 
 function updateNowPlaying(): void {
-  if (!current) {
+  const track = queue.current()
+  if (!track) {
     nowTitle.textContent = 'Nothing playing'
     nowArtist.textContent = ''
     setCoverImage(nowCoverImage, null, '')
     return
   }
 
-  nowTitle.textContent = current.track.title
-  nowArtist.textContent = current.track.artist
-  setCoverImage(nowCoverImage, current.album.coverUrl, `${current.album.title} cover`)
+  const album = findAlbumForTrack(track)
+  nowTitle.textContent = track.title
+  nowArtist.textContent = track.artist
+  setCoverImage(nowCoverImage, album?.coverUrl ?? null, album ? `${album.title} cover` : '')
 }
 
-function updatePlayButton(): void {
-  const playing = !audio.paused && !audio.ended
+function updateControls(): void {
+  const hasCurrent = queue.current() !== null
+  const playing = engine.isPlaying()
+
   playPauseButton.textContent = playing ? 'Pause' : 'Play'
   playPauseButton.setAttribute('aria-label', playing ? 'Pause' : 'Play')
-  playPauseButton.disabled = current === null
+  playPauseButton.disabled = !hasCurrent
+  previousButton.disabled = !hasCurrent
+  nextButton.disabled = !queue.hasNext()
 }
 
-function updateDuration(): void {
-  if (!Number.isFinite(audio.duration) || audio.duration <= 0) {
+function updateDuration(duration: number): void {
+  if (!Number.isFinite(duration) || duration <= 0) {
     durationLabel.textContent = '0:00'
     seekBar.max = '0'
     seekBar.disabled = true
     return
   }
 
-  durationLabel.textContent = formatTime(audio.duration)
-  seekBar.max = String(audio.duration)
+  durationLabel.textContent = formatTime(duration)
+  seekBar.max = String(duration)
   seekBar.disabled = false
 }
 
@@ -264,21 +286,114 @@ function syncTimeUi(time: number): void {
   currentTimeLabel.textContent = formatTime(time)
 }
 
-function resetPlayback(): void {
-  current = null
+function resetTimeUi(): void {
   isSeeking = false
-  audio.pause()
-  audio.removeAttribute('src')
-  audio.load()
-
   seekBar.value = '0'
   seekBar.max = '0'
   seekBar.disabled = true
   currentTimeLabel.textContent = '0:00'
   durationLabel.textContent = '0:00'
-  updatePlayButton()
+}
+
+function resetPlayback(): void {
+  activeAttempt = null
+  queue.setQueue([])
+  engine.pause()
+  resetTimeUi()
+  updateControls()
   updateNowPlaying()
   updateTrackHighlight()
+}
+
+function playAlbumTrack(album: Album, track: Track): void {
+  const index = album.tracks.findIndex((item) => item.id === track.id)
+  if (index < 0) return
+
+  const wasCurrent = queue.current()?.id === track.id
+  queue.setQueue(album.tracks, index)
+
+  if (wasCurrent) {
+    updateTrackHighlight()
+    updateControls()
+    if (!engine.isPlaying()) resumeCurrentTrack()
+    return
+  }
+
+  startCurrentTrack(true)
+}
+
+function startCurrentTrack(autoplay: boolean): void {
+  const track = queue.current()
+  if (!track) {
+    resetPlayback()
+    return
+  }
+
+  const attempt: PlaybackAttempt = {
+    failed: false
+  }
+  activeAttempt = attempt
+
+  engine.load(track)
+  resetTimeUi()
+  updateNowPlaying()
+  updateTrackHighlight()
+  updateControls()
+
+  if (autoplay) {
+    void engine.play().catch((error) => handlePlaybackFailure(attempt, error))
+  }
+}
+
+function resumeCurrentTrack(): void {
+  const track = queue.current()
+  if (!track) return
+
+  const duration = engine.getDuration()
+  if (duration > 0 && engine.getPosition() >= duration - 0.05) {
+    engine.seek(0)
+    syncTimeUi(0)
+  }
+
+  const attempt: PlaybackAttempt = {
+    failed: false
+  }
+  activeAttempt = attempt
+  void engine.play().catch((error) => handlePlaybackFailure(attempt, error))
+}
+
+function handlePlaybackFailure(attempt: PlaybackAttempt, error: unknown): void {
+  if (activeAttempt !== attempt || attempt.failed) return
+
+  // Pausing interrupts an in-flight play() promise. That is not a track failure.
+  if (error instanceof Error && error.name === 'AbortError') return
+
+  attempt.failed = true
+
+  const track = queue.current()
+  console.error(`[renderer] Could not play ${track?.title ?? 'track'}`, error)
+  statusLabel.textContent = track ? `Could not play ${track.title}.` : 'Could not play this file.'
+
+  if (queue.hasNext()) {
+    queue.next()
+    startCurrentTrack(true)
+    return
+  }
+
+  engine.pause()
+  updateControls()
+}
+
+function handleEnded(): void {
+  if (queue.hasNext()) {
+    queue.next()
+    startCurrentTrack(true)
+    return
+  }
+
+  engine.pause()
+  syncTimeUi(engine.getPosition())
+  updateControls()
 }
 
 function openAlbum(albumId: string): void {
@@ -294,10 +409,25 @@ function closeAlbum(): void {
   gridView.hidden = false
 }
 
+function reconcileQueue(): void {
+  const track = queue.current()
+  if (!track) return
+
+  const album = findAlbumForTrack(track)
+  if (!album) {
+    resetPlayback()
+    return
+  }
+
+  const index = album.tracks.findIndex((item) => item.id === track.id)
+  queue.setQueue(album.tracks, index)
+}
+
 function applySnapshot(snapshot: LibrarySnapshot): void {
   albums = snapshot.albums
   folderName = snapshot.folderName
 
+  reconcileQueue()
   updateStatus()
   renderGrid()
 
@@ -309,47 +439,10 @@ function applySnapshot(snapshot: LibrarySnapshot): void {
     }
   }
 
-  if (current) {
-    const album = albums.find((item) => item.id === current?.album.id)
-    const track = album?.tracks.find((item) => item.id === current?.track.id)
-
-    if (!album || !track) {
-      resetPlayback()
-    } else {
-      current = { track, album }
-      updateNowPlaying()
-      updateTrackHighlight()
-    }
-  }
-
-  updatePlayButton()
-  setScanning(false)
-}
-
-async function playTrack(track: Track, album: Album): Promise<void> {
-  const changedTrack = current?.track.id !== track.id
-  current = { track, album }
-
-  if (changedTrack) {
-    audio.src = track.url
-    currentTimeLabel.textContent = '0:00'
-    durationLabel.textContent = '0:00'
-    seekBar.value = '0'
-    seekBar.max = '0'
-    seekBar.disabled = true
-  }
-
   updateNowPlaying()
   updateTrackHighlight()
-  updatePlayButton()
-
-  try {
-    await audio.play()
-  } catch (error) {
-    console.error('[renderer] Playback failed', error)
-    statusLabel.textContent = `Could not play ${track.title}.`
-    updatePlayButton()
-  }
+  updateControls()
+  setScanning(false)
 }
 
 async function openFolder(): Promise<void> {
@@ -406,35 +499,54 @@ rescanButton.addEventListener('click', () => {
 
 backButton.addEventListener('click', closeAlbum)
 
-playPauseButton.addEventListener('click', () => {
-  if (!current) return
+previousButton.addEventListener('click', () => {
+  if (!queue.current()) return
 
-  if (audio.paused) {
-    void audio.play().catch((error) => {
-      console.error('[renderer] Playback failed', error)
-      statusLabel.textContent = 'Could not play this file.'
-    })
-  } else {
-    audio.pause()
+  if (engine.getPosition() > 3) {
+    engine.seek(0)
+    syncTimeUi(0)
+    return
   }
+
+  if (queue.hasPrevious()) {
+    queue.previous()
+    startCurrentTrack(true)
+    return
+  }
+
+  engine.seek(0)
+  syncTimeUi(0)
 })
 
-audio.addEventListener('play', updatePlayButton)
-audio.addEventListener('pause', updatePlayButton)
-audio.addEventListener('ended', updatePlayButton)
-audio.addEventListener('loadedmetadata', updateDuration)
-audio.addEventListener('durationchange', updateDuration)
+playPauseButton.addEventListener('click', () => {
+  if (!queue.current()) return
 
-audio.addEventListener('timeupdate', () => {
-  if (!isSeeking) syncTimeUi(audio.currentTime)
+  if (engine.isPlaying()) {
+    engine.pause()
+    return
+  }
+
+  resumeCurrentTrack()
 })
 
-audio.addEventListener('error', () => {
-  if (!current) return
-  console.error('[renderer] Audio element error', audio.error)
-  statusLabel.textContent = 'Could not play this file.'
-  updatePlayButton()
+nextButton.addEventListener('click', () => {
+  if (!queue.hasNext()) return
+  queue.next()
+  startCurrentTrack(true)
 })
+
+const unsubscribeEngine = [
+  engine.on('play', updateControls),
+  engine.on('pause', updateControls),
+  engine.on('ended', handleEnded),
+  engine.on('loadedmetadata', (duration) => updateDuration(duration)),
+  engine.on('timeupdate', (position) => {
+    if (!isSeeking) syncTimeUi(position)
+  }),
+  engine.on('error', (error) => {
+    if (activeAttempt) handlePlaybackFailure(activeAttempt, error)
+  })
+]
 
 seekBar.addEventListener('pointerdown', () => {
   isSeeking = true
@@ -446,7 +558,7 @@ seekBar.addEventListener('input', () => {
 
   currentTimeLabel.textContent = formatTime(time)
   // Seek live while dragging; repeat range requests are handled by the media protocol.
-  audio.currentTime = time
+  engine.seek(time)
 })
 
 function finishSeeking(): void {
@@ -459,7 +571,7 @@ seekBar.addEventListener('pointercancel', finishSeeking)
 window.addEventListener('pointerup', finishSeeking)
 
 volumeSlider.addEventListener('input', () => {
-  audio.volume = Number(volumeSlider.value)
+  engine.setVolume(Number(volumeSlider.value))
 })
 
 volumeSlider.addEventListener('change', () => {
@@ -475,7 +587,7 @@ const unsubscribeUpdated = window.library.onLibraryUpdated((snapshot) => {
 async function initialize(): Promise<void> {
   try {
     const settings = await window.library.getSettings()
-    audio.volume = settings.volume
+    engine.setVolume(settings.volume)
     volumeSlider.value = String(settings.volume)
   } catch (error) {
     console.error('[renderer] Could not load settings', error)
@@ -494,6 +606,7 @@ async function initialize(): Promise<void> {
 void initialize()
 
 window.addEventListener('beforeunload', () => {
+  for (const unsubscribe of unsubscribeEngine) unsubscribe()
   unsubscribeProgress()
   unsubscribeUpdated()
 })

@@ -47,7 +47,9 @@ npm start           # preview the production bundle
 | `src/preload/index.ts` | Exposes the typed `window.library` API via `contextBridge`. |
 | `src/preload/index.d.ts` | Global `Window` typing for the preload API. |
 | `src/renderer/index.html` | App shell: toolbar, album grid, album detail and player controls. |
-| `src/renderer/src/main.ts` | Album/detail rendering, playback, scanning UI and volume persistence. |
+| `src/renderer/player/engine.ts` | `PlaybackEngine` interface and the single-`HTMLAudioElement` implementation. |
+| `src/renderer/player/queue.ts` | Pure album queue with a current index and bounded next/previous. |
+| `src/renderer/src/main.ts` | Album/detail rendering, queue/transport wiring, scanning UI and volume persistence. |
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
 
@@ -88,10 +90,14 @@ it. Requests are served by `protocol.handle` in `src/main/media-protocol.ts`, wh
 - responds with `206 Partial Content` and `Content-Range` for byte ranges, which makes seeking work,
 - serves covers only from the generated cover cache.
 
-The bottom bar shows the current track, artist and cover. The last folder and volume are stored in
-`userData/settings.json` and restored on the next launch.
+The bottom bar shows the current track, artist and cover. Clicking a track in an album queues the
+whole album in disc/track order; playback advances automatically when a track ends and stops at the
+end of the last track. **Previous** restarts the current track when it is more than three seconds in,
+otherwise it moves back one track. If a file cannot be played, the player logs it and skips forward
+until it finds a playable track. The last folder and volume are stored in `userData/settings.json`
+and restored on the next launch.
 
 ## Out of scope (for now)
 
-Queues, next/previous, auto-advance, search, lyrics, tag editing and packaging are intentionally
-not implemented.
+Shuffle, repeat modes, gapless playback, crossfade, a visible queue panel, queue editing, search,
+lyrics, tag editing and packaging are intentionally not implemented.

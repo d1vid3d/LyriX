@@ -384,7 +384,7 @@ input:focus-visible {
   min-width: 0;
 }
 
-.play-pause {
+.control-button {
   flex: none;
   min-width: 66px;
   padding: 7px 12px;
@@ -394,11 +394,11 @@ input:focus-visible {
   cursor: pointer;
 }
 
-.play-pause:hover:not(:disabled) {
+.control-button:hover:not(:disabled) {
   background: #303036;
 }
 
-.play-pause:disabled {
+.control-button:disabled {
   opacity: 0.5;
   cursor: default;
 }
