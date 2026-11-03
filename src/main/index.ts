@@ -17,14 +17,19 @@ import {
   scanLibrary
 } from './library'
 import { handleMediaProtocol, registerMediaScheme } from './media-protocol'
-import { clampVolume, loadSettings, saveSettings } from './settings'
+import { clampVolume, loadSettings, normalizeUiState, saveSettings } from './settings'
 
 // Privileged schemes must be registered before the app is ready.
 registerMediaScheme()
 
 let mainWindow: BrowserWindow | null = null
 
-let settings: Settings = { lastFolder: null, volume: 1 }
+let settings: Settings = {
+  lastFolder: null,
+  volume: 1,
+  lastView: 'albums',
+  sortByView: {}
+}
 let cache: LibraryCache = emptyLibraryCache()
 let settingsFile = ''
 let cacheFile = ''
@@ -183,6 +188,15 @@ function registerIpc(): void {
       await saveSettings(settingsFile, settings)
     } catch (error) {
       console.error('[settings] Could not save volume', error)
+    }
+  })
+
+  ipcMain.handle('settings:set-ui', async (_event, value: unknown) => {
+    settings = { ...settings, ...normalizeUiState(value) }
+    try {
+      await saveSettings(settingsFile, settings)
+    } catch (error) {
+      console.error('[settings] Could not save UI state', error)
     }
   })
 }

@@ -37,7 +37,7 @@ export function handleMediaProtocol(covers: CoverService): void {
     const id = url.pathname.slice(1)
 
     if (url.host === TRACK_HOST) return serveTrack(id, request)
-    if (url.host === COVER_HOST) return serveCover(id, covers)
+    if (url.host === COVER_HOST) return serveCover(id, url.searchParams.get('size'), covers)
     return new Response(null, { status: 404 })
   })
 }
@@ -100,12 +100,16 @@ async function serveTrack(trackId: string, request: Request): Promise<Response> 
   return streamFile(filePath, range.start, range.end, size, 206, request)
 }
 
-async function serveCover(albumId: string, covers: CoverService): Promise<Response> {
+async function serveCover(
+  albumId: string,
+  size: string | null,
+  covers: CoverService
+): Promise<Response> {
   if (!ID_PATTERN.test(albumId)) return new Response(null, { status: 404 })
 
   let coverPath: string | null
   try {
-    coverPath = await covers.getCover(albumId)
+    coverPath = await covers.getCover(albumId, size === 'small' ? 'small' : 'full')
   } catch (error) {
     console.error(`[covers] Could not prepare cover ${albumId}`, error)
     return new Response(null, { status: 404 })

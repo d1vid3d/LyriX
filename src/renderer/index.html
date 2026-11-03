@@ -15,12 +15,39 @@
       <button id="rescan" class="secondary" type="button" disabled>Rescan</button>
       <span id="status" class="status" role="status">No folder selected</span>
       <span id="scan-progress" class="scan-progress" role="status" hidden></span>
+
+      <div class="view-bar">
+        <div id="view-switcher" class="segmented" role="group" aria-label="Library view">
+          <button type="button" data-view="albums" aria-pressed="true">Albums</button>
+          <button type="button" data-view="artists" aria-pressed="false">Artists</button>
+          <button type="button" data-view="tracks" aria-pressed="false">Tracks</button>
+        </div>
+        <select id="sort-select" aria-label="Sort by"></select>
+        <input
+          id="search"
+          type="search"
+          placeholder="Search"
+          aria-label="Search library"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
     </header>
 
     <main class="content">
       <section id="grid-view" class="view grid-view">
         <div id="album-grid" class="album-grid"></div>
         <p id="empty-state" class="empty-state">Open a folder to list its .flac files.</p>
+      </section>
+
+      <section id="artists-view" class="view" hidden>
+        <ul id="artist-list" class="artist-list"></ul>
+        <p id="artists-empty" class="empty-state" hidden></p>
+      </section>
+
+      <section id="tracks-view" class="view tracks-view" hidden>
+        <div id="track-scroll" class="track-scroll"></div>
+        <p id="tracks-empty" class="empty-state" hidden></p>
       </section>
 
       <section id="detail-view" class="view detail-view" hidden>
@@ -40,12 +67,23 @@
 
         <ol id="track-list" class="track-list"></ol>
       </section>
+
+      <section id="artist-detail-view" class="view detail-view" hidden>
+        <button id="artist-back" class="back" type="button">← Artists</button>
+
+        <div class="artist-header">
+          <h1 id="artist-name"></h1>
+          <p id="artist-meta" class="muted"></p>
+        </div>
+
+        <div id="artist-album-grid" class="album-grid artist-album-grid"></div>
+      </section>
     </main>
 
     <footer class="player">
       <div class="now-playing">
         <div class="now-cover cover">
-          <img id="now-cover" alt="" />
+          <img id="now-cover" alt="" loading="lazy" decoding="async" />
           <span class="cover-fallback" aria-hidden="true">♪</span>
         </div>
         <div class="now-meta">

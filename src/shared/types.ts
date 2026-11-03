@@ -40,7 +40,13 @@ export interface LibraryCache {
   tracks: Record<string, CachedTrack>
 }
 
-export interface Settings {
+/** UI choices persisted between launches. Values are validated by the renderer. */
+export interface UiState {
+  lastView: string
+  sortByView: Record<string, string>
+}
+
+export interface Settings extends UiState {
   lastFolder: string | null
   volume: number
 }
@@ -62,6 +68,7 @@ export interface LibraryApi {
   rescan(): Promise<LibrarySnapshot | null>
   getSettings(): Promise<Settings>
   saveVolume(volume: number): Promise<void>
+  saveUiState(state: UiState): Promise<void>
   onScanProgress(listener: (progress: ScanProgress) => void): () => void
   onLibraryUpdated(listener: (snapshot: LibrarySnapshot) => void): () => void
 }

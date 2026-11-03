@@ -4,7 +4,8 @@ import type {
   LibraryApi,
   LibrarySnapshot,
   ScanProgress,
-  Settings
+  Settings,
+  UiState
 } from '../shared/types'
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
@@ -22,6 +23,8 @@ const library: LibraryApi = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   saveVolume: (volume: number): Promise<void> =>
     ipcRenderer.invoke('settings:set-volume', volume),
+  saveUiState: (state: UiState): Promise<void> =>
+    ipcRenderer.invoke('settings:set-ui', state),
   onScanProgress: (listener) => subscribe<ScanProgress>('library:scan-progress', listener),
   onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener)
 }

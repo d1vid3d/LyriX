@@ -7,6 +7,8 @@ import { writeFileAtomic } from './json-file'
 import { getAlbumTrackPaths } from './library'
 
 const COVER_SIZE = 300
+const SMALL_COVER_SIZE = 96
+export type CoverSize = 'full' | 'small'
 // Embedded art is normally repeated on every track; checking a few keeps art-less albums cheap.
 const EMBEDDED_COVER_ATTEMPTS = 3
 const FALLBACK_NAMES = new Set(['cover.jpg', 'folder.jpg', 'front.jpg'])
@@ -20,19 +22,25 @@ export class CoverService {
   }
 
   /** Returns the path of a generated/cached JPEG, or null when the album has no art. */
-  async getCover(albumId: string): Promise<string | null> {
+  async getCover(albumId: string, size: CoverSize = 'full'): Promise<string | null> {
     if (!/^[a-f0-9]{40}$/.test(albumId)) return null
 
-    const cachedPath = join(this.cacheDir, `${albumId}.jpg`)
+    const fileName = size === 'small' ? `${albumId}-small.jpg` : `${albumId}.jpg`
+    const cachedPath = join(this.cacheDir, fileName)
     if (await isFile(cachedPath)) return cachedPath
 
-    const pending = this.inFlight.get(albumId)
+    const key = `${albumId}:${size}`
+    const pending = this.inFlight.get(key)
     if (pending) return pending
 
-    const job = this.createCover(albumId, cachedPath).finally(() => {
-      this.inFlight.delete(albumId)
+    const job = (
+      size === 'small'
+        ? this.createSmallCover(albumId, cachedPath)
+        : this.createCover(albumId, cachedPath)
+    ).finally(() => {
+      this.inFlight.delete(key)
     })
-    this.inFlight.set(albumId, job)
+    this.inFlight.set(key, job)
     return job
   }
 
@@ -43,10 +51,27 @@ export class CoverService {
     const image = (await readEmbeddedCover(trackPaths)) ?? (await readFolderCover(trackPaths))
     if (!image || image.isEmpty()) return null
 
+    return this.writeJpeg(targetPath, image, COVER_SIZE)
+  }
+
+  private async createSmallCover(albumId: string, targetPath: string): Promise<string | null> {
+    // Reuse the full cover as the source so the small variant is generated only once.
+    const fullCoverPath = await this.getCover(albumId)
+    if (!fullCoverPath) return null
+
+    const image = nativeImage.createFromPath(fullCoverPath)
+    if (image.isEmpty()) return null
+
+    return this.writeJpeg(targetPath, image, SMALL_COVER_SIZE)
+  }
+
+  private async writeJpeg(
+    targetPath: string,
+    image: NativeImage,
+    maxWidth: number
+  ): Promise<string | null> {
     const resized =
-      image.getSize().width > COVER_SIZE
-        ? image.resize({ width: COVER_SIZE, quality: 'good' })
-        : image
+      image.getSize().width > maxWidth ? image.resize({ width: maxWidth, quality: 'good' }) : image
     const jpeg = resized.toJPEG(85)
     if (jpeg.length === 0) return null
 
