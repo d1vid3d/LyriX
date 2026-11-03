@@ -25,6 +25,7 @@ const library: LibraryApi = {
     ipcRenderer.invoke('settings:set-volume', volume),
   saveUiState: (state: UiState): Promise<void> =>
     ipcRenderer.invoke('settings:set-ui', state),
+  getLyrics: (trackId: string) => ipcRenderer.invoke('lyrics:get', trackId),
   onScanProgress: (listener) => subscribe<ScanProgress>('library:scan-progress', listener),
   onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener)
 }

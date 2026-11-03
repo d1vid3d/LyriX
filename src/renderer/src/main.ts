@@ -1,4 +1,5 @@
 import './style.css'
+import '../styles/lyrics.css'
 import type {
   Album,
   LibrarySnapshot,
@@ -10,6 +11,8 @@ import type {
 import { HtmlAudioEngine } from '../player/engine'
 import type { PlaybackEngine } from '../player/engine'
 import { PlaybackQueue } from '../player/queue'
+import { LyricsController } from '../lyrics/lyricsController'
+import type { LyricsState } from '../lyrics/lyricsController'
 import {
   buildLibraryIndex,
   getDefaultSort,
@@ -20,6 +23,7 @@ import {
   queryLibrary
 } from '../library/query'
 import type { LibraryIndex, LibraryView, TrackItem } from '../library/query'
+import { LyricView } from '../ui/lyricView'
 import { VirtualList } from '../ui/virtualList'
 
 function getElement<T extends HTMLElement>(id: string): T {
@@ -77,6 +81,17 @@ const nowCoverImage = getElement<HTMLImageElement>('now-cover')
 const nowTitle = getElement<HTMLSpanElement>('now-title')
 const nowArtist = getElement<HTMLSpanElement>('now-artist')
 
+const nowPlayingSection = getElement<HTMLElement>('now-playing-view')
+const nowPlayingTarget = getElement<HTMLElement>('now-playing')
+const nowPlayingCloseButton = getElement<HTMLButtonElement>('now-playing-close')
+const nowPlayingCoverImage = getElement<HTMLImageElement>('now-playing-cover')
+const nowPlayingTitle = getElement<HTMLHeadingElement>('now-playing-title')
+const nowPlayingArtist = getElement<HTMLParagraphElement>('now-playing-artist')
+const nowPlayingAlbum = getElement<HTMLParagraphElement>('now-playing-album')
+const lyricsStatus = getElement<HTMLParagraphElement>('lyrics-status')
+const lyricScroll = getElement<HTMLDivElement>('lyric-scroll')
+const lyricLines = getElement<HTMLDivElement>('lyric-lines')
+
 type DetailRoute =
   | { kind: 'album'; albumId: string }
   | { kind: 'artist'; artistName: string }
@@ -103,6 +118,8 @@ let visibleTrackItems: TrackItem[] = []
 let isSeeking = false
 let libraryEventReceived = false
 let activeAttempt: PlaybackAttempt | null = null
+let nowPlayingOpen = false
+let libraryDirtyWhileNowPlaying = false
 
 const tracksVirtualList = new VirtualList<TrackItem>({
   container: trackScroll,
@@ -111,9 +128,17 @@ const tracksVirtualList = new VirtualList<TrackItem>({
   renderRow: (item, index) => createTrackRow(item, index)
 })
 
+const lyricsController = new LyricsController((trackId) => window.library.getLyrics(trackId))
+const lyricView = new LyricView({
+  scroller: lyricScroll,
+  lines: lyricLines,
+  status: lyricsStatus,
+  engine
+})
+
 engine.setVolume(Number(volumeSlider.value))
 
-for (const image of [detailCoverImage, nowCoverImage]) {
+for (const image of [detailCoverImage, nowCoverImage, nowPlayingCoverImage]) {
   image.addEventListener('error', () => {
     image.hidden = true
   })
@@ -339,13 +364,32 @@ function syncViewControls(): void {
 }
 
 function showSection(section: HTMLElement): void {
-  for (const view of [gridView, artistsView, tracksView, detailView, artistDetailView]) {
+  for (const view of [
+    gridView,
+    artistsView,
+    tracksView,
+    detailView,
+    artistDetailView,
+    nowPlayingSection
+  ]) {
     view.hidden = view !== section
   }
 }
 
+function currentSection(): HTMLElement {
+  const detail = detailStack[detailStack.length - 1]
+  if (detail) return detail.kind === 'album' ? detailView : artistDetailView
+  return activeView === 'albums' ? gridView : activeView === 'artists' ? artistsView : tracksView
+}
+
 function refreshScreen(): void {
   syncViewControls()
+
+  // Keep the library DOM untouched while Now Playing is open so closing restores scroll.
+  if (nowPlayingOpen) {
+    showSection(nowPlayingSection)
+    return
+  }
 
   const detail = detailStack[detailStack.length - 1]
   if (detail) {
@@ -362,9 +406,7 @@ function refreshScreen(): void {
     return
   }
 
-  const section =
-    activeView === 'albums' ? gridView : activeView === 'artists' ? artistsView : tracksView
-  showSection(section)
+  showSection(currentSection())
   renderLibraryView(activeView)
 }
 
@@ -517,6 +559,10 @@ function updateNowPlaying(): void {
     nowTitle.textContent = 'Nothing playing'
     nowArtist.textContent = ''
     setCoverImage(nowCoverImage, null, '')
+    nowPlayingTitle.textContent = 'Nothing playing'
+    nowPlayingArtist.textContent = ''
+    nowPlayingAlbum.textContent = ''
+    setCoverImage(nowPlayingCoverImage, null, '')
     return
   }
 
@@ -526,6 +572,15 @@ function updateNowPlaying(): void {
   setCoverImage(
     nowCoverImage,
     album ? smallCoverUrl(album.coverUrl) : null,
+    album ? `${album.title} cover` : ''
+  )
+
+  nowPlayingTitle.textContent = track.title
+  nowPlayingArtist.textContent = track.artist
+  nowPlayingAlbum.textContent = track.album
+  setCoverImage(
+    nowPlayingCoverImage,
+    album ? album.coverUrl : null,
     album ? `${album.title} cover` : ''
   )
 }
@@ -572,6 +627,7 @@ function resetPlayback(): void {
   activeAttempt = null
   queue.setQueue([])
   engine.pause()
+  lyricsController.setTrack(null)
   resetTimeUi()
   updateControls()
   updateNowPlaying()
@@ -619,6 +675,7 @@ function startCurrentTrack(autoplay: boolean): void {
   activeAttempt = attempt
 
   engine.load(track)
+  lyricsController.setTrack(track.id)
   resetTimeUi()
   updateNowPlaying()
   updateTrackHighlight()
@@ -680,23 +737,75 @@ function handleEnded(): void {
   updateControls()
 }
 
+function renderLyricsState(state: LyricsState): void {
+  if (state.status === 'ready' && state.doc) {
+    lyricView.setDocument(state.doc)
+    lyricView.start()
+    return
+  }
+
+  lyricView.stop()
+  lyricView.showMessage(state.status === 'loading' ? 'Loading lyrics…' : 'No lyrics found')
+}
+
+/** Close Now Playing for an action that will render another view itself. */
+function leaveNowPlayingForNavigation(): void {
+  if (!nowPlayingOpen) return
+
+  nowPlayingOpen = false
+  libraryDirtyWhileNowPlaying = false
+  lyricView.stop()
+}
+
+function openNowPlaying(): void {
+  if (nowPlayingOpen || !queue.current()) return
+
+  nowPlayingOpen = true
+  updateNowPlaying()
+  showSection(nowPlayingSection)
+  renderLyricsState(lyricsController.getState())
+}
+
+function closeNowPlaying(): void {
+  if (!nowPlayingOpen) return
+
+  nowPlayingOpen = false
+  lyricView.stop()
+
+  if (libraryDirtyWhileNowPlaying) {
+    libraryDirtyWhileNowPlaying = false
+    refreshScreen()
+    return
+  }
+
+  showSection(currentSection())
+}
+
 function openAlbum(albumId: string): void {
+  leaveNowPlayingForNavigation()
   detailStack.push({ kind: 'album', albumId })
   refreshScreen()
 }
 
 function openArtist(artistName: string): void {
+  leaveNowPlayingForNavigation()
   detailStack.push({ kind: 'artist', artistName })
   refreshScreen()
 }
 
 function goBack(): void {
+  leaveNowPlayingForNavigation()
   detailStack.pop()
   refreshScreen()
 }
 
 function switchView(view: LibraryView): void {
-  if (activeView === view && detailStack.length === 0) return
+  if (activeView === view && detailStack.length === 0) {
+    closeNowPlaying()
+    return
+  }
+
+  leaveNowPlayingForNavigation()
 
   if (searchTimer !== null) {
     clearTimeout(searchTimer)
@@ -754,6 +863,8 @@ function applySnapshot(snapshot: LibrarySnapshot): void {
     detailStack.pop()
   }
 
+  if (nowPlayingOpen) libraryDirtyWhileNowPlaying = true
+
   refreshScreen()
   updateNowPlaying()
   updateTrackHighlight()
@@ -786,8 +897,13 @@ function saveUiState(): void {
 }
 
 function applySearch(search: string): void {
+  const wasNowPlaying = nowPlayingOpen
+  if (wasNowPlaying) leaveNowPlayingForNavigation()
+
   appliedSearch = search
   renderLibraryView(activeView)
+
+  if (wasNowPlaying) showSection(currentSection())
 }
 
 function clearSearch(): void {
@@ -822,6 +938,7 @@ async function openFolder(): Promise<void> {
       return
     }
 
+    leaveNowPlayingForNavigation()
     resetPlayback()
     detailStack = []
     applySnapshot(snapshot)
@@ -887,6 +1004,12 @@ searchInput.addEventListener('input', () => {
 })
 
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && nowPlayingOpen) {
+    event.preventDefault()
+    closeNowPlaying()
+    return
+  }
+
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
     event.preventDefault()
     searchInput.focus()
@@ -915,6 +1038,15 @@ window.addEventListener('keydown', (event) => {
 
 backButton.addEventListener('click', goBack)
 artistBackButton.addEventListener('click', goBack)
+
+nowPlayingTarget.addEventListener('click', openNowPlaying)
+nowPlayingTarget.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    openNowPlaying()
+  }
+})
+nowPlayingCloseButton.addEventListener('click', closeNowPlaying)
 
 previousButton.addEventListener('click', () => {
   if (!queue.current()) return
@@ -1000,6 +1132,9 @@ const unsubscribeUpdated = window.library.onLibraryUpdated((snapshot) => {
   libraryEventReceived = true
   applySnapshot(snapshot)
 })
+const unsubscribeLyrics = lyricsController.subscribe((state) => {
+  if (nowPlayingOpen) renderLyricsState(state)
+})
 
 async function initialize(): Promise<void> {
   try {
@@ -1028,5 +1163,7 @@ window.addEventListener('beforeunload', () => {
   for (const unsubscribe of unsubscribeEngine) unsubscribe()
   unsubscribeProgress()
   unsubscribeUpdated()
+  unsubscribeLyrics()
+  lyricView.destroy()
   tracksVirtualList.destroy()
 })

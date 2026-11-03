@@ -38,6 +38,7 @@ npm test            # run the Vitest suite
 | `src/main/index.ts` | App startup, IPC, background refresh and scan coordination. |
 | `src/main/library.ts` | Recursive `.flac` scanning, cache reuse, album snapshots and path containment. |
 | `src/main/tags.ts` | Reads tags with `music-metadata` and applies filename/unknown fallbacks. |
+| `src/main/lyricsSource.ts` | Ordered lyric resolvers; reads embedded `LYRICS`/`UNSYNCEDLYRICS` tags on demand. |
 | `src/main/albums.ts` | Pure album grouping and sorting (album artist + album, disc/track). |
 | `src/main/cache.ts` | Versioned library cache at `userData/library-cache.json`. |
 | `src/main/settings.ts` | Settings at `userData/settings.json` (last folder, volume, last view and per-view sort). |
@@ -53,6 +54,10 @@ npm test            # run the Vitest suite
 | `src/renderer/ui/virtualList.ts` | Fixed-row virtual scroller used by the tracks view. |
 | `src/renderer/player/engine.ts` | `PlaybackEngine` interface and the single-`HTMLAudioElement` implementation. |
 | `src/renderer/player/queue.ts` | Pure album queue with a current index and bounded next/previous. |
+| `src/renderer/lyrics/lyricsController.ts` | On-demand lyric fetch/parse state, stale-response guard and LRU document cache (no DOM). |
+| `src/renderer/lyrics/segmentGroups.ts` | Pure grouping of word-timed segments into nowrap word containers. |
+| `src/renderer/ui/lyricView.ts` | Builds lyric DOM once, syncs line/segment classes and progress, centers and seeks. |
+| `src/renderer/styles/lyrics.css` | Lyric colors, sizes, transitions, progress fill and Now Playing layout. |
 | `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, scanning UI and UI-state persistence. |
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
@@ -66,6 +71,8 @@ npm test            # run the Vitest suite
 | `src/shared/lyrics/sync.ts` | Active line/segment lookup and clamped progress helpers. |
 | `src/shared/lyrics/index.ts` | Public exports for the pure lyric core. |
 | `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
+| `tests/lyricsController.test.ts` | Vitest coverage for stale responses, caching, eviction and missing lyrics. |
+| `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
 
 ## How the library works
 
@@ -129,6 +136,30 @@ the same way. Skipped or odd input becomes a human-readable warning instead of a
 stays on the previous line during gaps), `findActiveLineIndexes` (all lines containing a time,
 including overlaps), `findActiveSegmentIndex`, and clamped `lineProgress` / `segmentProgress`.
 
+## Lyrics and Now Playing
+
+Lyrics are read only when a track starts, never during scanning and never stored in the library
+cache. `src/main/lyricsSource.ts` runs ordered resolvers and returns the first non-empty result; the
+current resolver reads `common.lyrics` first and then native `LYRICS` / `UNSYNCEDLYRICS` tags
+(case-insensitive) with `music-metadata`, skipping covers. A sidecar `.lrc` resolver can be added as
+one more list entry. The `lyrics:get` IPC accepts only a track id, resolves the path in the main
+process and returns `null` instead of throwing.
+
+The renderer controller fetches and parses on each current-track change, ignores responses for a
+track that is no longer current, and caches the last 10 parsed documents (including “none”). It
+contains no DOM code. `LyricView` builds the line DOM once per document, keeps word containers
+unbreakable, and toggles only changed line/segment classes from `requestAnimationFrame`, reading the
+position from the `PlaybackEngine`. The current line is centered with smooth scrolling; manual
+wheel/touch/drag pauses centering for four seconds. Clicking a timed line seeks to its start without
+changing play/pause. Plain documents are static and not clickable.
+
+Clicking the cover/title in the bottom bar opens Now Playing in the main content area; the player bar
+stays visible. The close button or **Escape** restores the previous view without re-rendering it, so
+search text and scroll positions survive. The view updates live as tracks change, shows
+“Loading lyrics…” / “No lyrics found”, and stacks the cover above the lyrics on narrow windows. All
+lyric styling lives in `src/renderer/styles/lyrics.css`; JavaScript only sets classes and the
+`--progress` variable.
+
 ## How local playback works
 
 The renderer never touches the filesystem. It receives `media://track/<id>` and
@@ -156,5 +187,5 @@ restored on the next launch.
 
 Shuffle, repeat modes, gapless playback, crossfade, a visible queue panel, queue editing, fuzzy
 search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
-virtualization, lyric UI/highlighting, loading lyrics from files or tags, serializing lyric documents,
+virtualization, sidecar `.lrc` loading, online lyric lookup, singer-specific lyric styling,
 translations, TTML, tag editing and packaging are intentionally not implemented.

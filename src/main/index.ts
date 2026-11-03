@@ -13,9 +13,11 @@ import {
   applyLibrary,
   getLibraryRoot,
   getSnapshot,
+  resolveTrackFile,
   restoreLibrary,
   scanLibrary
 } from './library'
+import { resolveLyrics } from './lyricsSource'
 import { handleMediaProtocol, registerMediaScheme } from './media-protocol'
 import { clampVolume, loadSettings, normalizeUiState, saveSettings } from './settings'
 
@@ -177,6 +179,21 @@ function registerIpc(): void {
 
   ipcMain.handle('library:open-folder', () => chooseFolder())
   ipcMain.handle('library:rescan', () => rescan())
+
+  ipcMain.handle('lyrics:get', async (_event, trackId: unknown) => {
+    if (typeof trackId !== 'string' || trackId.length === 0) return null
+
+    try {
+      // The renderer only ever sends an id; the path comes from the scanned library.
+      const filePath = resolveTrackFile(trackId)
+      if (!filePath) return null
+      return await resolveLyrics({ id: trackId, filePath })
+    } catch (error) {
+      console.warn(`[lyrics] Could not load lyrics for ${trackId}`, error)
+      return null
+    }
+  })
+
   ipcMain.handle('settings:get', () => settings)
 
   ipcMain.handle('settings:set-volume', async (_event, volume: unknown) => {

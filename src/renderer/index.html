@@ -78,10 +78,43 @@
 
         <div id="artist-album-grid" class="album-grid artist-album-grid"></div>
       </section>
+
+      <section id="now-playing-view" class="view now-playing-view" hidden>
+        <div class="now-playing-header">
+          <button id="now-playing-close" class="back" type="button">← Close</button>
+        </div>
+
+        <div class="now-playing-body">
+          <div class="now-playing-info">
+            <div class="now-playing-cover cover">
+              <img id="now-playing-cover" alt="" />
+              <span class="cover-fallback" aria-hidden="true">♪</span>
+            </div>
+            <div class="now-playing-meta">
+              <h1 id="now-playing-title"></h1>
+              <p id="now-playing-artist" class="muted"></p>
+              <p id="now-playing-album" class="muted"></p>
+            </div>
+          </div>
+
+          <div class="now-playing-lyrics">
+            <p id="lyrics-status" class="lyrics-status" hidden></p>
+            <div id="lyric-scroll" class="lyric-scroll" hidden>
+              <div id="lyric-lines" class="lyric-lines"></div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="player">
-      <div class="now-playing">
+      <div
+        id="now-playing"
+        class="now-playing"
+        role="button"
+        tabindex="0"
+        aria-label="Open Now Playing"
+      >
         <div class="now-cover cover">
           <img id="now-cover" alt="" loading="lazy" decoding="async" />
           <span class="cover-fallback" aria-hidden="true">♪</span>
