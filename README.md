@@ -1,5 +1,7 @@
 # LyriX
 
+Notice: This project is still in early development and may be unstable. It is not yet packaged for distribution. As it stands it is a proof-of-concept for a local FLAC player with lyrics support. Tech stack, API, architecture and features may change significantly before a stable release.
+
 A minimal desktop player for local FLAC files, built with Electron, electron-vite and plain
 TypeScript/HTML/CSS. It reads tags, groups tracks into albums, shows cover art, offers album,
 artist and track views with search and sorting, and remembers the last folder, volume and view
