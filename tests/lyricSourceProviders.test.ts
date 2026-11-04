@@ -26,7 +26,7 @@ describe('getLyricSources', () => {
 
     const result = await getLyricSources(
       { id: 'track', filePath: audioPath },
-      { savedChoice: 'sidecar:Song.en.lrc', preference: 'embedded' }
+      { savedChoice: 'sidecar:Song.en.lrc', savedTranslationChoice: 'sidecar:Song.zh.lrc', preference: 'embedded' }
     )
 
     expect(result.options.map((option) => option.id)).toEqual([
@@ -35,16 +35,19 @@ describe('getLyricSources', () => {
       'sidecar:Song.en.lrc',
       'sidecar:Song.zh.lrc'
     ])
-    expect(result.options[0]).toMatchObject({ available: false, text: null })
+    expect(result.options[0]).toMatchObject({ available: false, text: null, variant: null })
     expect(result.options[1]).toMatchObject({
       available: true,
       detail: 'song.LRC',
-      text: '[00:01.00]exact'
+      text: '[00:01.00]exact',
+      variant: null
     })
     expect(result.options.slice(1).every((option) => !option.detail?.includes(directory))).toBe(true)
+    expect(result.options.map((option) => option.variant)).toEqual([null, null, 'en', 'zh'])
     expect(result).toMatchObject({
       trackId: 'track',
       savedChoice: 'sidecar:Song.en.lrc',
+      savedTranslationChoice: 'sidecar:Song.zh.lrc',
       preference: 'embedded',
       expectedSidecarName: 'Song.lrc'
     })

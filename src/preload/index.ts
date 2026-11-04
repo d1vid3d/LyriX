@@ -6,6 +6,7 @@ import type {
   LibrarySnapshot,
   ScanProgress,
   Settings,
+  TranslationSettingsInput,
   UiState
 } from '../shared/types'
 
@@ -32,6 +33,10 @@ const library: LibraryApi = {
     ipcRenderer.invoke('lyrics:set-choice', trackId, sourceId),
   saveLyricPreference: (preference: LyricPreference): Promise<void> =>
     ipcRenderer.invoke('settings:set-lyric-preference', preference),
+  saveTranslationChoice: (trackId: string, sourceId: string | null): Promise<void> =>
+    ipcRenderer.invoke('lyrics:set-translation-choice', trackId, sourceId),
+  saveTranslationSettings: (input: TranslationSettingsInput): Promise<void> =>
+    ipcRenderer.invoke('settings:set-translation', input),
   onScanProgress: (listener) => subscribe<ScanProgress>('library:scan-progress', listener),
   onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener)
 }

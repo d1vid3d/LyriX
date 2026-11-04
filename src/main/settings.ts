@@ -7,11 +7,20 @@ const DEFAULT_SETTINGS: Settings = {
   volume: 1,
   lastView: 'albums',
   sortByView: {},
-  lyricPreference: 'sidecar'
+  lyricPreference: 'sidecar',
+  translationEnabled: false,
+  translationLanguage: null
 }
+
+const TRANSLATION_LANGUAGE_PATTERN = /^[A-Za-z0-9_-]{1,32}$/
 
 export function normalizeLyricPreference(value: unknown): LyricPreference {
   return value === 'embedded' ? 'embedded' : 'sidecar'
+}
+
+/** Only short ASCII language tags such as "en", "en-US", or "zh_Hans" are accepted. */
+export function normalizeTranslationLanguage(value: unknown): string | null {
+  return typeof value === 'string' && TRANSLATION_LANGUAGE_PATTERN.test(value) ? value : null
 }
 
 export function clampVolume(volume: number): number {
@@ -51,7 +60,9 @@ function normalize(value: Partial<Settings> | null): Settings {
         : null,
     volume: clampVolume(value?.volume ?? DEFAULT_SETTINGS.volume),
     ...normalizeUiState(value),
-    lyricPreference: normalizeLyricPreference(value?.lyricPreference)
+    lyricPreference: normalizeLyricPreference(value?.lyricPreference),
+    translationEnabled: value?.translationEnabled === true,
+    translationLanguage: normalizeTranslationLanguage(value?.translationLanguage)
   }
 }
 

@@ -17,7 +17,9 @@ export function createAppStore(): AppStore {
       volume: 1,
       lastView: 'albums',
       sortByView: {},
-      lyricPreference: 'sidecar'
+      lyricPreference: 'sidecar',
+      translationEnabled: false,
+      translationLanguage: null
     },
     cache: emptyLibraryCache(),
     settingsFile: '',

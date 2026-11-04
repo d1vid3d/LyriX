@@ -32,7 +32,12 @@ const lyricsController = new LyricsController({
   fetchSources: (trackId) => window.library.getLyricSources(trackId),
   saveChoice: (trackId, sourceId) => window.library.saveLyricChoice(trackId, sourceId),
   savePreference: (preference) => window.library.saveLyricPreference(preference),
-  preference: 'sidecar'
+  saveTranslationChoice: (trackId, sourceId) =>
+    window.library.saveTranslationChoice(trackId, sourceId),
+  saveTranslationSettings: (input) => window.library.saveTranslationSettings(input),
+  preference: 'sidecar',
+  translationEnabled: false,
+  translationLanguage: null
 })
 const lyricView = new LyricView({
   scroller: elements.lyricScroll,
@@ -163,6 +168,13 @@ library = new LibraryController({
     elements.volumeSlider.value = String(settings.volume)
     toolbar.applyUiSettings(settings)
     lyricsController.setPreference(settings.lyricPreference, { persist: false })
+    lyricsController.applyTranslationSettings(
+      {
+        enabled: settings.translationEnabled,
+        language: settings.translationLanguage
+      },
+      { persist: false }
+    )
   },
   refreshLyrics: () => lyricsController.clearCacheAndReload()
 })

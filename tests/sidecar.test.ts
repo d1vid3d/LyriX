@@ -53,6 +53,20 @@ describe('findSidecars', () => {
     expect(sidecars.slice(1).map((sidecar) => sidecar.variant)).toEqual(['en', 'zh-Hans'])
   })
 
+  it('extracts the variant exactly as written', async () => {
+    await writeSidecar('Song.lrc', '[00:01.00]exact')
+    await writeSidecar('Song.EN.lrc', '[00:01.00]upper')
+    await writeSidecar('Song.en-US.lrc', '[00:01.00]region')
+
+    const sidecars = await findSidecars(trackPath())
+
+    expect(Object.fromEntries(sidecars.map((sidecar) => [sidecar.fileName, sidecar.variant]))).toEqual({
+      'Song.lrc': null,
+      'Song.EN.lrc': 'EN',
+      'Song.en-US.lrc': 'en-US'
+    })
+  })
+
   it('compares names and the extension case-insensitively', async () => {
     await writeSidecar('song.LRC', '[00:01.00]exact')
     await writeSidecar('SONG.EN.LRC', '[00:01.00]english')

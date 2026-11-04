@@ -41,7 +41,7 @@ function option(
   detail: string | null,
   available = true
 ): LyricSourceOption {
-  return { id, kind, label, detail, available, text: available ? 'text' : null }
+  return { id, kind, label, detail, available, text: available ? 'text' : null, variant: null }
 }
 
 function entry(source: LyricSourceOption, doc: LyricDocument | null): LyricsSourceEntry {
@@ -65,6 +65,15 @@ function state(overrides: Partial<LyricsState> = {}): LyricsState {
     mode: null,
     preference: 'sidecar',
     expectedSidecarName: 'Song.lrc',
+    translation: {
+      enabled: false,
+      language: null,
+      selectedId: null,
+      mode: null,
+      key: null,
+      available: false,
+      options: []
+    },
     ...overrides
   }
 }

@@ -52,6 +52,14 @@ export interface Settings extends UiState {
   lastFolder: string | null
   volume: number
   lyricPreference: LyricPreference
+  translationEnabled: boolean
+  translationLanguage: string | null
+}
+
+/** Input for the translation toggle and sticky language. */
+export interface TranslationSettingsInput {
+  enabled: boolean
+  language: string | null
 }
 
 export interface ScanProgress {
@@ -75,6 +83,8 @@ export interface LibraryApi {
   getLyricSources(trackId: string): Promise<LyricSources | null>
   saveLyricChoice(trackId: string, sourceId: string | null): Promise<void>
   saveLyricPreference(preference: LyricPreference): Promise<void>
+  saveTranslationChoice(trackId: string, sourceId: string | null): Promise<void>
+  saveTranslationSettings(input: TranslationSettingsInput): Promise<void>
   onScanProgress(listener: (progress: ScanProgress) => void): () => void
   onLibraryUpdated(listener: (snapshot: LibrarySnapshot) => void): () => void
 }

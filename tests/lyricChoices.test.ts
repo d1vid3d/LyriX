@@ -85,7 +85,8 @@ describe('LyricChoiceStore', () => {
     expect(store.get('track-2')).toBe('embedded')
     expect(await readJson()).toEqual({
       version: LYRIC_CHOICES_VERSION,
-      tracks: { 'track-1': 'sidecar:Song.lrc', 'track-2': 'embedded' }
+      tracks: { 'track-1': 'sidecar:Song.lrc', 'track-2': 'embedded' },
+      translations: {}
     })
 
     const reloaded = new LyricChoiceStore(choicesPath())
@@ -107,7 +108,8 @@ describe('LyricChoiceStore', () => {
     expect(store.get('track-2')).toBe('sidecar:Song.lrc')
     expect(await readJson()).toEqual({
       version: LYRIC_CHOICES_VERSION,
-      tracks: { 'track-2': 'sidecar:Song.lrc' }
+      tracks: { 'track-2': 'sidecar:Song.lrc' },
+      translations: {}
     })
   })
 
@@ -194,5 +196,84 @@ describe('LyricChoiceStore', () => {
 
     const raw = await readJson()
     expect(Object.keys(raw.tracks as Record<string, string>)).toHaveLength(MAX_LYRIC_CHOICES)
+  })
+
+  it('round-trips translation choices independently of main choices', async () => {
+    const store = new LyricChoiceStore(choicesPath())
+    await store.load()
+    await store.set('track-1', 'sidecar:Song.lrc')
+    await store.setTranslation('track-1', 'sidecar:Song.en.lrc')
+
+    expect(store.get('track-1')).toBe('sidecar:Song.lrc')
+    expect(store.getTranslation('track-1')).toBe('sidecar:Song.en.lrc')
+
+    const reloaded = new LyricChoiceStore(choicesPath())
+    await reloaded.load()
+    expect(reloaded.get('track-1')).toBe('sidecar:Song.lrc')
+    expect(reloaded.getTranslation('track-1')).toBe('sidecar:Song.en.lrc')
+
+    await reloaded.clearTranslation('track-1')
+    expect(reloaded.getTranslation('track-1')).toBeNull()
+    expect(reloaded.get('track-1')).toBe('sidecar:Song.lrc')
+  })
+
+  it('treats a missing translations map as empty and keeps existing choices', async () => {
+    await writeJson({
+      version: LYRIC_CHOICES_VERSION,
+      tracks: { 'track-1': 'sidecar:Song.lrc' }
+    })
+
+    const store = new LyricChoiceStore(choicesPath())
+    await store.load()
+
+    expect(store.get('track-1')).toBe('sidecar:Song.lrc')
+    expect(store.getTranslation('track-1')).toBeNull()
+  })
+
+  it('drops invalid translation entries', async () => {
+    await writeJson({
+      version: LYRIC_CHOICES_VERSION,
+      tracks: {},
+      translations: {
+        good: 'sidecar:Song.en.lrc',
+        badPath: 'sidecar:../Song.en.lrc',
+        badType: 42
+      }
+    })
+
+    const store = new LyricChoiceStore(choicesPath())
+    await store.load()
+
+    expect(store.getTranslation('good')).toBe('sidecar:Song.en.lrc')
+    expect(store.getTranslation('badPath')).toBeNull()
+    expect(store.getTranslation('badType')).toBeNull()
+
+    await store.setTranslation('track-1', 'sidecar:../Song.en.lrc')
+    expect(store.getTranslation('track-1')).toBeNull()
+  })
+
+  it('caps the translations map at 5000 entries independently', async () => {
+    const translations: Record<string, string> = {}
+    for (let index = 0; index <= MAX_LYRIC_CHOICES; index += 1) {
+      translations[`track-${index}`] = 'sidecar:Song.en.lrc'
+    }
+    await writeJson({ version: LYRIC_CHOICES_VERSION, tracks: {}, translations })
+
+    const store = new LyricChoiceStore(choicesPath())
+    await store.load()
+
+    expect(store.getTranslation('track-0')).toBeNull()
+    expect(store.getTranslation('track-1')).toBe('sidecar:Song.en.lrc')
+    expect(store.getTranslation(`track-${MAX_LYRIC_CHOICES}`)).toBe('sidecar:Song.en.lrc')
+
+    await store.setTranslation('track-new', 'sidecar:Song.en.lrc')
+
+    expect(store.getTranslation('track-1')).toBeNull()
+    expect(store.getTranslation('track-new')).toBe('sidecar:Song.en.lrc')
+
+    const raw = await readJson()
+    expect(Object.keys(raw.translations as Record<string, string>)).toHaveLength(
+      MAX_LYRIC_CHOICES
+    )
   })
 })

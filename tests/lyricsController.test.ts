@@ -43,7 +43,8 @@ function option(
     label: kind === 'embedded' ? 'Embedded tag' : 'Sidecar file',
     detail: kind === 'embedded' ? 'common.lyrics' : id.slice('sidecar:'.length),
     available,
-    text
+    text,
+    variant: null
   }
 }
 
@@ -51,12 +52,14 @@ function sources(
   trackId: string,
   options: LyricSourceOption[],
   savedChoice: string | null = null,
-  preference: LyricPreference = 'sidecar'
+  preference: LyricPreference = 'sidecar',
+  savedTranslationChoice: string | null = null
 ): LyricSources {
   return {
     trackId,
     options,
     savedChoice,
+    savedTranslationChoice,
     preference,
     expectedSidecarName: `${trackId}.lrc`
   }
@@ -71,25 +74,41 @@ function exact(trackId: string, text: string | null = lyricText('sidecar')) {
 }
 
 function variant(trackId: string, name: string, text: string | null = lyricText(name)) {
-  return option(`sidecar:${trackId}.${name}.lrc`, 'sidecar', text)
+  return { ...option(`sidecar:${trackId}.${name}.lrc`, 'sidecar', text), variant: name }
 }
 
 function createController(
   fetchSources: (trackId: string) => Promise<LyricSources | null>,
   preference: LyricPreference = 'sidecar',
-  cacheLimit?: number
+  cacheLimit?: number,
+  translation: { enabled: boolean; language: string | null } = {
+    enabled: false,
+    language: null
+  }
 ) {
   const saveChoice = vi.fn(async () => undefined)
   const savePreference = vi.fn(async () => undefined)
+  const saveTranslationChoice = vi.fn(async () => undefined)
+  const saveTranslationSettings = vi.fn(async () => undefined)
   const controller = new LyricsController({
     fetchSources,
     saveChoice,
     savePreference,
+    saveTranslationChoice,
+    saveTranslationSettings,
     preference,
+    translationEnabled: translation.enabled,
+    translationLanguage: translation.language,
     cacheLimit
   })
 
-  return { controller, saveChoice, savePreference }
+  return {
+    controller,
+    saveChoice,
+    savePreference,
+    saveTranslationChoice,
+    saveTranslationSettings
+  }
 }
 
 beforeEach(() => {
@@ -458,6 +477,194 @@ describe('LyricsController', () => {
       sources: [],
       selectedId: null,
       mode: null
+    })
+  })
+})
+
+describe('LyricsController translation layer', () => {
+  function translationSources(trackId: string, savedTranslationChoice: string | null = null) {
+    return sources(
+      trackId,
+      [embedded(trackId), exact(trackId), variant(trackId, 'en'), variant(trackId, 'ja')],
+      null,
+      'sidecar',
+      savedTranslationChoice
+    )
+  }
+
+  it('reports eligibility and alignment while leaving the document plain when disabled', async () => {
+    const fetchSources = vi.fn(async (trackId: string) => translationSources(trackId))
+    const { controller } = createController(fetchSources, 'sidecar', undefined, {
+      enabled: false,
+      language: 'en'
+    })
+
+    controller.setTrack('a')
+    await flush()
+
+    const state = controller.getState()
+    expect(state.translation).toMatchObject({
+      enabled: false,
+      language: 'en',
+      selectedId: 'sidecar:a.en.lrc',
+      mode: 'auto',
+      key: null,
+      available: true
+    })
+    expect(state.translation.options.map((option) => [option.option.id, option.eligible])).toEqual([
+      ['embedded', true],
+      ['sidecar:a.lrc', false],
+      ['sidecar:a.en.lrc', true],
+      ['sidecar:a.ja.lrc', true]
+    ])
+    expect(state.translation.options[1].reason).toBe('primary')
+    expect(state.translation.options[2].report).toMatchObject({ method: 'time', matched: 1 })
+    expect(state.doc?.lines[0]?.translations).toBeUndefined()
+  })
+
+  it('attaches and detaches the selected translation', async () => {
+    const fetchSources = vi.fn(async (trackId: string) => translationSources(trackId))
+    const { controller, saveTranslationSettings } = createController(
+      fetchSources,
+      'sidecar',
+      undefined,
+      { enabled: false, language: 'en' }
+    )
+
+    controller.setTrack('a')
+    await flush()
+
+    controller.setTranslationEnabled(true)
+
+    expect(saveTranslationSettings).toHaveBeenCalledWith({ enabled: true, language: 'en' })
+    expect(controller.getState().translation).toMatchObject({
+      enabled: true,
+      selectedId: 'sidecar:a.en.lrc',
+      key: 'sidecar:a.en.lrc'
+    })
+    expect(controller.getState().doc?.lines[0]?.translations).toEqual({
+      'sidecar:a.en.lrc': 'en'
+    })
+
+    controller.setTranslationEnabled(false)
+
+    expect(controller.getState().translation.key).toBeNull()
+    expect(controller.getState().doc?.lines[0]?.translations).toBeUndefined()
+  })
+
+  it('uses a saved translation choice and persists sticky language on manual selection', async () => {
+    const fetchSources = vi.fn(async (trackId: string) =>
+      translationSources(trackId, 'sidecar:a.ja.lrc')
+    )
+    const { controller, saveTranslationChoice, saveTranslationSettings } = createController(
+      fetchSources,
+      'sidecar',
+      undefined,
+      { enabled: true, language: 'en' }
+    )
+
+    controller.setTrack('a')
+    await flush()
+
+    expect(controller.getState().translation).toMatchObject({
+      selectedId: 'sidecar:a.ja.lrc',
+      mode: 'saved',
+      key: 'sidecar:a.ja.lrc'
+    })
+
+    controller.selectTranslation('sidecar:a.en.lrc')
+
+    expect(saveTranslationChoice).toHaveBeenCalledWith('a', 'sidecar:a.en.lrc')
+    expect(saveTranslationSettings).toHaveBeenCalledWith({ enabled: true, language: 'en' })
+    expect(controller.getState().translation).toMatchObject({
+      selectedId: 'sidecar:a.en.lrc',
+      mode: 'saved',
+      language: 'en'
+    })
+
+    controller.selectTranslation(null)
+
+    expect(saveTranslationChoice).toHaveBeenLastCalledWith('a', null)
+    expect(controller.getState().translation).toMatchObject({
+      selectedId: 'sidecar:a.en.lrc',
+      mode: 'auto',
+      language: 'en'
+    })
+  })
+
+  it('ignores a translation that is primary, unavailable, or unusable', async () => {
+    const fetchSources = vi.fn(async (trackId: string) => translationSources(trackId))
+    const { controller, saveTranslationChoice } = createController(
+      fetchSources,
+      'sidecar',
+      undefined,
+      { enabled: true, language: 'en' }
+    )
+
+    controller.setTrack('a')
+    await flush()
+
+    controller.selectTranslation('sidecar:a.lrc')
+    controller.selectTranslation('sidecar:a.missing.lrc')
+
+    expect(saveTranslationChoice).not.toHaveBeenCalled()
+    expect(controller.getState().translation.selectedId).toBe('sidecar:a.en.lrc')
+  })
+
+  it('keeps an ineligible saved translation and restores it when it becomes eligible again', async () => {
+    const fetchSources = vi.fn(async (trackId: string) =>
+      translationSources(trackId, 'embedded')
+    )
+    const { controller } = createController(fetchSources, 'sidecar', undefined, {
+      enabled: true,
+      language: 'en'
+    })
+
+    controller.setTrack('a')
+    await flush()
+    expect(controller.getState().translation).toMatchObject({
+      selectedId: 'embedded',
+      mode: 'saved'
+    })
+
+    controller.selectSource('embedded')
+
+    expect(controller.getState().translation).toMatchObject({
+      selectedId: 'sidecar:a.en.lrc',
+      mode: 'auto'
+    })
+
+    controller.selectSource('sidecar:a.lrc')
+
+    expect(controller.getState().translation).toMatchObject({
+      selectedId: 'embedded',
+      mode: 'saved'
+    })
+  })
+
+  it('preserves both saved choices across reload', async () => {
+    const fetchSources = vi.fn(async (trackId: string) =>
+      sources(trackId, [embedded(trackId), exact(trackId), variant(trackId, 'en')], null, 'sidecar')
+    )
+    const { controller } = createController(fetchSources, 'sidecar', undefined, {
+      enabled: true,
+      language: null
+    })
+
+    controller.setTrack('a')
+    await flush()
+    controller.selectSource('embedded')
+    controller.selectTranslation('sidecar:a.en.lrc')
+
+    controller.reload()
+    await flush()
+
+    const state = controller.getState()
+    expect(state).toMatchObject({ selectedId: 'embedded', mode: 'saved' })
+    expect(state.translation).toMatchObject({
+      selectedId: 'sidecar:a.en.lrc',
+      mode: 'saved',
+      key: 'sidecar:a.en.lrc'
     })
   })
 })

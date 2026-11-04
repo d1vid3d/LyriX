@@ -44,7 +44,7 @@ state, and lyric presentation.**
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 191 tests pass across 12 files. |
+| `npm test` | 325 tests pass across 18 files. |
 | `npm run build` | Passes; emits `out/main`, `out/preload`, `out/renderer`. |
 | `npm run dev` | Starts electron-vite and Electron. |
 
@@ -69,7 +69,7 @@ open/close, search/view/scroll preservation, and console cleanliness.
 
 Shuffle, repeat, gapless playback, crossfade, queue panel/editing, fuzzy search, search history,
 filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online lyric
-lookup, singer-specific styling, translations, TTML, tag editing, packaging.
+lookup, singer-specific styling, translation rendering/editing, TTML, tag editing, packaging.
 
 ### Invariants
 
@@ -123,6 +123,7 @@ lookup, singer-specific styling, translations, TTML, tag editing, packaging.
 │  window.library: getState, openFolder, rescan, getSettings,          │
 │                  saveVolume, saveUiState, getLyricSources,           │
 │                  saveLyricChoice, saveLyricPreference,               │
+│                  saveTranslationChoice, saveTranslationSettings,     │
 │                  onScanProgress, onLibraryUpdated                    │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ no Node APIs in renderer
@@ -142,6 +143,7 @@ lookup, singer-specific styling, translations, TTML, tag editing, packaging.
 │    ├─ player/queue.ts ── pure current-index queue                    │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
 │    ├─ lyrics/lyricsController.ts ── fetch/parse/select/state/cache   │
+│    ├─ lyrics/translationState.ts ── pure translation-layer state     │
 │    ├─ lyrics/segmentGroups.ts ── pure word grouping                  │
 │    ├─ ui/lyricView.ts ── lyric DOM + rAF sync + scroll + seek        │
 │    └─ styles/lyrics.css + src/style.css ── all presentation          │
@@ -157,6 +159,7 @@ lookup, singer-specific styling, translations, TTML, tag editing, packaging.
 | Cover extraction/resizing/cache | Main | Only via `media://cover/<id>` |
 | Audio bytes | Main (`media://track/<id>`) | `<audio src>` only |
 | Lyrics from embedded tags and sidecars | Main | `getLyricSources(trackId)` |
+| Translation alignment/attachment | Renderer (pure shared module) | Direct |
 | Playback position/transport | Renderer | Direct |
 | Library queries, search, sort | Renderer | Direct |
 | UI state persistence values | Renderer proposes, main validates/stores | Via IPC |
@@ -191,7 +194,7 @@ LyriX/
 │  │  │  ├─ embedded.ts        embedded tag resolver
 │  │  │  ├─ sidecar.ts         sidecar discovery + decoding
 │  │  │  ├─ sources.ts         provider list + canonical options
-│  │  │  └─ choices.ts         per-track choice store
+│  │  │  └─ choices.ts         per-track lyric + translation choice store
 │  │  ├─ ids.ts                SHA-1 ids
 │  │  └─ json-file.ts          tolerant reads, atomic writes
 │  ├─ preload/
@@ -219,6 +222,7 @@ LyriX/
 │  │  ├─ player/engine.ts      playback abstraction
 │  │  ├─ player/queue.ts       pure queue
 │  │  ├─ lyrics/lyricsController.ts  source fetch/parse/select/state/cache
+│  │  ├─ lyrics/translationState.ts  pure translation layer + document attachment
 │  │  ├─ lyrics/segmentGroups.ts
 │  │  ├─ lyrics/sourceMenuModel.ts   pure source-menu view model + keyboard helper
 │  │  └─ ui/{lyricView,lyricSourceMenu,lyricSourceMenuView,virtualList}.ts
@@ -226,7 +230,8 @@ LyriX/
 │     ├─ types.ts              cross-process data + API types
 │     └─ lyrics/
 │        ├─ types.ts
-│        ├─ sources.ts         source types + pure selection
+│        ├─ sources.ts         source types + pure main/translation selection
+│        ├─ translation.ts     pure alignment + attachment
 │        ├─ parse.ts
 │        ├─ time.ts
 │        ├─ sync.ts
@@ -250,6 +255,7 @@ LyriX/
    ├─ settings.test.ts
    ├─ sidecar.test.ts
    ├─ sourceMenuModel.test.ts
+   ├─ translation.test.ts
    └─ fixtures/{LineByLine.txt,TimedWordByWord.txt}
 ```
 
@@ -300,13 +306,14 @@ package is bundled into the CJS main process.
 | `CachedTrack` | Tag values plus `mtimeMs` and `size` for cache validation. |
 | `LibraryCache` | `version`, `folder`, `tracks: Record<absolutePath, CachedTrack>`. |
 | `UiState` | `lastView`, `sortByView`. |
-| `Settings` | `UiState` + `lastFolder`, `volume`, `lyricPreference`. |
+| `Settings` | `UiState` + `lastFolder`, `volume`, `lyricPreference`, `translationEnabled`, `translationLanguage`. |
+| `TranslationSettingsInput` | `enabled: boolean`, `language: string \| null` for the translation IPC. |
 | `ScanProgress` | `scanned`, `total`. |
 | `LibrarySnapshot` | `folderName`, `albums`. |
 | `LyricPreference` | `"sidecar"` or `"embedded"` (global auto-selection default). |
 | `LyricSourceKind` | `"embedded"` or `"sidecar"`. |
-| `LyricSourceOption` | `id`, `kind`, `label`, `detail`, `available`, `text`; ids are `"embedded"` or `"sidecar:<file name>"` (file name only). |
-| `LyricSources` | `trackId`, ordered `options`, `savedChoice`, `preference`, `expectedSidecarName` (file name only). |
+| `LyricSourceOption` | `id`, `kind`, `label`, `detail`, `available`, `text`, `variant`; ids are `"embedded"` or `"sidecar:<file name>"` (file name only). `variant` is the text between the base name and `.lrc` as written, or `null` for embedded and the exact sidecar. |
+| `LyricSources` | `trackId`, ordered `options`, `savedChoice`, `savedTranslationChoice`, `preference`, `expectedSidecarName` (file name only). |
 | `LibraryApi` | Typed preload surface (see §8). |
 
 Ids are 40-character lowercase SHA-1 hex strings:
@@ -383,10 +390,14 @@ Key functions:
 
 ### 7.6 `src/main/settings.ts` — settings normalization
 
-- Defaults: `lastFolder: null`, `volume: 1`, `lastView: 'albums'`, `sortByView: {}`.
+- Defaults: `lastFolder: null`, `volume: 1`, `lastView: 'albums'`, `sortByView: {}`,
+  `lyricPreference: 'sidecar'`, `translationEnabled: false`, `translationLanguage: null`.
 - `clampVolume` keeps `[0, 1]` and replaces non-finite values with `1`.
 - `normalizeUiState` keeps only string view names and non-empty string sort values.
-- `normalize` validates the folder string, clamps volume, and merges normalized UI state.
+- `normalizeTranslationLanguage` accepts only `/^[A-Za-z0-9_-]{1,32}$/`; anything else becomes `null`.
+- `translationEnabled` is true only for the boolean `true`.
+- `normalize` validates the folder string, clamps volume, merges normalized UI state, validates the
+  lyric preference, and normalizes both translation fields.
 - Reads use `readJsonFile`; writes use `writeJsonAtomic` with normalization.
 
 ### 7.7 `src/main/covers.ts` — cover art
@@ -454,19 +465,23 @@ The renderer only sends a track id; the path always comes from the scanned libra
     an empty list.
 - `sources.ts` — `PROVIDERS` is the ordered provider list (`embedded`, `sidecar`). Adding a provider
   that uses an existing source kind is one list entry.
-  - `getLyricSources(track, { savedChoice, preference })` runs every provider in `try/catch`; a
-    failing provider is logged and contributes nothing.
+  - `getLyricSources(track, { savedChoice, savedTranslationChoice, preference })` runs every
+    provider in `try/catch`; a failing provider is logged and contributes nothing.
   - Always returns the `embedded` slot and the exact sidecar slot with id
     `sidecar:<expectedSidecarName>`, marking missing slots `available: false`. Variant sidecars
     follow, sorted alphabetically. `expectedSidecarName` is a file name such as `Song.lrc`.
+  - Each option carries `variant`: the text between the base name and `.lrc` exactly as written
+    (`"EN"` for `Song.EN.lrc`), or `null` for embedded and the exact sidecar.
   - `detail` is the tag name used or the actual sidecar file name; it is never a full path.
+  - The response echoes `savedChoice` and `savedTranslationChoice` for the renderer.
 - `choices.ts` — `LyricChoiceStore` for `userData/lyric-choices.json`.
-  - Shape: `{ version: 1, tracks: Record<trackId, sourceId> }`.
-  - Tolerant read: bad JSON, wrong version, or malformed containers become an empty map.
+  - Shape: `{ version: 1, tracks: Record<trackId, sourceId>, translations?: Record<trackId, sourceId> }`.
+  - A missing `translations` map is treated as empty; existing `tracks` choices survive.
+  - Tolerant read: bad JSON, wrong version, or malformed containers become empty maps.
   - Source ids must be `embedded` or `sidecar:` followed by a file name with no path separators,
     at most 255 characters. Invalid ids are ignored.
-  - Writes atomically and caps the map at 5000 entries by dropping the oldest. API: `get`, `set`,
-    `clear`.
+  - Writes atomically and caps each map independently at 5000 entries by dropping the oldest.
+    API: `get`, `set`, `clear`, `getTranslation`, `setTranslation`, `clearTranslation`.
 
 ### 7.10 `src/main/ids.ts` and `json-file.ts`
 
@@ -518,18 +533,23 @@ subscribe.
 | `library:rescan` | — | `LibrarySnapshot \| null` (null when no root) |
 | `lyrics:get-sources` | `trackId: unknown` | `LyricSources \| null` |
 | `lyrics:set-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
+| `lyrics:set-translation-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
 | `settings:get` | — | `Settings` |
 | `settings:set-volume` | `volume: unknown` | `void` (clamped) |
 | `settings:set-ui` | `UiState` candidate | `void` (normalized) |
 | `settings:set-lyric-preference` | `preference: unknown` | `void` (validated) |
+| `settings:set-translation` | `{ enabled: unknown, language: unknown }` | `void` (validated) |
 
 Events to renderer: `library:scan-progress` (throttled) and `library:updated` (after a successful
 background refresh).
 
 `lyrics:get-sources` rejects non-string/empty ids with `null`, resolves the path through
-`resolveTrackFile(trackId)`, and catches every error. `lyrics:set-choice` validates the track id and
-source id; `null` clears the saved choice, and invalid input is a no-op. Preference writes accept
-only `"sidecar"` or `"embedded"`. Write failures are logged and never thrown across the boundary.
+`resolveTrackFile(trackId)`, and catches every error. `lyrics:set-choice` and
+`lyrics:set-translation-choice` validate the track id and source id; `null` clears the saved choice,
+and invalid input is a no-op. Preference writes accept only `"sidecar"` or `"embedded"`.
+`settings:set-translation` requires a boolean `enabled` and a `language` that is `null` or matches
+the language pattern; invalid input is a no-op. Write failures are logged and never thrown across the
+boundary.
 
 ---
 
@@ -548,6 +568,8 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `getLyricSources(trackId)` | `lyrics:get-sources` | Returns ordered source options and selection context, or `null`. |
 | `saveLyricChoice(trackId, sourceId)` | `lyrics:set-choice` | `null` clears the per-track choice. |
 | `saveLyricPreference(preference)` | `settings:set-lyric-preference` | Main accepts only `"sidecar"` / `"embedded"`. |
+| `saveTranslationChoice(trackId, sourceId)` | `lyrics:set-translation-choice` | `null` clears the per-track translation choice. |
+| `saveTranslationSettings({ enabled, language })` | `settings:set-translation` | Main validates both fields and writes atomically. |
 | `onScanProgress(listener)` | `library:scan-progress` | Returns an unsubscribe function. |
 | `onLibraryUpdated(listener)` | `library:updated` | Returns an unsubscribe function. |
 
@@ -740,7 +762,8 @@ No DOM, Electron, or filesystem references. Constructed with explicit dependenci
 ```ts
 {
   fetchSources(trackId), saveChoice(trackId, sourceId), savePreference(preference),
-  preference, cacheLimit?
+  saveTranslationChoice(trackId, sourceId), saveTranslationSettings({ enabled, language }),
+  preference, translationEnabled, translationLanguage, cacheLimit?
 }
 ```
 
@@ -762,7 +785,21 @@ State:
   selectedId: string | null,
   mode: 'auto' | 'saved' | null,
   preference: LyricPreference,
-  expectedSidecarName: string
+  expectedSidecarName: string,
+  translation: {
+    enabled: boolean,
+    language: string | null,
+    selectedId: string | null,
+    mode: 'auto' | 'saved' | null,
+    key: string | null,
+    available: boolean,
+    options: Array<{
+      option: LyricSourceOption,
+      eligible: boolean,
+      reason: 'primary' | 'unavailable' | 'unusable' | null,
+      report: AlignmentReport | null
+    }>
+  }
 }
 ```
 
@@ -780,10 +817,25 @@ Behavior:
   ids are ignored.
 - `setPreference(pref)` persists the preference and recomputes the current track. Startup settings
   application passes `{ persist: false }`.
-- `reload()` bypasses the cache, refetches the current track, and keeps its saved choice so an
+- Translation state is derived by the pure `buildTranslation` helper in `translationState.ts` on
+  every recompute; only parsed source entries are cached. Eligible options are available, usable,
+  and not the current primary; each carries its alignment report.
+- `state.doc` is the primary document with `attachTranslation` applied (key = translation option id)
+  only when translation is enabled and a translation is selected. Otherwise it is exactly the plain
+  primary document. `key` is null while nothing is attached.
+- `setTranslationEnabled(enabled)` persists through `saveTranslationSettings` and recomputes.
+  `applyTranslationSettings({ enabled, language })` applies both fields; startup uses
+  `{ persist: false }`.
+- `selectTranslation(id)` accepts only an eligible id, persists the per-track choice, and updates the
+  sticky language (plus settings) when the option has a `variant`. `selectTranslation(null)` clears
+  the per-track choice and returns to auto; neither changes `enabled`. A saved translation that
+  becomes ineligible (for example it is now the primary) is kept and treated as auto.
+- Translation selection is recomputed whenever the primary source changes, on reload, and on a new
+  track.
+- `reload()` bypasses the cache, refetches the current track, and keeps both saved choices so an
   edited sidecar is picked up.
 - `clearCacheAndReload()` drops every cached entry, then refetches the current track while preserving
-  its saved choice. The library controller calls it after a rescan or `library:updated`, so changed
+  both saved choices. The library controller calls it after a rescan or `library:updated`, so changed
   tags and sidecars are picked up without clearing a manual selection.
 - Each fetch captures a generation; a response is applied only if the generation is still current,
   so slow responses for a previous track are ignored.
@@ -792,7 +844,8 @@ Behavior:
 - `subscribe(listener)` adds a listener, immediately emits the current state, and returns an
   unsubscribe function.
 - Fetch/parse errors are logged and cached as `none`. Options and the selection are logged with
-  `console.debug` once per fetched track.
+  `console.debug` once per fetched track; translation changes log the selected id, mode, and
+  alignment report once.
 
 ### 9.16 `src/renderer/lyrics/segmentGroups.ts` — pure word grouping
 
@@ -995,6 +1048,29 @@ This module is pure: no DOM, Electron, audio, or filesystem APIs.
   `applyOffset` is true.
 - Odd/skipped input becomes a human-readable warning, never an exception.
 
+### Translation alignment (`translation.ts`)
+
+- `AlignmentMethod = 'time' | 'index' | 'partial' | 'none'`.
+- `AlignmentReport { method, matched, total, unmatchedTranslationLines }`; `matched`/`total` count
+  non-blank primary lines, and unmatched counts every unconsumed translation line.
+- Blank text means empty/whitespace, music notes (`♪ ♫ ♬ ♩`), or punctuation only.
+- `alignTranslation(primary, translation, { toleranceSeconds = 0.5, minTimeMatchRatio = 0.8 })`
+  returns one `string | null` per primary line plus a report.
+  - Time matching is greedy in primary order and one-to-one: the unused translation line with the
+    smallest absolute start difference within tolerance wins (ties keep the lowest index). Blank
+    primary lines are skipped; duet lines sharing a timestamp consume separate translations.
+  - When `matched / total >= minTimeMatchRatio`, method is `"time"`.
+  - Otherwise equal line counts (including blanks) pair by index, method `"index"`; this also covers
+    untimed documents.
+  - Otherwise the time matches are kept as `"partial"` when any exist, else `"none"`.
+- `attachTranslation(primary, key, lines)` returns a new document, clones each line, skips null
+  entries, and merges `translations[key]` without touching times, segments, or agents.
+- `selectTranslationSource(options, { primaryId, savedChoice, language, isUsable })` picks the
+  translation layer: an eligible saved choice (`"saved"`), else the first eligible option sorted by
+  id whose variant matches the language case-insensitively (`en` matches `en-US`), else a lone
+  eligible option (`"auto"`), else null. Eligibility excludes the primary, unavailable, and unusable
+  options.
+
 ### Sync helpers (`sync.ts`)
 
 | Function | Behavior |
@@ -1117,9 +1193,9 @@ All paths are under Electron `userData`.
 
 | Path | Contents | Write strategy |
 | --- | --- | --- |
-| `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`, `lyricPreference`. | Normalized, atomic. |
+| `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`, `lyricPreference`, `translationEnabled`, `translationLanguage`. | Normalized, atomic. |
 | `library-cache.json` | Version, folder, per-path tag entries with `mtimeMs`/`size`. | Validated, atomic. |
-| `lyric-choices.json` | Version 1 plus `tracks: Record<trackId, sourceId>`. | Validated, atomic, capped at 5000 entries. |
+| `lyric-choices.json` | Version 1 plus `tracks` and optional `translations`: `Record<trackId, sourceId>`. | Validated, atomic, capped at 5000 entries per map. |
 | `covers/<albumId>.jpg` | Full cover, max width 300 px, JPEG 85. | Atomic. |
 | `covers/<albumId>-small.jpg` | Small cover, max width 96 px, generated from full. | Atomic. |
 
@@ -1127,8 +1203,9 @@ The cache is keyed by absolute path. Entries are reused only when both `mtimeMs`
 otherwise tags are re-read. Files that no longer exist are naturally dropped because a scan rebuilds
 the entry map from the current directory walk.
 
-Sidecar `.lrc` files are user-owned inputs and are never written by LyriX. Per-track source choices
-are independent of the library cache, so they survive rescans and path-preserving tag updates.
+Sidecar `.lrc` files are user-owned inputs and are never written by LyriX. Per-track source and
+translation choices are independent of the library cache, so they survive rescans and
+path-preserving tag updates. A missing `translations` map is equivalent to an empty one.
 
 ---
 
@@ -1144,11 +1221,14 @@ are independent of the library cache, so they survive rescans and path-preservin
 - **Only `.flac` regular files** are served; sidecar reads accept only regular files in the track's
   own directory and skip anything over 1 MiB.
 - **IPC input validation**: track ids must be 40-character lowercase SHA-1 hex strings; volume is
-  clamped; UI state is normalized; malformed lyric ids return `null`; lyric choice ids must be
-  `embedded` or `sidecar:<file name>` with no path separators; preferences accept only known values.
-- **No sidecar paths cross IPC**: `LyricSourceOption.detail` and ids carry file names only.
+  clamped; UI state is normalized; malformed lyric ids return `null`; lyric and translation choice
+  ids must be `embedded` or `sidecar:<file name>` with no path separators; preferences accept only
+  known values; translation settings require a boolean and a language matching
+  `/^[A-Za-z0-9_-]{1,32}$/` (or null).
+- **No sidecar paths cross IPC**: `LyricSourceOption.detail`, ids, and variants carry file names
+  only.
 - **Tolerant persistence**: bad JSON, wrong cache/choice versions, and malformed entries degrade to
-  defaults instead of crashing.
+  defaults instead of crashing; translation alignment is pure and never throws on mismatched counts.
 - **Atomic writes** avoid partially written settings/cache/choice/cover files.
 - **Cancellable scans** prevent stale results from overwriting newer libraries.
 - **Stale async responses** are ignored in both the scan coordinator and the lyric controller.
@@ -1185,11 +1265,11 @@ environment; nothing mocks Electron or the DOM. The tested modules either have n
 | `tests/cache.test.ts` | Empty/missing cache; malformed JSON; wrong version; invalid folder and tracks containers; malformed entries dropped individually; nullable track/disc/year fields; save/load round-trip. |
 | `tests/ids.test.ts` | Known SHA-1 digests; determinism; 40 lowercase hex characters; different inputs produce different ids. |
 | `tests/json-file.test.ts` | Missing and malformed JSON fall back; valid JSON parses; atomic string and binary writes; parent-directory creation; overwrite; no temporary files left behind; pretty-printed JSON. |
-| `tests/lyricChoices.test.ts` | Round-trip; tolerant reads (bad JSON, wrong version, malformed containers); invalid id rejection; 5000-entry cap and oldest eviction. |
-| `tests/lyricSourceProviders.test.ts` | Canonical slot assembly; exact-sidecar id vs actual file name; variant ordering; provider failure isolation; saved-choice/preference echo. |
-| `tests/lyricSources.test.ts` | Saved vs auto selection; sidecar/embedded preference order; missing and unusable saved choices; variant fallback; custom usability predicate; nothing usable. |
+| `tests/lyricChoices.test.ts` | Main-choice and translation round-trips; missing `translations` tolerance; tolerant reads (bad JSON, wrong version, malformed containers); invalid id rejection; independent 5000-entry caps and oldest eviction; existing choices surviving. |
+| `tests/lyricSourceProviders.test.ts` | Canonical slot assembly; exact-sidecar id vs actual file name; variant ordering and extraction; provider failure isolation; saved-choice/preference/translation echo. |
+| `tests/lyricSources.test.ts` | Saved vs auto selection; sidecar/embedded preference order; missing and unusable saved choices; variant fallback; custom usability predicate; nothing usable; translation saved/auto, language matching, single fallback, ambiguity, and primary exclusion. |
 | `tests/lyrics.test.ts` | Both fixtures; format detection; metadata; word segments and agents; fractional timestamps; overlapping lines; gap behavior; offsets; warnings; sync helpers and progress clamps. |
-| `tests/lyricsController.test.ts` | Auto vs saved selection; embedded/sidecar preference; unusable source skipping; manual switch without refetch; clearing a choice; preference recomputation; reload bypassing the cache; stale-response guard; LRU eviction; cached “none”; reset behavior. |
+| `tests/lyricsController.test.ts` | Auto vs saved selection; embedded/sidecar preference; unusable source skipping; manual switch without refetch; clearing a choice; preference recomputation; reload bypassing the cache; stale-response guard; LRU eviction; cached “none”; reset behavior; translation enable/disable, auto by language, saved choice, sticky language, ineligible saved translation, and reload preservation. |
 | `tests/sourceMenuModel.test.ts` | Trigger/auto/saved states; canonical row order; badges (format, line count, singers, warnings); disabled reasons; loading labels; preference options; empty-state hints with and without `expectedSidecarName`; pure keyboard wrap/skip/edge helpers. |
 | `tests/sidecar.test.ts` | Exact/variant matching; case-insensitive names and extension; ignored names and directories; 1 MiB cap; UTF-8/UTF-16 BOM decoding; symlink skip where supported; unreadable directory. |
 | `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
@@ -1197,7 +1277,8 @@ environment; nothing mocks Electron or the DOM. The tested modules either have n
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
 | `tests/routeStack.test.ts` | `topRoute`; non-mutating push/pop; pruning invalid routes from the top only; back-label selection for each view and parent route. |
 | `tests/segmentGroups.test.ts` | Syllable grouping; `spaceAfter` boundaries; trailing final group; empty input. |
-| `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder, view, and lyric-preference fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
+| `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder, view, lyric-preference, and translation fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
+| `tests/translation.test.ts` | Time matching within/outside tolerance; equal-count index fallback; partial/none; missing and extra lines; blank and music-note lines; duet timestamps; untimed documents; custom options; non-mutating attachment with merged translations. |
 
 Tests that pin behavior which conflicts with a stated invariant are marked with an inline comment
 rather than changing production code.
@@ -1243,7 +1324,9 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 | Embedded lyric tags | `src/main/lyrics/embedded.ts` |
 | Sidecar discovery, decoding, size/symlink rules | `src/main/lyrics/sidecar.ts` |
 | Lyric provider list, option order, selection context | `src/main/lyrics/sources.ts`, `src/shared/lyrics/sources.ts` |
-| Per-track lyric choices | `src/main/lyrics/choices.ts` |
+| Translation alignment, attachment, pure selection | `src/shared/lyrics/translation.ts`, `src/shared/lyrics/sources.ts` |
+| Translation layer state, eligibility, reports | `src/renderer/lyrics/translationState.ts` |
+| Per-track lyric and translation choices | `src/main/lyrics/choices.ts` |
 | Views, search, sort definitions | `src/renderer/library/query.ts` |
 | Renderer wiring / controller composition | `src/renderer/src/main.ts` |
 | Routing and the detail back stack | `src/renderer/src/navigation.ts`, `src/renderer/src/routeStack.ts` |
@@ -1280,7 +1363,8 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
            label: 'Extra file',
            detail: extraFileName(track.filePath),
            available: true,
-           text
+           text,
+           variant: null
          }]
        : []
    }
@@ -1288,9 +1372,11 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 
 2. Add it to `PROVIDERS` in `src/main/lyrics/sources.ts` in the desired order.
 3. Return `[]` for expected misses; do not throw. Provider failures are logged and skipped.
-4. Keep ids file-name-only (`embedded` or `sidecar:<file name>`). A provider that fits those kinds
-   needs no IPC or renderer changes: the controller parses every available option and applies the
-   saved-choice / preference rules automatically, and the source menu lists the new option.
+4. Keep ids file-name-only (`embedded` or `sidecar:<file name>`) and set `variant` to the
+   language/region suffix as written (or `null`). A provider that fits those kinds needs no IPC or
+   renderer changes: the controller parses every available option and applies the saved-choice /
+   preference rules automatically, the source menu lists the new option, and translation selection
+   can use it as a second layer.
 5. A genuinely new kind (for example online lookup) also requires extending `LyricSourceKind`, the
    auto-selection order in `src/shared/lyrics/sources.ts`, and source-id validation in
    `src/main/lyrics/choices.ts`.
@@ -1331,7 +1417,9 @@ only needs `getPosition` and `seek`; the rest of the UI uses the interface.
 - Word-level progress exists only for enhanced LRC with inline markers.
 - Singer labels (`v1:`) are parsed into `agent` and exposed as `data-agent`, but not styled or shown
   as separate voices.
-- Translations and TTML are typed/reserved but not parsed.
+- Translations are aligned and attached to lyric lines (time/index/partial/none) but are not rendered
+  yet; there is no translation toggle or picker UI, no translation editing/writing, and no word-level
+  translation timing. TTML is typed/reserved but not parsed.
 - Plain lyrics are static: no highlighting and no click-to-seek.
 - Sidecars are limited to the track's own directory and the `<base>.lrc` / `<base>.<variant>.lrc`
   names. Files over 1 MiB, symlinks, directories, and non-UTF-8/UTF-16 encodings are skipped.
@@ -1358,7 +1446,7 @@ npm run dev        # manual smoke: open a folder, play tracks, open Now Playing
 Expected:
 
 - Type-check passes for both projects.
-- All Vitest files pass (currently 191 tests across 12 files).
+- All Vitest files pass (currently 325 tests across 18 files).
 - Production bundles build into `out/`.
 - `npm run dev` opens the app with no console errors.
 - Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.

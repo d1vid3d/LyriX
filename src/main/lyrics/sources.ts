@@ -16,6 +16,7 @@ export type LyricSourceProvider = (track: LyricsTrack) => Promise<LyricSourceOpt
 
 export interface LyricSourcesContext {
   savedChoice: string | null
+  savedTranslationChoice: string | null
   preference: LyricPreference
 }
 
@@ -57,6 +58,7 @@ export async function getLyricSources(
     trackId: track.id,
     options: [embedded, exact, ...variants],
     savedChoice: context.savedChoice,
+    savedTranslationChoice: context.savedTranslationChoice,
     preference: context.preference,
     expectedSidecarName: expected
   }
@@ -73,7 +75,8 @@ async function embeddedProvider(track: LyricsTrack): Promise<LyricSourceOption[]
       label: 'Embedded tag',
       detail: embedded.tag,
       available: true,
-      text: embedded.text
+      text: embedded.text,
+      variant: null
     }
   ]
 }
@@ -88,7 +91,8 @@ async function sidecarProvider(track: LyricsTrack): Promise<LyricSourceOption[]>
     label: sidecar.exact ? 'Sidecar file' : `Sidecar (${sidecar.variant ?? ''})`,
     detail: sidecar.fileName,
     available: true,
-    text: sidecar.text
+    text: sidecar.text,
+    variant: sidecar.exact ? null : sidecar.variant
   }))
 }
 
@@ -99,7 +103,8 @@ function missingEmbedded(): LyricSourceOption {
     label: 'Embedded tag',
     detail: null,
     available: false,
-    text: null
+    text: null,
+    variant: null
   }
 }
 
@@ -110,6 +115,7 @@ function missingSidecar(id: string): LyricSourceOption {
     label: 'Sidecar file',
     detail: null,
     available: false,
-    text: null
+    text: null,
+    variant: null
   }
 }

@@ -5,6 +5,9 @@ import type {
   LyricSourceOption,
   LyricSources
 } from '../../shared/lyrics/sources'
+import type { TranslationSettingsInput } from '../../shared/types'
+import { buildTranslation, sameTranslation } from './translationState'
+import type { TranslationState } from './translationState'
 
 export type LyricsStatus = 'loading' | 'ready' | 'none'
 export type LyricsSelectionMode = 'auto' | 'saved'
@@ -27,14 +30,21 @@ export interface LyricsState {
   mode: LyricsSelectionMode | null
   preference: LyricPreference
   expectedSidecarName: string
+  translation: TranslationState
 }
 
 export interface LyricsControllerDeps {
   fetchSources(trackId: string): Promise<LyricSources | null>
   saveChoice(trackId: string, sourceId: string | null): Promise<void>
   savePreference(preference: LyricPreference): Promise<void>
+  saveTranslationChoice(trackId: string, sourceId: string | null): Promise<void>
+  saveTranslationSettings(input: TranslationSettingsInput): Promise<void>
   /** Initial preference; the library settings may update it later. */
   preference: LyricPreference
+  /** Initial translation toggle from settings. */
+  translationEnabled: boolean
+  /** Initial sticky translation language from settings. */
+  translationLanguage: string | null
   /** Number of parsed source entries kept in memory (default 10). */
   cacheLimit?: number
 }
@@ -48,6 +58,7 @@ interface CachedSources {
   entries: LyricsSourceEntry[]
   expectedSidecarName: string
   savedChoice: string | null
+  savedTranslationChoice: string | null
 }
 
 const DEFAULT_CACHE_LIMIT = 10
@@ -59,26 +70,21 @@ export class LyricsController {
   private readonly cache = new Map<string, CachedSources>()
   private readonly listeners = new Set<(state: LyricsState) => void>()
   private preference: LyricPreference
+  private translationEnabled: boolean
+  private translationLanguage: string | null
   private state: LyricsState
   private requestGeneration = 0
 
   constructor(deps: LyricsControllerDeps) {
     this.deps = deps
     this.preference = deps.preference
+    this.translationEnabled = deps.translationEnabled
+    this.translationLanguage = deps.translationLanguage
 
     const limit = deps.cacheLimit ?? DEFAULT_CACHE_LIMIT
     this.cacheLimit = Number.isFinite(limit) && limit > 0 ? Math.trunc(limit) : DEFAULT_CACHE_LIMIT
 
-    this.state = {
-      status: 'none',
-      doc: null,
-      trackId: null,
-      sources: [],
-      selectedId: null,
-      mode: null,
-      preference: this.preference,
-      expectedSidecarName: ''
-    }
+    this.state = this.emptyState(null)
   }
 
   getState(): LyricsState {
@@ -108,7 +114,7 @@ export class LyricsController {
     const cached = this.cache.get(trackId)
     if (cached) {
       this.touchCache(trackId)
-      this.applyEntry(trackId, cached, cached.savedChoice)
+      this.applyEntry(trackId, cached)
       return
     }
 
@@ -120,7 +126,8 @@ export class LyricsController {
       selectedId: null,
       mode: null,
       preference: this.preference,
-      expectedSidecarName: ''
+      expectedSidecarName: '',
+      translation: this.emptyTranslation()
     })
     void this.load(trackId, generation)
   }
@@ -135,7 +142,7 @@ export class LyricsController {
 
     if (sourceId === null) {
       cached.savedChoice = null
-      this.applyEntry(trackId, cached, null)
+      this.applyEntry(trackId, cached)
       this.persistChoice(trackId, null)
       return
     }
@@ -144,8 +151,67 @@ export class LyricsController {
     if (!target || !target.usable) return
 
     cached.savedChoice = sourceId
-    this.applyEntry(trackId, cached, sourceId)
+    this.applyEntry(trackId, cached)
     this.persistChoice(trackId, sourceId)
+  }
+
+  /** Toggle the translation layer and persist the new value. */
+  setTranslationEnabled(enabled: boolean, options: SetPreferenceOptions = {}): void {
+    this.applyTranslationSettings(
+      { enabled, language: this.translationLanguage },
+      options
+    )
+  }
+
+  /** Apply toggle and sticky language together, e.g. at startup with `{ persist: false }`. */
+  applyTranslationSettings(
+    input: TranslationSettingsInput,
+    options: SetPreferenceOptions = {}
+  ): void {
+    this.translationEnabled = input.enabled
+    this.translationLanguage = input.language
+    if (options.persist !== false) this.persistTranslationSettings()
+
+    const trackId = this.state.trackId
+    const cached = trackId ? this.cache.get(trackId) : null
+    if (trackId && cached) {
+      this.applyEntry(trackId, cached)
+      return
+    }
+
+    this.setState({ ...this.state, translation: this.emptyTranslation() })
+  }
+
+  /**
+   * Selects the translation source for the current track. Null returns to auto-selection.
+   * A variant option also updates the sticky language used for other tracks.
+   */
+  selectTranslation(sourceId: string | null): void {
+    const trackId = this.state.trackId
+    if (!trackId) return
+
+    const cached = this.cache.get(trackId)
+    if (!cached) return
+
+    if (sourceId === null) {
+      cached.savedTranslationChoice = null
+      this.applyEntry(trackId, cached)
+      this.persistTranslationChoice(trackId, null)
+      return
+    }
+
+    const candidate = this.state.translation.options.find(
+      (option) => option.option.id === sourceId && option.eligible
+    )
+    if (!candidate) return
+
+    cached.savedTranslationChoice = sourceId
+    if (candidate.option.variant) {
+      this.translationLanguage = candidate.option.variant
+      this.persistTranslationSettings()
+    }
+    this.applyEntry(trackId, cached)
+    this.persistTranslationChoice(trackId, sourceId)
   }
 
   /** Persist the preference and recompute auto-selection for the current track. */
@@ -166,7 +232,7 @@ export class LyricsController {
 
     const cached = this.cache.get(trackId)
     if (cached) {
-      this.applyEntry(trackId, cached, cached.savedChoice)
+      this.applyEntry(trackId, cached)
       return
     }
 
@@ -179,11 +245,13 @@ export class LyricsController {
     if (!trackId) return
 
     const generation = ++this.requestGeneration
-    const savedChoice = this.cache.get(trackId)?.savedChoice ?? null
+    const cached = this.cache.get(trackId)
+    const savedChoice = cached?.savedChoice ?? null
+    const savedTranslationChoice = cached?.savedTranslationChoice ?? null
     this.cache.delete(trackId)
 
     this.setState({ ...this.state, status: 'loading', doc: null })
-    void this.load(trackId, generation, savedChoice)
+    void this.load(trackId, generation, savedChoice, savedTranslationChoice)
   }
 
   /**
@@ -199,17 +267,19 @@ export class LyricsController {
 
     const cached = this.cache.get(trackId)
     const savedChoice = cached ? cached.savedChoice : undefined
+    const savedTranslationChoice = cached ? cached.savedTranslationChoice : undefined
     const generation = ++this.requestGeneration
     this.cache.clear()
 
     this.setState({ ...this.state, status: 'loading', doc: null })
-    void this.load(trackId, generation, savedChoice)
+    void this.load(trackId, generation, savedChoice, savedTranslationChoice)
   }
 
   private async load(
     trackId: string,
     generation: number,
-    savedChoiceOverride?: string | null
+    savedChoiceOverride?: string | null,
+    savedTranslationChoiceOverride?: string | null
   ): Promise<void> {
     try {
       const response = await this.deps.fetchSources(trackId)
@@ -217,14 +287,22 @@ export class LyricsController {
 
       const cached = response
         ? this.buildCached(response)
-        : { entries: [], expectedSidecarName: '', savedChoice: null }
+        : {
+            entries: [],
+            expectedSidecarName: '',
+            savedChoice: null,
+            savedTranslationChoice: null
+          }
 
-      const savedChoice =
+      cached.savedChoice =
         savedChoiceOverride !== undefined ? savedChoiceOverride : cached.savedChoice
-      cached.savedChoice = savedChoice
+      cached.savedTranslationChoice =
+        savedTranslationChoiceOverride !== undefined
+          ? savedTranslationChoiceOverride
+          : cached.savedTranslationChoice
 
       this.remember(trackId, cached)
-      this.applyEntry(trackId, cached, savedChoice)
+      this.applyEntry(trackId, cached)
       this.logSources(trackId, cached)
     } catch (error) {
       if (generation !== this.requestGeneration) return
@@ -233,10 +311,12 @@ export class LyricsController {
       const cached: CachedSources = {
         entries: [],
         expectedSidecarName: '',
-        savedChoice: savedChoiceOverride !== undefined ? savedChoiceOverride : null
+        savedChoice: savedChoiceOverride !== undefined ? savedChoiceOverride : null,
+        savedTranslationChoice:
+          savedTranslationChoiceOverride !== undefined ? savedTranslationChoiceOverride : null
       }
       this.remember(trackId, cached)
-      this.applyEntry(trackId, cached, cached.savedChoice)
+      this.applyEntry(trackId, cached)
     }
   }
 
@@ -258,15 +338,16 @@ export class LyricsController {
     return {
       entries,
       expectedSidecarName: response.expectedSidecarName,
-      savedChoice: response.savedChoice
+      savedChoice: response.savedChoice,
+      savedTranslationChoice: response.savedTranslationChoice
     }
   }
 
-  private applyEntry(trackId: string, cached: CachedSources, savedChoice: string | null): void {
+  private applyEntry(trackId: string, cached: CachedSources): void {
     const selection = selectLyricSource(
       cached.entries.map((entry) => entry.option),
       {
-        savedChoice,
+        savedChoice: cached.savedChoice,
         preference: this.preference,
         isUsable: (option) =>
           cached.entries.find((entry) => entry.option.id === option.id)?.usable === true
@@ -277,17 +358,33 @@ export class LyricsController {
       ? (cached.entries.find((entry) => entry.option.id === selection.option.id) ?? null)
       : null
     const usableSelected = selected?.usable === true ? selected : null
+    const primaryDoc = usableSelected?.doc ?? null
 
+    const translation = buildTranslation({
+      enabled: this.translationEnabled,
+      language: this.translationLanguage,
+      primaryId: usableSelected?.option.id ?? null,
+      primaryDoc,
+      savedChoice: cached.savedTranslationChoice,
+      entries: cached.entries
+    })
+
+    const previousTranslation = this.state.translation
     this.setState({
       status: usableSelected ? 'ready' : 'none',
-      doc: usableSelected?.doc ?? null,
+      doc: translation.doc,
       trackId,
       sources: cached.entries,
       selectedId: usableSelected?.option.id ?? null,
       mode: usableSelected ? (selection?.mode ?? null) : null,
       preference: this.preference,
-      expectedSidecarName: cached.expectedSidecarName
+      expectedSidecarName: cached.expectedSidecarName,
+      translation: translation.state
     })
+
+    if (!sameTranslation(previousTranslation, translation.state)) {
+      this.logTranslation(translation.state)
+    }
   }
 
   private emptyState(trackId: string | null): LyricsState {
@@ -299,14 +396,52 @@ export class LyricsController {
       selectedId: null,
       mode: null,
       preference: this.preference,
-      expectedSidecarName: ''
+      expectedSidecarName: '',
+      translation: this.emptyTranslation()
     }
+  }
+
+  private emptyTranslation(): TranslationState {
+    return buildTranslation({
+      enabled: this.translationEnabled,
+      language: this.translationLanguage,
+      primaryId: null,
+      primaryDoc: null,
+      savedChoice: null,
+      entries: []
+    }).state
   }
 
   private persistChoice(trackId: string, sourceId: string | null): void {
     void this.deps
       .saveChoice(trackId, sourceId)
       .catch((error) => console.error('[lyrics] Could not save the lyric choice', error))
+  }
+
+  private persistTranslationChoice(trackId: string, sourceId: string | null): void {
+    void this.deps
+      .saveTranslationChoice(trackId, sourceId)
+      .catch((error) => console.error('[lyrics] Could not save the translation choice', error))
+  }
+
+  private persistTranslationSettings(): void {
+    void this.deps
+      .saveTranslationSettings({
+        enabled: this.translationEnabled,
+        language: this.translationLanguage
+      })
+      .catch((error) => console.error('[lyrics] Could not save translation settings', error))
+  }
+
+  private logTranslation(translation: TranslationState): void {
+    const report =
+      translation.options.find((option) => option.option.id === translation.selectedId)?.report ??
+      null
+    console.debug('[lyrics] translation', {
+      selectedId: translation.selectedId,
+      mode: translation.mode,
+      report
+    })
   }
 
   private logSources(trackId: string, cached: CachedSources): void {
@@ -335,7 +470,8 @@ export class LyricsController {
       next.selectedId === this.state.selectedId &&
       next.mode === this.state.mode &&
       next.preference === this.state.preference &&
-      next.expectedSidecarName === this.state.expectedSidecarName
+      next.expectedSidecarName === this.state.expectedSidecarName &&
+      sameTranslation(next.translation, this.state.translation)
     ) {
       return
     }

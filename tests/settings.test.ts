@@ -10,7 +10,9 @@ const DEFAULTS: Settings = {
   volume: 1,
   lastView: 'albums',
   sortByView: {},
-  lyricPreference: 'sidecar'
+  lyricPreference: 'sidecar',
+  translationEnabled: false,
+  translationLanguage: null
 }
 
 let directory = ''
@@ -73,7 +75,9 @@ describe('loadSettings', () => {
       volume: 1,
       lastView: 'albums',
       sortByView: { tracks: 'title' },
-      lyricPreference: 'sidecar'
+      lyricPreference: 'sidecar',
+      translationEnabled: false,
+      translationLanguage: null
     })
   })
 
@@ -127,6 +131,37 @@ describe('loadSettings', () => {
     expect(settings.sortByView).toEqual({ albums: 'bogus', genres: 'title' })
   })
 
+  it.each([
+    ['en', 'en'],
+    ['en-US', 'en-US'],
+    ['zh_Hans', 'zh_Hans'],
+    ['', null],
+    ['has space', null],
+    ['a'.repeat(33), null],
+    ['a'.repeat(32), 'a'.repeat(32)],
+    [42, null],
+    [null, null]
+  ] as Array<[unknown, string | null]>)(
+    'normalizes translationLanguage %j to %j',
+    async (language, expected) => {
+      await writeJson({ translationLanguage: language })
+
+      expect((await loadSettings(settingsPath())).translationLanguage).toBe(expected)
+    }
+  )
+
+  it.each([
+    [true, true],
+    [false, false],
+    ['true', false],
+    [1, false],
+    [null, false]
+  ] as Array<[unknown, boolean]>)('normalizes translationEnabled %j to %j', async (enabled, expected) => {
+    await writeJson({ translationEnabled: enabled })
+
+    expect((await loadSettings(settingsPath())).translationEnabled).toBe(expected)
+  })
+
   it('falls back to defaults for an empty object', async () => {
     await writeJson({})
 
@@ -158,7 +193,9 @@ describe('saveSettings', () => {
       volume: 0,
       lastView: 'albums',
       sortByView: { artists: 'name' },
-      lyricPreference: 'sidecar'
+      lyricPreference: 'sidecar',
+      translationEnabled: false,
+      translationLanguage: null
     })
   })
 

@@ -43,10 +43,10 @@ npm test            # run the Vitest suite
 | `src/main/lyrics/embedded.ts` | Reads embedded `LYRICS`/`UNSYNCEDLYRICS` tags on demand. |
 | `src/main/lyrics/sidecar.ts` | Finds and decodes same-directory `.lrc` sidecars. |
 | `src/main/lyrics/sources.ts` | Provider list and canonical lyric source options. |
-| `src/main/lyrics/choices.ts` | Per-track lyric choices at `userData/lyric-choices.json`. |
+| `src/main/lyrics/choices.ts` | Per-track lyric and translation choices at `userData/lyric-choices.json`. |
 | `src/main/albums.ts` | Pure album grouping and sorting (album artist + album, disc/track). |
 | `src/main/cache.ts` | Versioned library cache at `userData/library-cache.json`. |
-| `src/main/settings.ts` | Settings at `userData/settings.json` (last folder, volume, last view, per-view sort and lyric preference). |
+| `src/main/settings.ts` | Settings at `userData/settings.json` (last folder, volume, last view, per-view sort, lyric preference and translation toggle/language). |
 | `src/main/covers.ts` | Extracts/resizes cover art and caches full and thumbnail JPEGs in `userData/covers`. |
 | `src/main/json-file.ts` | Tolerant JSON reads and atomic writes. |
 | `src/main/ids.ts` | Stable SHA-1 ids for file paths and albums. |
@@ -59,7 +59,8 @@ npm test            # run the Vitest suite
 | `src/renderer/ui/virtualList.ts` | Fixed-row virtual scroller used by the tracks view. |
 | `src/renderer/player/engine.ts` | `PlaybackEngine` interface and the single-`HTMLAudioElement` implementation. |
 | `src/renderer/player/queue.ts` | Pure album queue with a current index and bounded next/previous. |
-| `src/renderer/lyrics/lyricsController.ts` | On-demand lyric source fetch/parse/selection, stale-response guard and LRU source cache (no DOM). |
+| `src/renderer/lyrics/lyricsController.ts` | On-demand lyric source fetch/parse/selection, translation-layer state, stale-response guard and LRU source cache (no DOM). |
+| `src/renderer/lyrics/translationState.ts` | Pure translation eligibility, alignment reports and document attachment (no DOM). |
 | `src/renderer/lyrics/segmentGroups.ts` | Pure grouping of word-timed segments into nowrap word containers. |
 | `src/renderer/lyrics/sourceMenuModel.ts` | Pure lyric-source menu view model, user-facing strings, disabled reasons, badges and keyboard helper. |
 | `src/renderer/ui/lyricView.ts` | Builds lyric DOM once, syncs line/segment classes and progress, centers and seeks. |
@@ -71,7 +72,8 @@ npm test            # run the Vitest suite
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
 | `src/shared/lyrics/types.ts` | Lyric format, document, line, segment, metadata and parse-option types. |
-| `src/shared/lyrics/sources.ts` | Lyric source types and the pure saved-choice/preference selector. |
+| `src/shared/lyrics/sources.ts` | Lyric source types plus the pure main-source and translation selectors. |
+| `src/shared/lyrics/translation.ts` | Pure line alignment and non-mutating translation attachment. |
 | `src/shared/lyrics/time.ts` | Timestamp token parsing, fraction handling and format-detection regexes. |
 | `src/shared/lyrics/parse.ts` | `parseLyrics` entry point, option defaults and the ordered parser registry. |
 | `src/shared/lyrics/parsers/shared.ts` | Header extraction, timed-line finalization, end estimation and offset shifting. |
@@ -80,14 +82,15 @@ npm test            # run the Vitest suite
 | `src/shared/lyrics/parsers/enhanced-lrc.ts` | Word-timed enhanced LRC parser with `vN:` singer prefixes. |
 | `src/shared/lyrics/sync.ts` | Active line/segment lookup and clamped progress helpers. |
 | `src/shared/lyrics/index.ts` | Public exports for the pure lyric core. |
-| `tests/lyricChoices.test.ts` | Vitest coverage for choice round-trips, tolerant reads, invalid ids and the 5000-entry cap. |
-| `tests/lyricSourceProviders.test.ts` | Vitest coverage for canonical source assembly and provider failure isolation. |
-| `tests/lyricSources.test.ts` | Vitest coverage for saved/auto selection, preference order and usability rules. |
+| `tests/lyricChoices.test.ts` | Vitest coverage for main/translation choice round-trips, tolerant reads, invalid ids, independent 5000-entry caps and missing-map tolerance. |
+| `tests/lyricSourceProviders.test.ts` | Vitest coverage for canonical source assembly, variant extraction and provider failure isolation. |
+| `tests/lyricSources.test.ts` | Vitest coverage for saved/auto selection, preference order, usability rules and translation selection. |
 | `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
-| `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, reload, stale responses, caching and eviction. |
+| `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, translation enable/selection, reload, stale responses, caching and eviction. |
 | `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
-| `tests/sidecar.test.ts` | Vitest coverage for sidecar matching, size limits, BOM decoding and symlink skipping. |
+| `tests/sidecar.test.ts` | Vitest coverage for sidecar matching, size limits, BOM decoding, variant extraction and symlink skipping. |
 | `tests/sourceMenuModel.test.ts` | Vitest coverage for source-menu labels, badges, reasons, empty hints and keyboard navigation. |
+| `tests/translation.test.ts` | Vitest coverage for time/index/partial/none alignment, blanks, duet timestamps, untimed documents and non-mutating attachment. |
 
 ## How the library works
 
@@ -163,18 +166,24 @@ Unicode NFC normalization. It reads only regular files, skips symlinks, director
 1 MiB, and decodes UTF-8 (with BOM stripped) and UTF-16 LE/BE (with BOM).
 
 The main process returns an ordered source list: the embedded slot, the exact sidecar slot, then any
-variant sidecars alphabetically. Missing slots are marked unavailable. The global preference
-(`"sidecar"` by default, or `"embedded"`) picks the automatic source; a per-track saved choice
-overrides it. Choices live in `userData/lyric-choices.json` (version 1, capped at 5000 entries) and
-the preference lives in `userData/settings.json`. The `lyrics:get-sources` IPC accepts only a track
-id, resolves the path in the main process and returns `null` instead of throwing;
-`lyrics:set-choice` and `settings:set-lyric-preference` validate their input.
+variant sidecars alphabetically. Missing slots are marked unavailable, and variant options carry the
+suffix as written (`EN` for `Song.EN.lrc`). The global preference (`"sidecar"` by default, or
+`"embedded"`) picks the automatic source; a per-track saved choice overrides it. Choices live in
+`userData/lyric-choices.json` (version 1, `tracks` plus an optional `translations` map, each capped
+at 5000 entries) and the preference plus translation toggle/language live in
+`userData/settings.json`. The `lyrics:get-sources` IPC accepts only a track id, resolves the path in
+the main process and returns `null` instead of throwing; `lyrics:set-choice`,
+`lyrics:set-translation-choice`, `settings:set-lyric-preference` and `settings:set-translation`
+validate their input.
 
 The renderer controller fetches the sources on each current-track change, parses every available
 option and selects one using the pure `selectLyricSource` rules. It ignores responses for a track
 that is no longer current, caches the last 10 whole source entries (including “none”), and can
-switch sources without refetching. `reload()` bypasses the cache while keeping the saved choice, so
-an edited sidecar is picked up. It contains no DOM code. `LyricView` builds the line DOM once per
+switch sources without refetching. `reload()` bypasses the cache while keeping the saved choices, so
+an edited sidecar is picked up. It contains no DOM code. The translation layer is derived on every
+recompute: a second source (never the primary) is chosen by saved choice or sticky language, aligned
+against the primary with `alignTranslation`, and attached to `state.doc` only when translation is
+enabled. No translation UI or rendering exists yet. `LyricView` builds the line DOM once per
 document, keeps word containers unbreakable, and toggles only changed line/segment classes from
 `requestAnimationFrame`, reading the position from the `PlaybackEngine`. The current line is centered
 with smooth scrolling; manual wheel/touch/drag pauses centering for four seconds. Clicking a timed
@@ -222,12 +231,12 @@ the whole album in disc/track order; clicking one in the tracks view queues the 
 Playback advances automatically when a track ends and stops at the end of the last track.
 **Previous** restarts the current track when it is more than three seconds in, otherwise it moves back
 one track. If a file cannot be played, the player logs it and skips forward until it finds a playable
-track. The last folder, volume, view, per-view sort and lyric preference are stored in
-`userData/settings.json` and restored on the next launch.
+track. The last folder, volume, view, per-view sort, lyric preference and translation toggle/language
+are stored in `userData/settings.json` and restored on the next launch.
 
 ## Out of scope (for now)
 
 Shuffle, repeat modes, gapless playback, crossfade, a visible queue panel, queue editing, fuzzy
 search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
-virtualization, online lyric lookup, singer-specific lyric styling, translations, TTML, tag editing
-and packaging are intentionally not implemented.
+virtualization, online lyric lookup, singer-specific lyric styling, translation rendering/editing,
+TTML, tag editing and packaging are intentionally not implemented.

@@ -4,7 +4,8 @@ import { isValidLyricSourceId, isValidTrackId } from './lyrics/choices'
 import type { LyricChoiceStore } from './lyrics/choices'
 import { getLyricSources } from './lyrics/sources'
 import type { ScanCoordinator } from './scanCoordinator'
-import { clampVolume, normalizeUiState, saveSettings } from './settings'
+import type { TranslationSettingsInput } from '../shared/types'
+import { clampVolume, normalizeTranslationLanguage, normalizeUiState, saveSettings } from './settings'
 import type { AppStore } from './store'
 
 /** Registers every IPC channel; input validation stays on this side of the bridge. */
@@ -41,6 +42,7 @@ export function registerIpc(
         { id: trackId, filePath },
         {
           savedChoice: choices.get(trackId),
+          savedTranslationChoice: choices.getTranslation(trackId),
           preference: store.settings.lyricPreference
         }
       )
@@ -64,6 +66,24 @@ export function registerIpc(
       console.error(`[lyrics] Could not save the lyric choice for ${trackId}`, error)
     }
   })
+
+  ipcMain.handle(
+    'lyrics:set-translation-choice',
+    async (_event, trackId: unknown, sourceId: unknown) => {
+      if (!isValidTrackId(trackId)) return
+
+      try {
+        if (sourceId === null) {
+          await choices.clearTranslation(trackId)
+          return
+        }
+        if (!isValidLyricSourceId(sourceId)) return
+        await choices.setTranslation(trackId, sourceId)
+      } catch (error) {
+        console.error(`[lyrics] Could not save the translation choice for ${trackId}`, error)
+      }
+    }
+  )
 
   ipcMain.handle('settings:get', () => store.settings)
 
@@ -98,4 +118,34 @@ export function registerIpc(
       console.error('[settings] Could not save lyric preference', error)
     }
   })
+
+  ipcMain.handle('settings:set-translation', async (_event, value: unknown) => {
+    const input = parseTranslationSettings(value)
+    if (!input) return
+
+    store.settings = {
+      ...store.settings,
+      translationEnabled: input.enabled,
+      translationLanguage: input.language
+    }
+    try {
+      await saveSettings(store.settingsFile, store.settings)
+    } catch (error) {
+      console.error('[settings] Could not save translation settings', error)
+    }
+  })
+}
+
+function parseTranslationSettings(value: unknown): TranslationSettingsInput | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+
+  const candidate = value as Record<string, unknown>
+  if (typeof candidate.enabled !== 'boolean') return null
+  if (candidate.language !== null && typeof candidate.language !== 'string') return null
+
+  const language =
+    candidate.language === null ? null : normalizeTranslationLanguage(candidate.language)
+  if (candidate.language !== null && language === null) return null
+
+  return { enabled: candidate.enabled, language }
 }

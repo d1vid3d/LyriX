@@ -10,6 +10,7 @@ const TRACK_ID_PATTERN = /^[a-f0-9]{40}$/
 interface LyricChoicesFile {
   version: number
   tracks: Record<string, string>
+  translations?: Record<string, string>
 }
 
 /** Track ids are 40-character lowercase SHA-1 hex strings. */
@@ -40,65 +41,109 @@ function isValidTrackKey(value: unknown): value is string {
 /** Per-track lyric source choices at userData/lyric-choices.json. */
 export class LyricChoiceStore {
   private choices: Record<string, string> = {}
+  private translations: Record<string, string> = {}
 
   constructor(private readonly filePath: string) {}
 
   async load(): Promise<void> {
     const raw = await readJsonFile<unknown>(this.filePath, null)
-    this.choices = parseChoices(raw)
+    const parsed = parseChoices(raw)
+    this.choices = parsed.tracks
+    this.translations = parsed.translations
   }
 
   get(trackId: string): string | null {
-    if (!isValidTrackKey(trackId)) return null
-    return this.choices[trackId] ?? null
+    return readEntry(this.choices, trackId)
+  }
+
+  getTranslation(trackId: string): string | null {
+    return readEntry(this.translations, trackId)
   }
 
   async set(trackId: string, sourceId: string): Promise<void> {
-    if (!isValidTrackKey(trackId) || !isValidLyricSourceId(sourceId)) return
+    await this.writeEntry(this.choices, trackId, sourceId)
+  }
 
-    // Re-insert so the most recently changed entry is the newest.
-    delete this.choices[trackId]
-    this.choices[trackId] = sourceId
-    this.trim()
-    await this.save()
+  async setTranslation(trackId: string, sourceId: string): Promise<void> {
+    await this.writeEntry(this.translations, trackId, sourceId)
   }
 
   async clear(trackId: string): Promise<void> {
-    if (!isValidTrackKey(trackId) || !(trackId in this.choices)) return
+    await this.removeEntry(this.choices, trackId)
+  }
 
-    delete this.choices[trackId]
+  async clearTranslation(trackId: string): Promise<void> {
+    await this.removeEntry(this.translations, trackId)
+  }
+
+  private async writeEntry(
+    map: Record<string, string>,
+    trackId: string,
+    sourceId: string
+  ): Promise<void> {
+    if (!isValidTrackKey(trackId) || !isValidLyricSourceId(sourceId)) return
+
+    // Re-insert so the most recently changed entry is the newest.
+    delete map[trackId]
+    map[trackId] = sourceId
+    trim(map)
     await this.save()
   }
 
-  private trim(): void {
-    const keys = Object.keys(this.choices)
-    for (let index = 0; index < keys.length - MAX_LYRIC_CHOICES; index += 1) {
-      delete this.choices[keys[index]]
-    }
+  private async removeEntry(map: Record<string, string>, trackId: string): Promise<void> {
+    if (!isValidTrackKey(trackId) || !(trackId in map)) return
+
+    delete map[trackId]
+    await this.save()
   }
 
   private async save(): Promise<void> {
-    const value: LyricChoicesFile = { version: LYRIC_CHOICES_VERSION, tracks: this.choices }
+    const value: LyricChoicesFile = {
+      version: LYRIC_CHOICES_VERSION,
+      tracks: this.choices,
+      translations: this.translations
+    }
     await writeJsonAtomic(this.filePath, value)
   }
 }
 
-function parseChoices(raw: unknown): Record<string, string> {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+function readEntry(map: Record<string, string>, trackId: string): string | null {
+  if (!isValidTrackKey(trackId)) return null
+  return map[trackId] ?? null
+}
+
+function trim(map: Record<string, string>): void {
+  const keys = Object.keys(map)
+  for (let index = 0; index < keys.length - MAX_LYRIC_CHOICES; index += 1) {
+    delete map[keys[index]]
+  }
+}
+
+function parseChoices(raw: unknown): {
+  tracks: Record<string, string>
+  translations: Record<string, string>
+} {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { tracks: {}, translations: {} }
+  }
 
   const file = raw as Record<string, unknown>
-  if (file.version !== LYRIC_CHOICES_VERSION) return {}
-  if (!file.tracks || typeof file.tracks !== 'object' || Array.isArray(file.tracks)) return {}
+  if (file.version !== LYRIC_CHOICES_VERSION) return { tracks: {}, translations: {} }
 
-  const choices: Record<string, string> = {}
-  for (const [trackId, sourceId] of Object.entries(file.tracks as Record<string, unknown>)) {
-    if (isValidTrackKey(trackId) && isValidLyricSourceId(sourceId)) choices[trackId] = sourceId
+  return {
+    tracks: parseMap(file.tracks),
+    translations: parseMap(file.translations)
+  }
+}
+
+function parseMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+
+  const map: Record<string, string> = {}
+  for (const [trackId, sourceId] of Object.entries(value as Record<string, unknown>)) {
+    if (isValidTrackKey(trackId) && isValidLyricSourceId(sourceId)) map[trackId] = sourceId
   }
 
-  const keys = Object.keys(choices)
-  for (let index = 0; index < keys.length - MAX_LYRIC_CHOICES; index += 1) {
-    delete choices[keys[index]]
-  }
-
-  return choices
+  trim(map)
+  return map
 }
