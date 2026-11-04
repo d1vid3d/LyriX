@@ -4,6 +4,7 @@ import type {
   SourceMenuPreferenceOption,
   SourceMenuRow
 } from '../lyrics/sourceMenuModel'
+import type { TranslationMenuModel } from '../lyrics/translationMenuModel'
 
 /** Builds the popover body. The component owns events, focus, and open/close state. */
 export function buildPopoverContent(model: SourceMenuModel): DocumentFragment {
@@ -20,9 +21,13 @@ export function buildPopoverContent(model: SourceMenuModel): DocumentFragment {
   for (const row of model.rows) sources.append(createSourceRow(row, model.inUseLabel))
   fragment.append(sources)
 
-  const divider = el('div', 'lyric-source-divider')
-  divider.setAttribute('role', 'separator')
-  fragment.append(divider, createPreferenceGroup(model), createReload(model))
+  fragment.append(
+    createDivider(),
+    createPreferenceGroup(model),
+    createDivider(),
+    createTranslationSection(model),
+    createReload(model)
+  )
 
   return fragment
 }
@@ -45,16 +50,91 @@ function createAutoRow(model: SourceMenuModel): HTMLButtonElement {
 }
 
 function createSourceRow(row: SourceMenuRow, inUseLabel: string): HTMLButtonElement {
-  const button = createMenuItem('menuitemradio')
-  button.dataset.action = 'source'
+  const button = createOptionRow(row, inUseLabel, 'source', `source:${row.id}`)
   button.dataset.sourceId = row.id
-  button.dataset.focusKey = `source:${row.id}`
-  button.setAttribute('aria-checked', String(row.checked))
+  return button
+}
 
-  if (row.disabled) {
-    button.disabled = true
-    button.setAttribute('aria-disabled', 'true')
+function createTranslationSection(model: SourceMenuModel): HTMLDivElement {
+  const translation = model.translation
+  const section = el('div', 'lyric-translation-section')
+  section.setAttribute('role', 'group')
+  section.setAttribute('aria-label', model.groups.translation)
+  section.append(
+    el('div', 'lyric-source-preference-title', translation.label),
+    createTranslationSwitch(translation)
+  )
+
+  if (translation.switch.checked) {
+    const options = el('div', 'lyric-translation-options')
+    options.setAttribute('role', 'group')
+    options.setAttribute('aria-label', model.groups.translationOptions)
+    options.append(createTranslationAutoRow(translation))
+    for (const row of translation.rows) {
+      options.append(createTranslationRow(row, model.inUseLabel))
+    }
+    section.append(options)
   }
+
+  return section
+}
+
+function createTranslationSwitch(translation: TranslationMenuModel): HTMLButtonElement {
+  const button = createMenuItem('menuitemcheckbox')
+  button.classList.add('lyric-translation-switch-row')
+  button.dataset.action = 'translation-toggle'
+  button.dataset.focusKey = 'translation-toggle'
+  button.setAttribute('aria-checked', String(translation.switch.checked))
+  if (translation.switch.disabled) disable(button)
+
+  const control = el('span', 'lyric-translation-switch')
+  control.setAttribute('aria-hidden', 'true')
+  control.classList.toggle('lyric-translation-switch--on', translation.switch.checked)
+
+  const text = el('span', 'lyric-source-row-text')
+  text.append(el('span', 'lyric-source-row-label', translation.switch.label))
+  if (translation.switch.hint) {
+    text.append(el('span', 'lyric-translation-hint', translation.switch.hint))
+  }
+
+  button.append(control, text)
+  return button
+}
+
+function createTranslationAutoRow(translation: TranslationMenuModel): HTMLButtonElement {
+  const button = createMenuItem('menuitemradio')
+  button.classList.add('lyric-source-row--auto')
+  button.dataset.action = 'translation-auto'
+  button.dataset.focusKey = 'translation-auto'
+  button.setAttribute('aria-checked', String(translation.autoRow.checked))
+  button.append(createRadio(translation.autoRow.checked))
+
+  const text = el('span', 'lyric-source-row-text')
+  text.append(
+    el('span', 'lyric-source-row-label', translation.autoRow.label),
+    el('span', 'lyric-source-row-detail', translation.autoRow.detail)
+  )
+  button.append(text)
+  return button
+}
+
+function createTranslationRow(row: SourceMenuRow, inUseLabel: string): HTMLButtonElement {
+  const button = createOptionRow(row, inUseLabel, 'translation', `translation:${row.id}`)
+  button.dataset.translationId = row.id
+  return button
+}
+
+function createOptionRow(
+  row: SourceMenuRow,
+  inUseLabel: string,
+  action: string,
+  focusKey: string
+): HTMLButtonElement {
+  const button = createMenuItem('menuitemradio')
+  button.dataset.action = action
+  button.dataset.focusKey = focusKey
+  button.setAttribute('aria-checked', String(row.checked))
+  if (row.disabled) disable(button)
 
   button.append(createRadio(row.checked))
 
@@ -105,17 +185,21 @@ function createReload(model: SourceMenuModel): HTMLButtonElement {
   button.classList.add('lyric-source-reload')
   button.dataset.action = 'reload'
   button.dataset.focusKey = 'reload'
-
-  if (model.reload.disabled) {
-    button.disabled = true
-    button.setAttribute('aria-disabled', 'true')
-  }
+  if (model.reload.disabled) disable(button)
 
   button.textContent = model.reload.label
   return button
 }
 
-function createMenuItem(role: 'menuitem' | 'menuitemradio'): HTMLButtonElement {
+function createDivider(): HTMLDivElement {
+  const divider = el('div', 'lyric-source-divider')
+  divider.setAttribute('role', 'separator')
+  return divider
+}
+
+function createMenuItem(
+  role: 'menuitem' | 'menuitemradio' | 'menuitemcheckbox'
+): HTMLButtonElement {
   const button = el('button', 'lyric-source-row')
   button.type = 'button'
   button.setAttribute('role', role)
@@ -134,6 +218,11 @@ function createBadge(badge: SourceMenuBadge): HTMLSpanElement {
   const element = el('span', `lyric-source-badge lyric-source-badge--${badge.tone}`, badge.text)
   if (badge.title) element.title = badge.title
   return element
+}
+
+function disable(button: HTMLButtonElement): void {
+  button.disabled = true
+  button.setAttribute('aria-disabled', 'true')
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(

@@ -5,11 +5,16 @@ import type { LyricsState } from '../lyrics/lyricsController'
 import { buildSourceMenuModel } from '../lyrics/sourceMenuModel'
 import type { SourceMenuModel } from '../lyrics/sourceMenuModel'
 import { LyricSourceMenu } from '../ui/lyricSourceMenu'
+import { TranslationToggle } from '../ui/translationToggle'
 import type { AppElements } from './dom'
 import { setCoverImage } from './format'
 
 export interface LyricViewLike {
-  setDocument(doc: LyricDocument): void
+  setDocument(
+    doc: LyricDocument,
+    translationKey?: string | null,
+    translationVariant?: string | null
+  ): void
   start(): void
   stop(): void
   showMessage(message: string): void
@@ -23,6 +28,8 @@ export interface NowPlayingDeps {
   subscribeLyrics(listener: (state: LyricsState) => void): () => void
   selectLyricSource(sourceId: string | null): void
   setLyricPreference(preference: LyricPreference): void
+  setTranslationEnabled(enabled: boolean): void
+  selectTranslation(id: string | null): void
   reloadLyrics(): void
   lyricView: LyricViewLike
   showSection(section: HTMLElement): void
@@ -35,6 +42,7 @@ export interface NowPlayingDeps {
 export class NowPlayingController {
   private readonly deps: NowPlayingDeps
   private readonly menu: LyricSourceMenu
+  private readonly translationToggle: TranslationToggle
   private open = false
   private dirty = false
 
@@ -43,7 +51,12 @@ export class NowPlayingController {
     this.menu = new LyricSourceMenu(deps.elements.lyricSourceMenu, {
       onSelect: (sourceId) => deps.selectLyricSource(sourceId),
       onPreference: (preference) => deps.setLyricPreference(preference),
+      onTranslationToggle: (enabled) => deps.setTranslationEnabled(enabled),
+      onTranslationSelect: (id) => deps.selectTranslation(id),
       onReload: () => deps.reloadLyrics()
+    })
+    this.translationToggle = new TranslationToggle(deps.elements.translationToggle, {
+      onToggle: (enabled) => deps.setTranslationEnabled(enabled)
     })
 
     deps.elements.nowPlayingTarget.addEventListener('click', () => this.openNowPlaying())
@@ -134,18 +147,30 @@ export class NowPlayingController {
   destroy(): void {
     this.menu.close()
     this.menu.destroy()
+    this.translationToggle.destroy()
   }
 
   private applyLyricsState(state: LyricsState): void {
     const model = buildSourceMenuModel(state)
     this.menu.update(model)
+    this.translationToggle.update(model.translationToggle)
 
     if (this.open) this.renderLyricsState(state, model)
   }
 
   private renderLyricsState(state: LyricsState, model: SourceMenuModel): void {
     if (state.status === 'ready' && state.doc) {
-      this.deps.lyricView.setDocument(state.doc)
+      const selected = state.translation.key
+        ? state.translation.options.find(
+            (option) => option.option.id === state.translation.key
+          )
+        : undefined
+
+      this.deps.lyricView.setDocument(
+        state.doc,
+        state.translation.key,
+        selected?.option.variant ?? null
+      )
       this.deps.lyricView.start()
       return
     }

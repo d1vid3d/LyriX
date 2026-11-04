@@ -10,6 +10,8 @@ import { buildPopoverContent } from './lyricSourceMenuView'
 export interface LyricSourceMenuCallbacks {
   onSelect(sourceId: string | null): void
   onPreference(preference: LyricPreference): void
+  onTranslationToggle(enabled: boolean): void
+  onTranslationSelect(id: string | null): void
   onReload(): void
 }
 
@@ -247,6 +249,25 @@ export class LyricSourceMenu {
         const preference = item.dataset.preference
         if (preference === 'sidecar' || preference === 'embedded') {
           this.callbacks.onPreference(preference)
+        }
+        return
+      }
+      case 'translation-toggle': {
+        const checked = item.getAttribute('aria-checked') === 'true'
+        this.callbacks.onTranslationToggle(!checked)
+        return
+      }
+      case 'translation-auto':
+        this.callbacks.onTranslationSelect(null)
+        this.close()
+        this.trigger.focus()
+        return
+      case 'translation': {
+        const translationId = item.dataset.translationId
+        if (translationId) {
+          this.callbacks.onTranslationSelect(translationId)
+          this.close()
+          this.trigger.focus()
         }
         return
       }

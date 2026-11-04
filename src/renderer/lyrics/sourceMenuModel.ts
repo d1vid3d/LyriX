@@ -1,6 +1,15 @@
 import type { LyricDocument, LyricFormat } from '../../shared/lyrics'
 import type { LyricPreference } from '../../shared/lyrics/sources'
 import type { LyricsSourceEntry, LyricsState } from './lyricsController'
+import { unavailableReason } from './lyricMenuText'
+import {
+  buildTranslationMenu,
+  buildTranslationToggle
+} from './translationMenuModel'
+import type {
+  TranslationMenuModel,
+  TranslationToggleModel
+} from './translationMenuModel'
 
 export type SourceMenuBadgeTone = 'muted' | 'warning'
 
@@ -39,6 +48,8 @@ export interface SourceMenuModel {
   groups: {
     sources: string
     preference: string
+    translation: string
+    translationOptions: string
   }
   autoRow: {
     label: string
@@ -60,6 +71,8 @@ export interface SourceMenuModel {
     hint: string
     text: string
   }
+  translation: TranslationMenuModel
+  translationToggle: TranslationToggleModel
   loadingMessage: string
 }
 
@@ -68,6 +81,8 @@ const LOADING = 'Loading…'
 const LOADING_LYRICS = 'Loading lyrics…'
 const TITLE = 'Lyrics source'
 const SOURCES_GROUP = 'Sources'
+const TRANSLATION_GROUP = 'Translation'
+const TRANSLATION_OPTIONS_GROUP = 'Translation options'
 const AUTO = 'Auto'
 const USING = 'Using'
 const IN_USE = 'In use'
@@ -80,9 +95,6 @@ const PREFERENCE_LABELS: Record<LyricPreference, string> = {
 }
 const EMPTY_MESSAGE = 'No lyrics found'
 const EMPTY_HINT_GENERIC = 'Add a lyrics file next to the track, then choose Reload sources.'
-const REASON_EMBEDDED_MISSING = "No lyrics in this file's tags"
-const REASON_UNREADABLE = "Couldn't read any lyric lines"
-const REASON_SIDECAR_MISSING = 'No sidecar file next to this track'
 const SINGERS = 'Singers'
 const FORMAT_LABELS: Record<LyricFormat, string> = {
   'enhanced-lrc': 'Word-timed',
@@ -110,7 +122,9 @@ export function buildSourceMenuModel(state: LyricsState): SourceMenuModel {
     title: TITLE,
     groups: {
       sources: SOURCES_GROUP,
-      preference: PREFERENCE_LABEL
+      preference: PREFERENCE_LABEL,
+      translation: TRANSLATION_GROUP,
+      translationOptions: TRANSLATION_OPTIONS_GROUP
     },
     autoRow: {
       label: AUTO,
@@ -143,6 +157,8 @@ export function buildSourceMenuModel(state: LyricsState): SourceMenuModel {
       hint,
       text: `${EMPTY_MESSAGE}\n${hint}`
     },
+    translation: buildTranslationMenu(state),
+    translationToggle: buildTranslationToggle(state),
     loadingMessage: LOADING_LYRICS
   }
 }
@@ -196,25 +212,9 @@ function buildRow(state: LyricsState, entry: LyricsSourceEntry): SourceMenuRow {
     checked: state.mode === 'saved' && state.selectedId === entry.option.id,
     inUse: state.selectedId === entry.option.id,
     disabled,
-    reason: disabled ? unavailableReason(state, entry) : null,
+    reason: disabled ? unavailableReason(state.expectedSidecarName, entry.option) : null,
     badges: buildBadges(entry)
   }
-}
-
-function unavailableReason(state: LyricsState, entry: LyricsSourceEntry): string {
-  if (!entry.option.available) {
-    if (entry.option.kind === 'embedded') return REASON_EMBEDDED_MISSING
-
-    const exactId = state.expectedSidecarName
-      ? `sidecar:${state.expectedSidecarName}`
-      : null
-    if (exactId !== null && entry.option.id === exactId) {
-      return `No "${state.expectedSidecarName}" next to this track`
-    }
-    return REASON_SIDECAR_MISSING
-  }
-
-  return REASON_UNREADABLE
 }
 
 function buildBadges(entry: LyricsSourceEntry): SourceMenuBadge[] {

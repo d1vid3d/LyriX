@@ -113,6 +113,8 @@ nowPlaying = new NowPlayingController({
   subscribeLyrics: (listener) => lyricsController.subscribe(listener),
   selectLyricSource: (sourceId) => lyricsController.selectSource(sourceId),
   setLyricPreference: (preference) => lyricsController.setPreference(preference),
+  setTranslationEnabled: (enabled) => lyricsController.setTranslationEnabled(enabled),
+  selectTranslation: (id) => lyricsController.selectTranslation(id),
   reloadLyrics: () => lyricsController.reload(),
   lyricView,
   showSection: (section) => navigation.showSection(section),

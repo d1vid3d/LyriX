@@ -32,6 +32,7 @@ Current capabilities:
 - Queue an album (album detail) or the visible filtered list (tracks view).
 - Load embedded lyrics on demand and display them in a **Now Playing** view.
 - Render line-timed LRC, word-timed enhanced LRC, and plain untimed lyrics.
+- Render an aligned translation under each lyric line, with a menu picker and quick toggle.
 - Synchronize lyrics from `requestAnimationFrame` using only the playback engine position.
 - Persist the last folder, volume, active view, and per-view sort between launches.
 
@@ -44,7 +45,7 @@ state, and lyric presentation.**
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 325 tests pass across 18 files. |
+| `npm test` | 356 tests pass across 20 files. |
 | `npm run build` | Passes; emits `out/main`, `out/preload`, `out/renderer`. |
 | `npm run dev` | Starts electron-vite and Electron. |
 
@@ -68,8 +69,10 @@ open/close, search/view/scroll preservation, and console cleanliness.
 ### Non-goals (current scope)
 
 Shuffle, repeat, gapless playback, crossfade, queue panel/editing, fuzzy search, search history,
-filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online lyric
-lookup, singer-specific styling, translation rendering/editing, TTML, tag editing, packaging.
+filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online lyric or
+translation lookup, singer-specific styling, translation editing, swapping original/translation,
+side-by-side translation layout, word-level translation timing, per-language fonts, translation
+keyboard shortcuts, TTML, tag editing, packaging.
 
 ### Invariants
 
@@ -144,8 +147,12 @@ lookup, singer-specific styling, translation rendering/editing, TTML, tag editin
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
 │    ├─ lyrics/lyricsController.ts ── fetch/parse/select/state/cache   │
 │    ├─ lyrics/translationState.ts ── pure translation-layer state     │
+│    ├─ lyrics/translationMenuModel.ts ── translation menu/toggle model│
+│    ├─ lyrics/translationLabels.ts ── language + sidecar examples     │
+│    ├─ lyrics/translationText.ts ── per-line translation lookup       │
 │    ├─ lyrics/segmentGroups.ts ── pure word grouping                  │
 │    ├─ ui/lyricView.ts ── lyric DOM + rAF sync + scroll + seek        │
+│    ├─ ui/translationToggle.ts ── translation quick-toggle pill       │
 │    └─ styles/lyrics.css + src/style.css ── all presentation          │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -217,15 +224,18 @@ LyriX/
 │  │  │  ├─ style.css          theme + app layout
 │  │  │  └─ views/             album grid, artist list, tracks, details
 │  │  ├─ styles/lyrics.css     lyric + Now Playing styling
-│  │  ├─ styles/lyricSourceMenu.css  source chip/popover styling
+│  │  ├─ styles/lyricSourceMenu.css  source chip/popover + translation toggle styling
 │  │  ├─ library/query.ts      pure view/sort/search registry
 │  │  ├─ player/engine.ts      playback abstraction
 │  │  ├─ player/queue.ts       pure queue
 │  │  ├─ lyrics/lyricsController.ts  source fetch/parse/select/state/cache
 │  │  ├─ lyrics/translationState.ts  pure translation layer + document attachment
+│  │  ├─ lyrics/translationMenuModel.ts pure translation section + quick-toggle model
+│  │  ├─ lyrics/translationLabels.ts language labels + sidecar example names
+│  │  ├─ lyrics/translationText.ts   per-line translation text lookup
 │  │  ├─ lyrics/segmentGroups.ts
 │  │  ├─ lyrics/sourceMenuModel.ts   pure source-menu view model + keyboard helper
-│  │  └─ ui/{lyricView,lyricSourceMenu,lyricSourceMenuView,virtualList}.ts
+│  │  └─ ui/{lyricView,lyricSourceMenu,lyricSourceMenuView,translationToggle,virtualList}.ts
 │  └─ shared/
 │     ├─ types.ts              cross-process data + API types
 │     └─ lyrics/
@@ -256,6 +266,8 @@ LyriX/
    ├─ sidecar.test.ts
    ├─ sourceMenuModel.test.ts
    ├─ translation.test.ts
+   ├─ translationLabels.test.ts
+   ├─ translationText.test.ts
    └─ fixtures/{LineByLine.txt,TimedWordByWord.txt}
 ```
 
@@ -670,8 +682,9 @@ Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, and `activeAtte
   it was open; both close paths also close the source menu.
 - `leaveForNavigation` closes it silently for actions that will render another view.
 - It subscribes to the lyric controller and only renders while open, but it always updates the
-  source-menu view model. The menu callbacks are wired to `selectSource`, `setPreference`, and
-  `reload` through `NowPlayingDeps`; the controller itself stays DOM-free.
+  source-menu and translation-toggle view models. The menu callbacks are wired to `selectSource`,
+  `setPreference`, `setTranslationEnabled`, `selectTranslation`, and `reload` through
+  `NowPlayingDeps`; the controller itself stays DOM-free.
 
 `PlayerBar` owns the bottom bar: now-playing title/artist/cover, play/pause labels and disabled
 states, duration, seek value, and time labels. It reads the current track and playing state through
@@ -822,7 +835,9 @@ Behavior:
   and not the current primary; each carries its alignment report.
 - `state.doc` is the primary document with `attachTranslation` applied (key = translation option id)
   only when translation is enabled and a translation is selected. Otherwise it is exactly the plain
-  primary document. `key` is null while nothing is attached.
+  primary document. `key` is null while nothing is attached. The derived instance is memoized by
+  primary-document identity + translation key, so unchanged recomputations keep the same `state.doc`
+  and the lyric view does not rebuild its DOM.
 - `setTranslationEnabled(enabled)` persists through `saveTranslationSettings` and recomputes.
   `applyTranslationSettings({ enabled, language })` applies both fields; startup uses
   `{ persist: false }`.
@@ -864,6 +879,10 @@ Behavior:
 - Timed documents add `.lyric-line--seekable`, `tabindex="0"`, and `role="button"`.
 - Lines with segments build `.lyric-word` containers (nowrap) containing `.lyric-seg` spans with
   `data-segment-index`; lines without segments set `textContent` directly.
+- When a translation key is active and a line has non-empty text for it, a `div.lyric-translation`
+  is appended as the **last** child of that line. Lines without a translation get no element. The
+  translation is plain line-level text, never word-split; `lang` is set only when the selected
+  option's variant matches `/^[a-z]{2,3}(-[A-Za-z0-9]+)*$/i`.
 - Plain documents add `.lyric-lines--static` and no click/seek behavior.
 
 **Synchronization**
@@ -878,7 +897,12 @@ Behavior:
 - Segment classes toggled only when flags change: `lyric-seg--sung`, `--active`, `--upcoming`.
 - The active segment gets `--progress` from `segmentProgress`; the previous active element's
   `--progress` is removed. Segment state is cleared when a line leaves the active set.
+- Translation state is inherited through ancestor line classes only; JavaScript never toggles
+  classes or styles on `.lyric-translation`.
 - The current line is centered with smooth scrolling when the primary line changes.
+- A rebuild caused by toggling translation or switching the translation source on the same track
+  centers the current line immediately (no smooth animation, no jump to the top). Track changes keep
+  their existing behavior.
 - Manual wheel/touch/drag pauses auto-centering for **4 seconds**; the pending target is applied after
   the pause.
 - Clicking a timed line (or pressing Enter/Space on it) seeks to `line.start`; it does not change
@@ -903,6 +927,20 @@ Model:
 - `reload` — `Reload sources` or `Reloading…`, disabled while loading.
 - `emptyState` — `No lyrics found` plus a hint using `expectedSidecarName` or a generic fallback.
 - `loadingMessage` — the lyric-view loading text.
+- `translation` — `label`, `status` (`off` / `active` / `unavailable` / `needs-choice`), a switch
+  (`Show translation`, checked, disabled only while off with no eligible option, hint), an Auto row
+  (`Language: <LANG>` when sticky, else `Using: <label>`), and rows only while enabled. Rows carry
+  the saved-choice `checked`, `inUse`, disabled/reason (`Currently used as lyrics`, the same
+  source-missing reasons, or `Couldn't read any lyric lines`), a muted `Intl.DisplayNames` language
+  badge with raw-variant fallback, and an alignment badge. Alignment text is `Matched n/total` for
+  time, `Paired by line order` for index, and `Partial match n/total` for partial; a warning tone and
+  a one-sentence tooltip appear when `matched < total` or the method is index/partial.
+- `translationToggle` — `Translation`, `pressed`, disabled while loading, when there are no lyrics,
+  or when translation is off with no eligible option, plus a state-explaining tooltip.
+
+The translation section and quick-toggle model are built by
+`src/renderer/lyrics/translationMenuModel.ts`; the language and sidecar-example helpers live in
+`translationLabels.ts`, and the per-line text lookup in `translationText.ts`.
 
 Pure keyboard helpers:
 
@@ -912,27 +950,41 @@ Pure keyboard helpers:
 
 ### 9.19 `src/renderer/ui/lyricSourceMenu.ts` — source chip and popover
 
-Constructed with a container and `{ onSelect, onPreference, onReload }`. It knows nothing about the
-controller.
+Constructed with a container and `{ onSelect, onPreference, onTranslationToggle,
+onTranslationSelect, onReload }`. It knows nothing about the controller.
 
 - `update(model)` refreshes the chip and, while open, re-renders the popover in place. Focus is
   restored by item key when possible.
 - `open()` shows the popover, sets `aria-expanded="true"`, and focuses the first enabled item.
 - `close()` hides it and resets `aria-expanded`. `isOpen()` and `destroy()` complete the lifecycle.
 - The chip is a `aria-haspopup="menu"` button. The popover is `role="menu"` with a labelled source
-  `role="group"` and preference `role="group"`.
+  `role="group"`, the preference `role="group"`, and a Translation section.
 - Source and preference rows are `role="menuitemradio"` with `aria-checked`; Reload is
   `role="menuitem"`. Disabled rows get `disabled` and `aria-disabled="true"`.
+- The Translation section starts with a `role="menuitemcheckbox"` switch row carrying its hint.
+  While enabled it renders a labelled `role="group"` with the Auto row and every translation option
+  (`role="menuitemradio"`), using the same badges, `In use` pill, and disabled reasons as source
+  rows. Toggling the switch leaves the menu open so the rows can appear/disappear; picking a
+  translation row or Auto closes it.
 - Source selection closes the menu; preference changes and Reload leave it open.
 - Keyboard: Enter/Space/ArrowDown on the chip opens and focuses the first enabled item;
   ArrowUp/ArrowDown wrap over enabled items, Home/End jump, Enter/Space activate, Escape closes and
-  returns focus to the chip, and Tab closes. Escape is consumed while the menu is open so it does
-  not also close Now Playing or clear search.
+  returns focus to the chip, and Tab closes. The translation switch and enabled translation rows are
+  part of the same navigation ring; disabled rows are skipped. Escape is consumed while the menu is
+  open so it does not also close Now Playing or clear search.
 - A capture-phase pointerdown listener closes the popover on outside clicks.
 
 `src/renderer/ui/lyricSourceMenuView.ts` builds the popover body (title, source rows, badges,
-preference group, Reload) from the model. It is stateless; the component owns events, focus, and
-open/close state.
+preference group, Translation section, Reload) from the model. It is stateless; the component owns
+events, focus, and open/close state.
+
+### 9.19.1 `src/renderer/ui/translationToggle.ts` — quick translation pill
+
+- Constructed with a container and `{ onToggle(enabled) }`; `update(model)` sets the label,
+  `aria-pressed`, disabled state, `title`, and accessible label from the model.
+- It knows nothing about the controller and reports the next pressed state on click.
+- It sits next to the lyric source chip in the Now Playing header; the pressed state uses the
+  accent color.
 
 ### 9.20 Styles
 
@@ -951,6 +1003,11 @@ bar, and scrollbars.
 | `--lyric-color-active` | `#f1f1f4` | Bright current-line text. |
 | `--lyric-color-sung` | `var(--accent)` | Sung words and fill. |
 | `--lyric-line-gap` | `14px` | Space between lines. |
+| `--lyric-translation-font-size` | `calc(var(--lyric-font-size) * 0.8)` | Translation size under each line. |
+| `--lyric-translation-color-upcoming` | `#5a5a63` | Dim future translations. |
+| `--lyric-translation-color-past` | `#45454c` | Past/ended translations. |
+| `--lyric-translation-color-active` | `#c9c9d2` | Current/overlapping translations. |
+| `--lyric-translation-gap` | `4px` | Space between a line and its translation. |
 | `--lyric-transition` | color/opacity/font-size/transform 180 ms ease | Line transitions. |
 | `--lyric-transition-fast` | color 120 ms linear | Segment transitions. |
 
@@ -970,7 +1027,13 @@ Menu visual rules:
 - Rows are comfortable padded radio rows; badges are small muted pills; the `In use` pill uses the
   accent color; warning badges use `--lsm-warning`.
 - Disabled rows use `--lsm-disabled-opacity` and no hover/cursor affordance.
-- Focus-visible outlines use the accent color on the chip, rows, preference options, and Reload.
+- The Translation section reuses the preference-title styling, adds a small switch control
+  (`--lsm-switch-*`), a muted hint line, and the same row/badge visuals as sources. Language badges
+  are muted; alignment warnings reuse `--lsm-warning`.
+- The quick translation pill reuses the trigger padding/border/radius variables and uses the accent
+  color for its pressed (`aria-pressed="true"`) state.
+- Focus-visible outlines use the accent color on the chip, rows, preference options, translation
+  switch/rows, quick toggle, and Reload.
 
 Lyric visual rules:
 
@@ -983,6 +1046,10 @@ Lyric visual rules:
 - The active segment uses `background-clip: text` with a left-to-right gradient: sung color up to
   `--progress`, active color after it. `-webkit-text-fill-color: transparent` reveals the gradient;
   `color` stays opaque so leaving the active state never flashes dark.
+- `.lyric-translation` is a block under the line text, smaller, wrapping normally. It follows the
+  line state through ancestor classes: the current line is bright, other overlapping active lines
+  are slightly dimmer, and past/upcoming/ended translations stay dim. It inherits the line's
+  movement/scale and transitions through the DOM hierarchy.
 - Plain documents are static: no highlight, no seek cursor.
 - Now Playing uses a 280 px cover column beside the lyrics; at ≤ 820 px it stacks the cover/meta above
   the lyrics.
@@ -1152,8 +1219,8 @@ This module is pure: no DOM, Electron, audio, or filesystem APIs.
 - **Tracks view** — virtualized track list + empty state.
 - **Album detail** — back button, cover, title/artist/year, ordered track list.
 - **Artist detail** — back button, artist name/counts, album grid.
-- **Now Playing** — close button, large cover, title/artist/album, lyric source chip + popover,
-  lyric status/scroller.
+- **Now Playing** — close button, large cover, title/artist/album, translation quick toggle, lyric
+  source chip + popover (including the Translation section), lyric status/scroller.
 - **Player bar** — clickable current-track target, Previous/Play/Pause/Next, time, seek, duration,
   volume.
 - **Audio element** — hidden `<audio id="audio">`.
@@ -1169,9 +1236,10 @@ Keyboard:
 | `Enter`/`Space`/`ArrowDown` on the source chip | Open the source menu and focus its first enabled item. |
 | `ArrowUp`/`ArrowDown` in the source menu | Move focus through enabled items, skipping disabled ones and wrapping. |
 | `Home`/`End` in the source menu | Focus the first/last enabled item. |
-| `Enter`/`Space` in the source menu | Activate the focused source, preference, or Reload action. |
+| `Enter`/`Space` in the source menu | Activate the focused source, preference, translation switch, translation row, or Reload action. |
 | `Escape` in the source menu | Close the menu and return focus to the chip; does not close Now Playing or clear search. |
 | `Tab` in the source menu | Close the menu. |
+| Click/Enter/Space on the translation quick toggle | Show or hide the selected translation. |
 
 Accessibility details:
 
@@ -1180,8 +1248,11 @@ Accessibility details:
 - Lyric lines are focusable buttons only when timed.
 - The source chip uses `aria-haspopup="menu"` and a synchronized `aria-expanded`.
 - The source popover is `role="menu"` with labelled `role="group"` sections; source and preference
-  rows use `role="menuitemradio"` + `aria-checked`, Reload uses `role="menuitem"`, and disabled rows
-  use `disabled` + `aria-disabled="true"`.
+  rows use `role="menuitemradio"` + `aria-checked`, the translation switch uses
+  `role="menuitemcheckbox"` + `aria-checked`, Reload uses `role="menuitem"`, and disabled rows use
+  `disabled` + `aria-disabled="true"`.
+- The translation quick toggle uses `aria-pressed`, a model-driven `title`, and an accessible label.
+- Translation elements set `lang` only when the selected option's variant is a valid language tag.
 - Focus-visible outlines use the accent color.
 - Status/progress elements use `role="status"`.
 
@@ -1269,8 +1340,10 @@ environment; nothing mocks Electron or the DOM. The tested modules either have n
 | `tests/lyricSourceProviders.test.ts` | Canonical slot assembly; exact-sidecar id vs actual file name; variant ordering and extraction; provider failure isolation; saved-choice/preference/translation echo. |
 | `tests/lyricSources.test.ts` | Saved vs auto selection; sidecar/embedded preference order; missing and unusable saved choices; variant fallback; custom usability predicate; nothing usable; translation saved/auto, language matching, single fallback, ambiguity, and primary exclusion. |
 | `tests/lyrics.test.ts` | Both fixtures; format detection; metadata; word segments and agents; fractional timestamps; overlapping lines; gap behavior; offsets; warnings; sync helpers and progress clamps. |
-| `tests/lyricsController.test.ts` | Auto vs saved selection; embedded/sidecar preference; unusable source skipping; manual switch without refetch; clearing a choice; preference recomputation; reload bypassing the cache; stale-response guard; LRU eviction; cached “none”; reset behavior; translation enable/disable, auto by language, saved choice, sticky language, ineligible saved translation, and reload preservation. |
-| `tests/sourceMenuModel.test.ts` | Trigger/auto/saved states; canonical row order; badges (format, line count, singers, warnings); disabled reasons; loading labels; preference options; empty-state hints with and without `expectedSidecarName`; pure keyboard wrap/skip/edge helpers. |
+| `tests/lyricsController.test.ts` | Auto vs saved selection; embedded/sidecar preference; unusable source skipping; manual switch without refetch; clearing a choice; preference recomputation; reload bypassing the cache; stale-response guard; LRU eviction; cached “none”; reset behavior; translation enable/disable, auto by language, saved choice, sticky language, ineligible saved translation, reload preservation, and stable derived-document identity. |
+| `tests/sourceMenuModel.test.ts` | Trigger/auto/saved states; canonical row order; badges (format, line count, singers, warnings); disabled reasons; loading labels; preference options; empty-state hints with and without `expectedSidecarName`; translation status, switch/hint rules, auto row, hidden/disabled rows, language and alignment badges, quick-toggle states; pure keyboard wrap/skip/edge helpers with translation rows. |
+| `tests/translationLabels.test.ts` | Language-tag detection; English `Intl.DisplayNames` labels; raw-variant fallback for invalid tags; sidecar example names with/without a sticky language. |
+| `tests/translationText.test.ts` | Per-line translation lookup: missing key, missing entry, blank text, matching plain text. |
 | `tests/sidecar.test.ts` | Exact/variant matching; case-insensitive names and extension; ignored names and directories; 1 MiB cap; UTF-8/UTF-16 BOM decoding; symlink skip where supported; unreadable directory. |
 | `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
 | `tests/queue.test.ts` | Start-index clamping (negative, past end, fractional, non-finite); empty queue; next/previous at both ends; `hasNext`/`hasPrevious`; input-array copy; `getTracks`/`getCurrentIndex`. |
@@ -1339,14 +1412,18 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 | Playback backend or queue behavior | `src/renderer/player/engine.ts`, `src/renderer/player/queue.ts` |
 | Lyric source fetch, parsing, selection, LRU cache | `src/renderer/lyrics/lyricsController.ts` |
 | Lyric source menu labels, badges, disabled reasons, empty hint | `src/renderer/lyrics/sourceMenuModel.ts` |
+| Translation menu/toggle labels, status, badges, hints | `src/renderer/lyrics/translationMenuModel.ts` |
+| Language labels, sidecar example names | `src/renderer/lyrics/translationLabels.ts` |
+| Per-line translation text lookup | `src/renderer/lyrics/translationText.ts` |
 | Source chip/popover DOM, keyboard, ARIA, focus | `src/renderer/ui/lyricSourceMenu.ts` |
-| Source popover row/badge DOM builders | `src/renderer/ui/lyricSourceMenuView.ts` |
-| Lyric source menu styling | `src/renderer/styles/lyricSourceMenu.css` |
-| Now Playing source-menu wiring / close behavior | `src/renderer/src/nowPlaying.ts` |
+| Source popover row/badge/preference/translation DOM builders | `src/renderer/ui/lyricSourceMenuView.ts` |
+| Translation quick-toggle pill | `src/renderer/ui/translationToggle.ts` |
+| Lyric source/translation menu and quick-toggle styling | `src/renderer/styles/lyricSourceMenu.css` |
+| Now Playing source/translation wiring / close behavior | `src/renderer/src/nowPlaying.ts` |
 | Lyric cache refresh after rescan or `library:updated` | `src/renderer/lyrics/lyricsController.ts` (`clearCacheAndReload`), `src/renderer/src/libraryController.ts`, `src/renderer/src/main.ts` |
 | Lyric parsing/sync (stable core) | `src/shared/lyrics/` |
-| Lyric DOM, class toggles, scroll, seek | `src/renderer/ui/lyricView.ts` |
-| Lyric/Now Playing visual styling | `src/renderer/styles/lyrics.css` |
+| Lyric DOM, class toggles, scroll, seek, translation children | `src/renderer/ui/lyricView.ts` |
+| Lyric/Now Playing/translation visual styling | `src/renderer/styles/lyrics.css` |
 | App shell markup, CSP, element ids | `src/renderer/index.html` |
 
 ### Add a lyric source
@@ -1417,9 +1494,11 @@ only needs `getPosition` and `seek`; the rest of the UI uses the interface.
 - Word-level progress exists only for enhanced LRC with inline markers.
 - Singer labels (`v1:`) are parsed into `agent` and exposed as `data-agent`, but not styled or shown
   as separate voices.
-- Translations are aligned and attached to lyric lines (time/index/partial/none) but are not rendered
-  yet; there is no translation toggle or picker UI, no translation editing/writing, and no word-level
-  translation timing. TTML is typed/reserved but not parsed.
+- Translations are aligned and attached to lyric lines (time/index/partial/none) and rendered as
+  plain line-level text under each line, chosen through the Translation section or the quick toggle.
+  There is no translation editing/writing, no word-level translation timing, no swapping of
+  original/translation, no side-by-side layout, no per-language fonts, no translation keyboard
+  shortcut, and no online translation lookup. TTML is typed/reserved but not parsed.
 - Plain lyrics are static: no highlighting and no click-to-seek.
 - Sidecars are limited to the track's own directory and the `<base>.lrc` / `<base>.<variant>.lrc`
   names. Files over 1 MiB, symlinks, directories, and non-UTF-8/UTF-16 encodings are skipped.
@@ -1446,7 +1525,7 @@ npm run dev        # manual smoke: open a folder, play tracks, open Now Playing
 Expected:
 
 - Type-check passes for both projects.
-- All Vitest files pass (currently 325 tests across 18 files).
+- All Vitest files pass (currently 356 tests across 20 files).
 - Production bundles build into `out/`.
 - `npm run dev` opens the app with no console errors.
 - Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.

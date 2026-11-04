@@ -667,4 +667,39 @@ describe('LyricsController translation layer', () => {
       key: 'sidecar:a.en.lrc'
     })
   })
+
+  it('keeps the same derived document instance across unchanged emissions', async () => {
+    const fetchSources = vi.fn(async (trackId: string) =>
+      sources(trackId, [
+        embedded(trackId),
+        exact(trackId),
+        variant(trackId, 'en'),
+        variant(trackId, 'ja')
+      ])
+    )
+    const { controller } = createController(fetchSources, 'sidecar', undefined, {
+      enabled: true,
+      language: 'en'
+    })
+
+    controller.setTrack('a')
+    await flush()
+
+    const first = controller.getState().doc
+    expect(first?.lines[0]?.translations).toEqual({ 'sidecar:a.en.lrc': 'en' })
+
+    controller.setTranslationEnabled(true)
+    expect(controller.getState().doc).toBe(first)
+
+    controller.selectTranslation('sidecar:a.en.lrc')
+    expect(controller.getState().doc).toBe(first)
+
+    controller.setPreference('sidecar')
+    expect(controller.getState().doc).toBe(first)
+
+    controller.selectTranslation('sidecar:a.ja.lrc')
+    const next = controller.getState().doc
+    expect(next).not.toBe(first)
+    expect(next?.lines[0]?.translations).toEqual({ 'sidecar:a.ja.lrc': 'ja' })
+  })
 })

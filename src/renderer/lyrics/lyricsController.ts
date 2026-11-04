@@ -72,6 +72,11 @@ export class LyricsController {
   private preference: LyricPreference
   private translationEnabled: boolean
   private translationLanguage: string | null
+  private translationDocMemo: {
+    primary: LyricDocument
+    key: string
+    doc: LyricDocument
+  } | null = null
   private state: LyricsState
   private requestGeneration = 0
 
@@ -372,7 +377,7 @@ export class LyricsController {
     const previousTranslation = this.state.translation
     this.setState({
       status: usableSelected ? 'ready' : 'none',
-      doc: translation.doc,
+      doc: this.stableDocument(primaryDoc, translation.state.key, translation.doc),
       trackId,
       sources: cached.entries,
       selectedId: usableSelected?.option.id ?? null,
@@ -385,6 +390,27 @@ export class LyricsController {
     if (!sameTranslation(previousTranslation, translation.state)) {
       this.logTranslation(translation.state)
     }
+  }
+
+  /**
+   * Keeps the derived document instance stable while the primary document and translation key
+   * are unchanged, so the lyric view does not rebuild its DOM on unrelated state emissions.
+   */
+  private stableDocument(
+    primaryDoc: LyricDocument | null,
+    key: string | null,
+    next: LyricDocument | null
+  ): LyricDocument | null {
+    if (!primaryDoc || !key || !next) {
+      this.translationDocMemo = null
+      return next
+    }
+
+    const memo = this.translationDocMemo
+    if (memo && memo.primary === primaryDoc && memo.key === key) return memo.doc
+
+    this.translationDocMemo = { primary: primaryDoc, key, doc: next }
+    return next
   }
 
   private emptyState(trackId: string | null): LyricsState {

@@ -7,6 +7,8 @@ import {
 import type { LyricDocument, LyricLine } from '../../shared/lyrics'
 import type { PlaybackEngine } from '../player/engine'
 import { groupSegments } from '../lyrics/segmentGroups'
+import { isLanguageTag } from '../lyrics/translationLabels'
+import { translationTextForLine } from '../lyrics/translationText'
 
 const SEGMENT_CLASSES = [
   'lyric-seg--sung',
@@ -48,6 +50,8 @@ export class LyricView {
   private readonly engine: Pick<PlaybackEngine, 'getPosition' | 'seek'>
 
   private doc: LyricDocument | null = null
+  private translationKey: string | null = null
+  private translationVariant: string | null = null
   private lineElements: HTMLElement[] = []
   private segmentElements = new Map<number, HTMLSpanElement[]>()
   private lineFlags: Array<LineFlags | null> = []
@@ -77,9 +81,15 @@ export class LyricView {
   }
 
   /** Rebuilds only when the document instance changes. */
-  setDocument(doc: LyricDocument): void {
+  setDocument(
+    doc: LyricDocument,
+    translationKey: string | null = null,
+    translationVariant: string | null = null
+  ): void {
     const changed = this.doc !== doc
     this.doc = doc
+    this.translationKey = translationKey
+    this.translationVariant = translationVariant
 
     if (changed) {
       this.build(doc)
@@ -91,6 +101,8 @@ export class LyricView {
     if (this.running) {
       this.resetSyncState()
       if (doc.timed) {
+        // A rebuild (track change, translation toggle, or source switch) keeps the current
+        // line centered immediately; only ordinary line changes scroll smoothly.
         this.sync(true)
         this.startFrame()
       } else {
@@ -165,12 +177,29 @@ export class LyricView {
         lineElement.textContent = line.text
       }
 
+      this.appendTranslation(lineElement, line)
+
       this.lineElements.push(lineElement)
       fragment.append(lineElement)
     }
 
     this.linesElement.classList.toggle('lyric-lines--static', !doc.timed)
     this.linesElement.replaceChildren(fragment)
+  }
+
+  private appendTranslation(lineElement: HTMLElement, line: LyricLine): void {
+    const text = translationTextForLine(line, this.translationKey)
+    if (text === null) return
+
+    const translation = document.createElement('div')
+    translation.className = 'lyric-translation'
+    translation.textContent = text
+
+    if (isLanguageTag(this.translationVariant)) {
+      translation.lang = this.translationVariant
+    }
+
+    lineElement.append(translation)
   }
 
   private buildSegments(lineElement: HTMLElement, line: LyricLine): void {

@@ -4,8 +4,9 @@ Notice: This project is still in early development and may be unstable. It is no
 
 A minimal desktop player for local FLAC files, built with Electron, electron-vite and plain
 TypeScript/HTML/CSS. It reads tags, groups tracks into albums, shows cover art, offers album,
-artist and track views with search and sorting, loads embedded or sidecar `.lrc` lyrics, and
-remembers the last folder, volume, view and lyric preference between launches.
+artist and track views with search and sorting, loads embedded or sidecar `.lrc` lyrics, renders an
+aligned translation under each line, and remembers the last folder, volume, view, lyric preference
+and translation settings between launches.
 
 ## Requirements
 
@@ -61,13 +62,18 @@ npm test            # run the Vitest suite
 | `src/renderer/player/queue.ts` | Pure album queue with a current index and bounded next/previous. |
 | `src/renderer/lyrics/lyricsController.ts` | On-demand lyric source fetch/parse/selection, translation-layer state, stale-response guard and LRU source cache (no DOM). |
 | `src/renderer/lyrics/translationState.ts` | Pure translation eligibility, alignment reports and document attachment (no DOM). |
+| `src/renderer/lyrics/translationMenuModel.ts` | Pure translation menu section and quick-toggle view model: status, switch, Auto row, badges, hints. |
+| `src/renderer/lyrics/translationLabels.ts` | Language-tag detection, `Intl.DisplayNames` labels and sidecar example names. |
+| `src/renderer/lyrics/translationText.ts` | Pure per-line translation text lookup. |
+| `src/renderer/lyrics/lyricMenuText.ts` | Shared disabled-reason strings for source and translation rows. |
 | `src/renderer/lyrics/segmentGroups.ts` | Pure grouping of word-timed segments into nowrap word containers. |
-| `src/renderer/lyrics/sourceMenuModel.ts` | Pure lyric-source menu view model, user-facing strings, disabled reasons, badges and keyboard helper. |
-| `src/renderer/ui/lyricView.ts` | Builds lyric DOM once, syncs line/segment classes and progress, centers and seeks. |
+| `src/renderer/lyrics/sourceMenuModel.ts` | Pure lyric-source menu view model, user-facing strings, disabled reasons, badges, translation section and keyboard helper. |
+| `src/renderer/ui/lyricView.ts` | Builds lyric DOM once, renders translation children, syncs line/segment classes and progress, centers and seeks. |
 | `src/renderer/ui/lyricSourceMenu.ts` | Source chip and popover DOM, keyboard navigation, ARIA and focus handling. |
-| `src/renderer/ui/lyricSourceMenuView.ts` | Stateless popover row, badge and preference DOM builders. |
-| `src/renderer/styles/lyrics.css` | Lyric colors, sizes, transitions, progress fill and Now Playing layout. |
-| `src/renderer/styles/lyricSourceMenu.css` | Source chip/popover styling, with restyle variables at the top. |
+| `src/renderer/ui/lyricSourceMenuView.ts` | Stateless popover row, badge, preference and translation-section DOM builders. |
+| `src/renderer/ui/translationToggle.ts` | Small translation on/off pill with `aria-pressed`, driven by the view model. |
+| `src/renderer/styles/lyrics.css` | Lyric and translation colors, sizes, transitions, progress fill and Now Playing layout. |
+| `src/renderer/styles/lyricSourceMenu.css` | Source chip/popover, translation section and quick-toggle styling, with restyle variables at the top. |
 | `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, scanning UI and UI-state persistence. |
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
@@ -86,11 +92,13 @@ npm test            # run the Vitest suite
 | `tests/lyricSourceProviders.test.ts` | Vitest coverage for canonical source assembly, variant extraction and provider failure isolation. |
 | `tests/lyricSources.test.ts` | Vitest coverage for saved/auto selection, preference order, usability rules and translation selection. |
 | `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
-| `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, translation enable/selection, reload, stale responses, caching and eviction. |
+| `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, translation enable/selection, stable derived-document identity, reload, stale responses, caching and eviction. |
 | `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
 | `tests/sidecar.test.ts` | Vitest coverage for sidecar matching, size limits, BOM decoding, variant extraction and symlink skipping. |
-| `tests/sourceMenuModel.test.ts` | Vitest coverage for source-menu labels, badges, reasons, empty hints and keyboard navigation. |
+| `tests/sourceMenuModel.test.ts` | Vitest coverage for source-menu labels, badges, reasons, empty hints, translation status/switch/rows/badges, quick-toggle states and keyboard navigation. |
 | `tests/translation.test.ts` | Vitest coverage for time/index/partial/none alignment, blanks, duet timestamps, untimed documents and non-mutating attachment. |
+| `tests/translationLabels.test.ts` | Vitest coverage for language-tag detection, display names, invalid-tag fallback and sidecar example names. |
+| `tests/translationText.test.ts` | Vitest coverage for per-line translation lookup and blank/missing entries. |
 
 ## How the library works
 
@@ -183,8 +191,10 @@ switch sources without refetching. `reload()` bypasses the cache while keeping t
 an edited sidecar is picked up. It contains no DOM code. The translation layer is derived on every
 recompute: a second source (never the primary) is chosen by saved choice or sticky language, aligned
 against the primary with `alignTranslation`, and attached to `state.doc` only when translation is
-enabled. No translation UI or rendering exists yet. `LyricView` builds the line DOM once per
-document, keeps word containers unbreakable, and toggles only changed line/segment classes from
+enabled. The derived document is memoized by primary-document identity plus translation key, so
+unrelated state emissions do not rebuild the lyric DOM. `LyricView` builds the line DOM once per
+document, keeps word containers unbreakable, appends a plain `div.lyric-translation` under lines
+that have text for the active key, and toggles only changed line/segment classes from
 `requestAnimationFrame`, reading the position from the `PlaybackEngine`. The current line is centered
 with smooth scrolling; manual wheel/touch/drag pauses centering for four seconds. Clicking a timed
 line seeks to its start without changing play/pause. Plain documents are static and not clickable.
@@ -210,6 +220,19 @@ consumes Escape so it does not also close Now Playing. A rescan or `library:upda
 lyric cache and reloads the current track's sources, so edited tags and sidecars appear without
 losing a saved choice. When nothing is found, the empty state keeps “No lyrics found” and adds a
 hint naming the expected sidecar file (or a generic version when the name is unavailable).
+
+A **Translation** pill sits next to the source chip and toggles the selected translation under each
+lyric line; it uses `aria-pressed`, shows a state-explaining tooltip, and is disabled while lyrics
+load, when there are no lyrics, or when translation is off with no eligible option. The source
+popover also has a Translation section: a **Show translation** switch (kept open when toggled) and,
+while enabled, an **Auto** row plus every eligible translation option. Rows show the same saved-choice
+radio, `In use` pill and disabled reasons as source rows, plus a muted language badge
+(`Intl.DisplayNames`, raw variant as fallback) and an alignment badge. Alignment reads
+`Matched n/total` for timestamp matching, `Paired by line order` for index matching, and
+`Partial match n/total` for partial matching; anything short of a full timestamp match gets a warning
+tone and a one-sentence tooltip. Translation text is plain line-level text and follows the line's
+current/past/upcoming styling through ancestor classes; it is never word-highlighted. Toggling or
+switching translation on the same track keeps the current line centered without animation.
 
 ## How local playback works
 
@@ -238,5 +261,6 @@ are stored in `userData/settings.json` and restored on the next launch.
 
 Shuffle, repeat modes, gapless playback, crossfade, a visible queue panel, queue editing, fuzzy
 search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
-virtualization, online lyric lookup, singer-specific lyric styling, translation rendering/editing,
-TTML, tag editing and packaging are intentionally not implemented.
+virtualization, online lyric or translation lookup, singer-specific lyric styling, translation
+editing, swapping original/translation, side-by-side translation layout, word-level translation
+timing, per-language fonts, TTML, tag editing and packaging are intentionally not implemented.

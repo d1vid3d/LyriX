@@ -62,12 +62,19 @@
   --lsm-option-inner-gap: 6px;
   --lsm-option-padding: 6px 10px;
   --lsm-reload-padding: 8px 10px;
+  --lsm-switch-width: 28px;
+  --lsm-switch-height: 16px;
+  --lsm-switch-knob: 12px;
+  --lsm-switch-inset: 2px;
+  --lsm-switch-offset: calc(var(--lsm-switch-width) - var(--lsm-switch-knob) - var(--lsm-switch-inset) * 2);
 }
 
 .now-playing-lyrics-header {
   display: flex;
   flex: none;
+  align-items: center;
   justify-content: flex-end;
+  gap: var(--lsm-gap);
   padding: var(--lsm-header-padding);
 }
 
@@ -359,4 +366,106 @@
 .lyric-source-reload:disabled {
   opacity: var(--lsm-disabled-opacity);
   cursor: default;
+}
+
+/* Translation section */
+
+.lyric-translation-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsm-preference-gap);
+}
+
+.lyric-translation-switch-row {
+  align-items: center;
+}
+
+.lyric-translation-switch {
+  position: relative;
+  display: inline-block;
+  width: var(--lsm-switch-width);
+  height: var(--lsm-switch-height);
+  margin-top: var(--lsm-radio-offset);
+  border-radius: var(--lsm-radius-pill);
+  background: var(--lsm-border);
+  transition: background var(--lsm-transition);
+}
+
+.lyric-translation-switch::after {
+  position: absolute;
+  top: var(--lsm-switch-inset);
+  left: var(--lsm-switch-inset);
+  width: var(--lsm-switch-knob);
+  height: var(--lsm-switch-knob);
+  border-radius: var(--lsm-radio-radius);
+  background: var(--lsm-text);
+  content: '';
+  transition: transform var(--lsm-transition);
+}
+
+.lyric-translation-switch--on {
+  background: var(--lsm-accent);
+}
+
+.lyric-translation-switch--on::after {
+  background: var(--lsm-background);
+  transform: translateX(var(--lsm-switch-offset));
+}
+
+.lyric-translation-hint {
+  color: var(--lsm-muted);
+  font-size: var(--lsm-small-font-size);
+  line-height: var(--lsm-reason-line-height);
+}
+
+.lyric-translation-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsm-group-gap);
+}
+
+/* Quick translation toggle */
+
+.translation-toggle-host {
+  display: inline-flex;
+  align-items: center;
+}
+
+.translation-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--lsm-trigger-padding);
+  border: var(--lsm-border-width) solid var(--lsm-border);
+  border-radius: var(--lsm-radius-pill);
+  background: transparent;
+  color: var(--lsm-muted);
+  font: inherit;
+  font-size: var(--lsm-trigger-font-size);
+  line-height: var(--lsm-trigger-line-height);
+  cursor: pointer;
+  transition:
+    color var(--lsm-transition),
+    border-color var(--lsm-transition),
+    background var(--lsm-transition);
+}
+
+.translation-toggle:hover:not(:disabled) {
+  border-color: var(--lsm-accent);
+  color: var(--lsm-text);
+}
+
+.translation-toggle[aria-pressed='true'] {
+  border-color: var(--lsm-accent);
+  background: color-mix(in srgb, var(--lsm-accent) 18%, transparent);
+  color: var(--lsm-accent);
+}
+
+.translation-toggle:disabled {
+  opacity: var(--lsm-disabled-opacity);
+  cursor: default;
+}
+
+.translation-toggle:focus-visible {
+  outline: var(--lsm-focus-outline);
+  outline-offset: var(--lsm-focus-offset);
 }
