@@ -9,7 +9,8 @@ const DEFAULTS: Settings = {
   lastFolder: null,
   volume: 1,
   lastView: 'albums',
-  sortByView: {}
+  sortByView: {},
+  lyricPreference: 'sidecar'
 }
 
 let directory = ''
@@ -71,9 +72,25 @@ describe('loadSettings', () => {
       lastFolder: null,
       volume: 1,
       lastView: 'albums',
-      sortByView: { tracks: 'title' }
+      sortByView: { tracks: 'title' },
+      lyricPreference: 'sidecar'
     })
   })
+
+  it.each([
+    ['sidecar', 'sidecar'],
+    ['embedded', 'embedded'],
+    ['invalid', 'sidecar'],
+    [null, 'sidecar'],
+    [42, 'sidecar']
+  ] as Array<[unknown, Settings['lyricPreference']]>)(
+    'normalizes lyricPreference %j to %j',
+    async (preference, expected) => {
+      await writeJson({ lyricPreference: preference })
+
+      expect((await loadSettings(settingsPath())).lyricPreference).toBe(expected)
+    }
+  )
 
   it.each([
     [-1, 0],
@@ -129,8 +146,9 @@ describe('saveSettings', () => {
       lastFolder: '   ',
       volume: -3,
       lastView: '',
-      sortByView: { albums: '', artists: 'name' }
-    } as Settings
+      sortByView: { albums: '', artists: 'name' },
+      lyricPreference: 'bogus'
+    } as unknown as Settings
 
     await saveSettings(settingsPath(), invalid)
 
@@ -139,7 +157,15 @@ describe('saveSettings', () => {
       lastFolder: null,
       volume: 0,
       lastView: 'albums',
-      sortByView: { artists: 'name' }
+      sortByView: { artists: 'name' },
+      lyricPreference: 'sidecar'
     })
+  })
+
+  it('persists a valid lyric preference', async () => {
+    await saveSettings(settingsPath(), { ...DEFAULTS, lyricPreference: 'embedded' })
+
+    const raw = JSON.parse(await readFile(settingsPath(), 'utf8'))
+    expect(raw.lyricPreference).toBe('embedded')
   })
 })

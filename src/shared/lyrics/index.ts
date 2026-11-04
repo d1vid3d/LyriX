@@ -9,6 +9,15 @@ export type {
   ResolvedLyricParseOptions
 } from './types'
 export { detectLyricFormat, parseLyrics } from './parse'
+export { selectLyricSource } from './sources'
+export type {
+  LyricPreference,
+  LyricSourceKind,
+  LyricSourceOption,
+  LyricSources,
+  SelectedLyricSource,
+  SelectLyricSourceContext
+} from './sources'
 export {
   findActiveLineIndex,
   findActiveLineIndexes,

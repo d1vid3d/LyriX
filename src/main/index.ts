@@ -5,6 +5,7 @@ import { loadLibraryCache } from './cache'
 import { CoverService } from './covers'
 import { registerIpc } from './ipc'
 import { restoreLibrary } from './library'
+import { LyricChoiceStore } from './lyrics/choices'
 import { handleMediaProtocol, registerMediaScheme } from './media-protocol'
 import { ScanCoordinator } from './scanCoordinator'
 import { loadSettings } from './settings'
@@ -25,9 +26,13 @@ app
     const userData = app.getPath('userData')
     store.settingsFile = join(userData, 'settings.json')
     store.cacheFile = join(userData, 'library-cache.json')
+    store.lyricChoicesFile = join(userData, 'lyric-choices.json')
 
     store.settings = await loadSettings(store.settingsFile)
     store.cache = await loadLibraryCache(store.cacheFile)
+
+    const choices = new LyricChoiceStore(store.lyricChoicesFile)
+    await choices.load()
 
     let root: string | null = null
     if (store.settings.lastFolder) {
@@ -42,7 +47,7 @@ app
     handleMediaProtocol(new CoverService(join(userData, 'covers')))
 
     const scan = new ScanCoordinator(store, windows)
-    registerIpc(store, scan)
+    registerIpc(store, scan, choices)
     windows.createWindow()
 
     app.on('activate', () => {

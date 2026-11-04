@@ -1,11 +1,17 @@
 import type { Settings, UiState } from '../shared/types'
+import type { LyricPreference } from '../shared/lyrics/sources'
 import { readJsonFile, writeJsonAtomic } from './json-file'
 
 const DEFAULT_SETTINGS: Settings = {
   lastFolder: null,
   volume: 1,
   lastView: 'albums',
-  sortByView: {}
+  sortByView: {},
+  lyricPreference: 'sidecar'
+}
+
+export function normalizeLyricPreference(value: unknown): LyricPreference {
+  return value === 'embedded' ? 'embedded' : 'sidecar'
 }
 
 export function clampVolume(volume: number): number {
@@ -44,7 +50,8 @@ function normalize(value: Partial<Settings> | null): Settings {
         ? value.lastFolder
         : null,
     volume: clampVolume(value?.volume ?? DEFAULT_SETTINGS.volume),
-    ...normalizeUiState(value)
+    ...normalizeUiState(value),
+    lyricPreference: normalizeLyricPreference(value?.lyricPreference)
   }
 }
 

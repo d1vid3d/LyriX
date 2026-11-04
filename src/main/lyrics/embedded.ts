@@ -1,44 +1,20 @@
 import { parseFile } from 'music-metadata'
-import type { LyricsResult } from '../shared/types'
 
-/** The main process resolves the file path; resolvers never receive renderer input. */
-export interface LyricsTrack {
-  id: string
-  filePath: string
+export interface EmbeddedLyrics {
+  text: string
+  /** Tag name that supplied the text, e.g. "common.lyrics" or "vorbis:LYRICS". */
+  tag: string
 }
-
-export type LyricResolver = (track: LyricsTrack) => Promise<LyricsResult | null>
 
 const LYRICS_TAG_IDS = new Set(['lyrics', 'unsyncedlyrics'])
 const LINE_TIMESTAMP_RE = /^\s*\[\d+:\d{1,2}(?:\.\d+)?\]/m
 
-/**
- * Resolvers run in order and the first non-empty result wins. A sidecar `.lrc` resolver can be
- * inserted here without changing the IPC or renderer.
- */
-const RESOLVERS: readonly LyricResolver[] = [embeddedResolver]
-
-export async function resolveLyrics(track: LyricsTrack): Promise<LyricsResult | null> {
-  for (const resolver of RESOLVERS) {
-    try {
-      const result = await resolver(track)
-      if (result && result.text.trim() !== '') {
-        console.debug(`[lyrics] ${track.id} loaded from ${result.source}`)
-        return result
-      }
-    } catch (error) {
-      console.warn(`[lyrics] ${resolver.name || 'resolver'} failed for ${track.id}`, error)
-    }
-  }
-
-  return null
-}
-
-async function embeddedResolver(track: LyricsTrack): Promise<LyricsResult | null> {
-  const metadata = await parseFile(track.filePath, { duration: false, skipCovers: true })
+/** Reads embedded lyric tags without touching the filesystem outside the track file. */
+export async function readEmbeddedLyrics(filePath: string): Promise<EmbeddedLyrics | null> {
+  const metadata = await parseFile(filePath, { duration: false, skipCovers: true })
 
   const common = extractCommonLyrics(metadata.common.lyrics)
-  if (common) return { text: common, source: 'common.lyrics' }
+  if (common) return { text: common, tag: 'common.lyrics' }
 
   return extractNativeLyrics(metadata.native)
 }
@@ -72,7 +48,7 @@ function extractLyricEntry(entry: unknown): string | null {
   return extractTagValue(record.value)
 }
 
-function extractNativeLyrics(native: unknown): LyricsResult | null {
+function extractNativeLyrics(native: unknown): EmbeddedLyrics | null {
   if (!native || typeof native !== 'object') return null
 
   for (const [tagType, tags] of Object.entries(native as Record<string, unknown>)) {
@@ -86,7 +62,7 @@ function extractNativeLyrics(native: unknown): LyricsResult | null {
       if (!LYRICS_TAG_IDS.has(id.toLowerCase())) continue
 
       const text = extractTagValue(record.value)
-      if (text) return { text, source: `${tagType}:${id}` }
+      if (text) return { text, tag: `${tagType}:${id}` }
     }
   }
 

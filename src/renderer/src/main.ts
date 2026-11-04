@@ -27,7 +27,12 @@ attachCoverFallbacks([
   elements.nowPlayingCoverImage
 ])
 
-const lyricsController = new LyricsController((trackId) => window.library.getLyrics(trackId))
+const lyricsController = new LyricsController({
+  fetchSources: (trackId) => window.library.getLyricSources(trackId),
+  saveChoice: (trackId, sourceId) => window.library.saveLyricChoice(trackId, sourceId),
+  savePreference: (preference) => window.library.saveLyricPreference(preference),
+  preference: 'sidecar'
+})
 const lyricView = new LyricView({
   scroller: elements.lyricScroll,
   lines: elements.lyricLines,
@@ -153,6 +158,7 @@ library = new LibraryController({
     engine.setVolume(settings.volume)
     elements.volumeSlider.value = String(settings.volume)
     toolbar.applyUiSettings(settings)
+    lyricsController.setPreference(settings.lyricPreference, { persist: false })
   }
 })
 

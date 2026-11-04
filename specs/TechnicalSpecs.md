@@ -68,8 +68,9 @@ open/close, search/view/scroll preservation, and console cleanliness.
 ### Non-goals (current scope)
 
 Shuffle, repeat, gapless playback, crossfade, queue panel/editing, fuzzy search, search history,
-filters, artist images, multi-artist splitting, genres, grid/artist virtualization, sidecar `.lrc`
-loading, online lyric lookup, singer-specific styling, translations, TTML, tag editing, packaging.
+filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online lyric
+lookup, the lyric-source picker menu, singer-specific styling, translations, TTML, tag editing,
+packaging.
 
 ### Invariants
 
@@ -79,9 +80,10 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 3. **`media://` enforces path containment** using `realpath` + relative-path checks, and only serves
    regular `.flac` files or cached cover JPEGs.
 4. **Lyrics are on-demand only.** They are not read during scan and not stored in the library cache.
-5. **Lyric IPC never throws across the boundary.** Invalid ids, missing files, and parse failures
-   resolve to `null`.
-6. **Disk writes are atomic.** Settings, library cache, and cover files use temp-file + rename.
+5. **Lyric source IPC never throws across the boundary.** Invalid ids, missing files, and parse
+   failures resolve to `null`; choice writes validate their input and no-op on failure.
+6. **Disk writes are atomic.** Settings, library cache, lyric choices, and cover files use
+   temp-file + rename.
 7. **Scans are cancellable.** A generation counter makes stale scans stop reporting and never
    overwrite newer state.
 8. **Persisted values are validated** by the main process before use, and again by the renderer for
@@ -89,6 +91,8 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 9. **The renderer reads playback position only through `PlaybackEngine`**, never by reaching into the
    `<audio>` element for lyric sync.
 10. **UI updates are minimal.** Virtual rows and lyric lines update only when their state changes.
+11. **Sidecar reads stay inside the track's directory.** Only regular files are read; symlinks,
+    directories, and files over 1 MiB are skipped.
 
 ---
 
@@ -100,7 +104,7 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 │                                                                      │
 │  index.ts ── app lifecycle + startup wiring                          │
 │    ├─ window.ts ── BrowserWindow + renderer sends                    │
-│    ├─ ipc.ts ── library:*, settings:*, lyrics:get handlers           │
+│    ├─ ipc.ts ── library:*, settings:*, lyrics:* handlers             │
 │    ├─ scanCoordinator.ts ── generation, progress, folder persistence │
 │    ├─ store.ts ── settings/cache state                               │
 │    ├─ library.ts ── scan, cache reuse, snapshot, path index          │
@@ -109,7 +113,7 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 │    │    └─ ids.ts ── SHA-1 ids                                       │
 │    ├─ cache.ts / settings.ts / json-file.ts ── persistence           │
 │    ├─ covers.ts ── embedded/folder art → cached JPEGs                │
-│    ├─ lyricsSource.ts ── ordered embedded lyric resolvers            │
+│    ├─ lyrics/ ── embedded + sidecar providers, choice store          │
 │    └─ media-protocol.ts + range.ts ── media:// serving + ranges      │
 │                                                                      │
 │  Events out: library:scan-progress, library:updated                  │
@@ -118,7 +122,8 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 ┌───────────────────────────────┴──────────────────────────────────────┐
 │ Preload (contextIsolation, sandbox)                                  │
 │  window.library: getState, openFolder, rescan, getSettings,          │
-│                  saveVolume, saveUiState, getLyrics,                 │
+│                  saveVolume, saveUiState, getLyricSources,           │
+│                  saveLyricChoice, saveLyricPreference,               │
 │                  onScanProgress, onLibraryUpdated                    │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ no Node APIs in renderer
@@ -137,7 +142,7 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 │    ├─ player/engine.ts ── PlaybackEngine + HtmlAudioEngine           │
 │    ├─ player/queue.ts ── pure current-index queue                    │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
-│    ├─ lyrics/lyricsController.ts ── fetch/parse/state/cache          │
+│    ├─ lyrics/lyricsController.ts ── fetch/parse/select/state/cache   │
 │    ├─ lyrics/segmentGroups.ts ── pure word grouping                  │
 │    ├─ ui/lyricView.ts ── lyric DOM + rAF sync + scroll + seek        │
 │    └─ styles/lyrics.css + src/style.css ── all presentation          │
@@ -152,7 +157,7 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 | Library cache/settings files | Main | None |
 | Cover extraction/resizing/cache | Main | Only via `media://cover/<id>` |
 | Audio bytes | Main (`media://track/<id>`) | `<audio src>` only |
-| Lyrics from tags | Main | `getLyrics(trackId)` |
+| Lyrics from embedded tags and sidecars | Main | `getLyricSources(trackId)` |
 | Playback position/transport | Renderer | Direct |
 | Library queries, search, sort | Renderer | Direct |
 | UI state persistence values | Renderer proposes, main validates/stores | Via IPC |
@@ -183,7 +188,11 @@ LyriX/
 │  │  ├─ covers.ts             cover extraction/resizing/cache
 │  │  ├─ media-protocol.ts     media:// handler
 │  │  ├─ range.ts              Range header parser
-│  │  ├─ lyricsSource.ts       lyric resolver list + embedded tags
+│  │  ├─ lyrics/
+│  │  │  ├─ embedded.ts        embedded tag resolver
+│  │  │  ├─ sidecar.ts         sidecar discovery + decoding
+│  │  │  ├─ sources.ts         provider list + canonical options
+│  │  │  └─ choices.ts         per-track choice store
 │  │  ├─ ids.ts                SHA-1 ids
 │  │  └─ json-file.ts          tolerant reads, atomic writes
 │  ├─ preload/
@@ -209,13 +218,14 @@ LyriX/
 │  │  ├─ library/query.ts      pure view/sort/search registry
 │  │  ├─ player/engine.ts      playback abstraction
 │  │  ├─ player/queue.ts       pure queue
-│  │  ├─ lyrics/lyricsController.ts
+│  │  ├─ lyrics/lyricsController.ts  source fetch/parse/select/state/cache
 │  │  ├─ lyrics/segmentGroups.ts
 │  │  └─ ui/{lyricView,virtualList}.ts
 │  └─ shared/
 │     ├─ types.ts              cross-process data + API types
 │     └─ lyrics/
 │        ├─ types.ts
+│        ├─ sources.ts         source types + pure selection
 │        ├─ parse.ts
 │        ├─ time.ts
 │        ├─ sync.ts
@@ -226,6 +236,9 @@ LyriX/
    ├─ cache.test.ts
    ├─ ids.test.ts
    ├─ json-file.test.ts
+   ├─ lyricChoices.test.ts
+   ├─ lyricSourceProviders.test.ts
+   ├─ lyricSources.test.ts
    ├─ lyrics.test.ts
    ├─ lyricsController.test.ts
    ├─ query.test.ts
@@ -234,6 +247,7 @@ LyriX/
    ├─ routeStack.test.ts
    ├─ segmentGroups.test.ts
    ├─ settings.test.ts
+   ├─ sidecar.test.ts
    └─ fixtures/{LineByLine.txt,TimedWordByWord.txt}
 ```
 
@@ -284,10 +298,13 @@ package is bundled into the CJS main process.
 | `CachedTrack` | Tag values plus `mtimeMs` and `size` for cache validation. |
 | `LibraryCache` | `version`, `folder`, `tracks: Record<absolutePath, CachedTrack>`. |
 | `UiState` | `lastView`, `sortByView`. |
-| `Settings` | `UiState` + `lastFolder`, `volume`. |
+| `Settings` | `UiState` + `lastFolder`, `volume`, `lyricPreference`. |
 | `ScanProgress` | `scanned`, `total`. |
 | `LibrarySnapshot` | `folderName`, `albums`. |
-| `LyricsResult` | `text`, `source` (tag/resolver that supplied it). |
+| `LyricPreference` | `"sidecar"` or `"embedded"` (global auto-selection default). |
+| `LyricSourceKind` | `"embedded"` or `"sidecar"`. |
+| `LyricSourceOption` | `id`, `kind`, `label`, `detail`, `available`, `text`; ids are `"embedded"` or `"sidecar:<file name>"` (file name only). |
+| `LyricSources` | `trackId`, ordered `options`, `savedChoice`, `preference`, `expectedSidecarName` (file name only). |
 | `LibraryApi` | Typed preload surface (see §8). |
 
 Ids are 40-character lowercase SHA-1 hex strings:
@@ -411,20 +428,43 @@ ready.
 `parseByteRange(header, size)` supports `start-end`, `start-`, and `-suffix`, returning
 `{ start, end }`, `'invalid'`, or `'unsatisfiable'`.
 
-### 7.9 `src/main/lyricsSource.ts` — lyric resolvers
+### 7.9 `src/main/lyrics/` — lyric sources
 
-- `LyricsTrack = { id, filePath }`; `LyricResolver = (track) => Promise<LyricsResult | null>`.
-- `RESOLVERS` is an ordered list; currently only `embeddedResolver`. The first non-empty result wins.
-- Each resolver is wrapped in `try/catch`; failures are logged and the next resolver runs.
-- One `console.debug` is emitted per successful result with the track id and source.
-- `embeddedResolver` calls `parseFile(filePath, { duration: false, skipCovers: true })`.
-- Lookup order:
-  1. `common.lyrics` (string or `{ text }` / `{ syncText }` entries).
-  2. Native tags whose id is `LYRICS` or `UNSYNCEDLYRICS`, case-insensitive.
-- `music-metadata` strips timestamps from `common.lyrics[].text` but retains millisecond entries in
-  `syncText`; the resolver reconstructs line-timed LRC (`[mm:ss.cc]`) from `syncText` when the text
-  itself has no timestamps. This preserves timed and enhanced word lyrics.
-- Handles strings, arrays, `{ text }`, `{ value }`, and `{ syncText }` shapes defensively.
+`LyricsTrack = { id, filePath }`; `LyricSourceProvider = (track) => Promise<LyricSourceOption[]>`.
+The renderer only sends a track id; the path always comes from the scanned library.
+
+- `embedded.ts` — `readEmbeddedLyrics(filePath)` returns `{ text, tag }` or `null`.
+  - Calls `parseFile(filePath, { duration: false, skipCovers: true })`.
+  - Lookup order: `common.lyrics` (string or `{ text }` / `{ syncText }` entries), then native tags
+    whose id is `LYRICS` or `UNSYNCEDLYRICS`, case-insensitive.
+  - `music-metadata` strips timestamps from `common.lyrics[].text` but retains millisecond entries
+    in `syncText`; the resolver reconstructs line-timed LRC (`[mm:ss.cc]`) when the text itself has
+    no timestamps. This preserves timed and enhanced word lyrics.
+  - Handles strings, arrays, `{ text }`, `{ value }`, and `{ syncText }` shapes defensively.
+- `sidecar.ts` — `findSidecars(trackFilePath)`.
+  - Looks only in the track's own directory for `<base>.lrc` (exact) and `<base>.<variant>.lrc`
+    (variants). Names are compared case-insensitively after Unicode NFC normalization; `.lrc` is
+    case-insensitive too.
+  - Uses `lstat` and reads only regular files; symlinks and directories are skipped. Files larger
+    than 1 MiB are skipped.
+  - Decodes UTF-8 (BOM stripped) and UTF-16 LE/BE when their BOM is present.
+  - Per-file read/decode errors are logged and that file is skipped; an unreadable directory yields
+    an empty list.
+- `sources.ts` — `PROVIDERS` is the ordered provider list (`embedded`, `sidecar`). Adding a provider
+  that uses an existing source kind is one list entry.
+  - `getLyricSources(track, { savedChoice, preference })` runs every provider in `try/catch`; a
+    failing provider is logged and contributes nothing.
+  - Always returns the `embedded` slot and the exact sidecar slot with id
+    `sidecar:<expectedSidecarName>`, marking missing slots `available: false`. Variant sidecars
+    follow, sorted alphabetically. `expectedSidecarName` is a file name such as `Song.lrc`.
+  - `detail` is the tag name used or the actual sidecar file name; it is never a full path.
+- `choices.ts` — `LyricChoiceStore` for `userData/lyric-choices.json`.
+  - Shape: `{ version: 1, tracks: Record<trackId, sourceId> }`.
+  - Tolerant read: bad JSON, wrong version, or malformed containers become an empty map.
+  - Source ids must be `embedded` or `sidecar:` followed by a file name with no path separators,
+    at most 255 characters. Invalid ids are ignored.
+  - Writes atomically and caps the map at 5000 entries by dropping the oldest. API: `get`, `set`,
+    `clear`.
 
 ### 7.10 `src/main/ids.ts` and `json-file.ts`
 
@@ -447,9 +487,9 @@ ready.
 
 ### 7.12 `src/main/store.ts` — shared state
 
-`AppStore` holds `settings`, `cache`, `settingsFile`, and `cacheFile`. The startup code fills it and
-the scan coordinator / IPC handlers mutate it. Keeping it in one object preserves the previous
-module-level state without spreading it across modules.
+`AppStore` holds `settings`, `cache`, `settingsFile`, `cacheFile`, and `lyricChoicesFile`. The startup
+code fills it and the scan coordinator / IPC handlers mutate it. Keeping it in one object preserves
+the previous module-level state without spreading it across modules.
 
 ### 7.13 `src/main/scanCoordinator.ts` — scans and background refresh
 
@@ -465,24 +505,29 @@ module-level state without spreading it across modules.
 
 ### 7.14 `src/main/ipc.ts` — IPC handlers
 
-`registerIpc(store, scan)` registers the existing channels. `library:get-state` starts the one-time
-startup refresh only when a last folder exists, after the renderer has had a chance to subscribe.
+`registerIpc(store, scan, choices)` registers the existing channels. `library:get-state` starts the
+one-time startup refresh only when a last folder exists, after the renderer has had a chance to
+subscribe.
 
 | Channel | Input | Output |
 | --- | --- | --- |
 | `library:get-state` | — | `LibrarySnapshot` |
 | `library:open-folder` | — | `LibrarySnapshot \| null` (null on cancel/empty) |
 | `library:rescan` | — | `LibrarySnapshot \| null` (null when no root) |
-| `lyrics:get` | `trackId: unknown` | `LyricsResult \| null` |
+| `lyrics:get-sources` | `trackId: unknown` | `LyricSources \| null` |
+| `lyrics:set-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
 | `settings:get` | — | `Settings` |
 | `settings:set-volume` | `volume: unknown` | `void` (clamped) |
 | `settings:set-ui` | `UiState` candidate | `void` (normalized) |
+| `settings:set-lyric-preference` | `preference: unknown` | `void` (validated) |
 
 Events to renderer: `library:scan-progress` (throttled) and `library:updated` (after a successful
 background refresh).
 
-The lyrics handler rejects non-string/empty ids with `null`, resolves the path through
-`resolveTrackFile(trackId)`, and catches every error.
+`lyrics:get-sources` rejects non-string/empty ids with `null`, resolves the path through
+`resolveTrackFile(trackId)`, and catches every error. `lyrics:set-choice` validates the track id and
+source id; `null` clears the saved choice, and invalid input is a no-op. Preference writes accept
+only `"sidecar"` or `"embedded"`. Write failures are logged and never thrown across the boundary.
 
 ---
 
@@ -498,7 +543,9 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `getSettings()` | `settings:get` | Returns normalized settings. |
 | `saveVolume(volume)` | `settings:set-volume` | Main clamps the value. |
 | `saveUiState(state)` | `settings:set-ui` | Main normalizes the value. |
-| `getLyrics(trackId)` | `lyrics:get` | Returns raw text + source, or `null`. |
+| `getLyricSources(trackId)` | `lyrics:get-sources` | Returns ordered source options and selection context, or `null`. |
+| `saveLyricChoice(trackId, sourceId)` | `lyrics:set-choice` | `null` clears the per-track choice. |
+| `saveLyricPreference(preference)` | `settings:set-lyric-preference` | Main accepts only `"sidecar"` / `"embedded"`. |
 | `onScanProgress(listener)` | `library:scan-progress` | Returns an unsubscribe function. |
 | `onLibraryUpdated(listener)` | `library:updated` | Returns an unsubscribe function. |
 
@@ -682,30 +729,63 @@ Each renderer takes data plus callbacks and owns no global state:
   playing highlight changes); `destroy` removes listeners and DOM.
 - Used only by the tracks view, with 52 px rows.
 
-### 9.15 `src/renderer/lyrics/lyricsController.ts` — on-demand lyric state
+### 9.15 `src/renderer/lyrics/lyricsController.ts` — on-demand lyric sources
 
-No DOM, Electron, or filesystem references. Constructed with a fetch function
-(`window.library.getLyrics`).
+No DOM, Electron, or filesystem references. Constructed with explicit dependencies:
+
+```ts
+{
+  fetchSources(trackId), saveChoice(trackId, sourceId), savePreference(preference),
+  preference, cacheLimit?
+}
+```
 
 State:
 
 ```ts
-{ status: 'loading' | 'ready' | 'none', doc: LyricDocument | null, trackId: string | null }
+{
+  status: 'loading' | 'ready' | 'none',
+  doc: LyricDocument | null,
+  trackId: string | null,
+  sources: Array<{
+    option: LyricSourceOption,
+    doc: LyricDocument | null,
+    format: LyricFormat | null,
+    lineCount: number,
+    warningCount: number,
+    usable: boolean
+  }>,
+  selectedId: string | null,
+  mode: 'auto' | 'saved' | null,
+  preference: LyricPreference,
+  expectedSidecarName: string
+}
 ```
 
 Behavior:
 
 - `setTrack(id)` ignores a repeated id; `null` clears state.
 - Cache hit (including cached “none”) returns immediately and refreshes LRU order.
-- Otherwise emits `loading` and starts a fetch.
-- Each fetch captures a generation; a response is applied only if the generation is still current, so
-  slow responses for a previous track are ignored.
-- Parses with `parseLyrics`; empty text or zero lines becomes `none`.
-- Caches parsed documents **and** `null` results, up to **10** entries, evicting the least recently
+- Otherwise emits `loading`, fetches `LyricSources`, and parses every available option with
+  `parseLyrics`. An entry is usable only when it produces at least one line.
+- Selection uses the pure `selectLyricSource` with an `isUsable` predicate backed by those parsed
+  entries. `mode` is `"saved"` when the persisted per-track choice won and `"auto"` otherwise.
+- `status` is `"none"` when nothing is usable, but `sources` still exposes every option.
+- `selectSource(id)` switches immediately from the current entries without refetching and persists
+  the choice. `selectSource(null)` clears the choice and returns to auto. Unavailable or unusable
+  ids are ignored.
+- `setPreference(pref)` persists the preference and recomputes the current track. Startup settings
+  application passes `{ persist: false }`.
+- `reload()` bypasses the cache, refetches the current track, and keeps its saved choice so an
+  edited sidecar is picked up.
+- Each fetch captures a generation; a response is applied only if the generation is still current,
+  so slow responses for a previous track are ignored.
+- Caches whole parsed source entries (including “none”), up to **10**, evicting the least recently
   used.
 - `subscribe(listener)` adds a listener, immediately emits the current state, and returns an
   unsubscribe function.
-- Fetch/parse errors are logged and cached as `none`.
+- Fetch/parse errors are logged and cached as `none`. Options and the selection are logged with
+  `console.debug` once per fetched track.
 
 ### 9.16 `src/renderer/lyrics/segmentGroups.ts` — pure word grouping
 
@@ -888,9 +968,11 @@ This module is pure: no DOM, Electron, audio, or filesystem APIs.
 ### 11.4 Lyric load and display
 
 1. `setTrack` checks the LRU cache; a hit applies immediately.
-2. A miss sets `loading` and invokes `lyrics:get`.
-3. Main resolves the path from the library index and reads embedded tags.
-4. Main returns `{ text, source }` or `null`; the renderer parses and caches the result.
+2. A miss sets `loading` and invokes `lyrics:get-sources`.
+3. Main resolves the path from the library index, reads embedded tags and same-directory sidecars,
+   and returns ordered `LyricSources` or `null`.
+4. The renderer parses every available option, picks one with the saved-choice / preference rules,
+   and caches the whole source entry.
 5. If Now Playing is open, the controller subscription renders the new state:
    - `ready` → build/sync the document and start the frame loop,
    - `loading` → “Loading lyrics…”,
@@ -950,14 +1032,18 @@ All paths are under Electron `userData`.
 
 | Path | Contents | Write strategy |
 | --- | --- | --- |
-| `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`. | Normalized, atomic. |
+| `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`, `lyricPreference`. | Normalized, atomic. |
 | `library-cache.json` | Version, folder, per-path tag entries with `mtimeMs`/`size`. | Validated, atomic. |
+| `lyric-choices.json` | Version 1 plus `tracks: Record<trackId, sourceId>`. | Validated, atomic, capped at 5000 entries. |
 | `covers/<albumId>.jpg` | Full cover, max width 300 px, JPEG 85. | Atomic. |
 | `covers/<albumId>-small.jpg` | Small cover, max width 96 px, generated from full. | Atomic. |
 
 The cache is keyed by absolute path. Entries are reused only when both `mtimeMs` and `size` match;
 otherwise tags are re-read. Files that no longer exist are naturally dropped because a scan rebuilds
 the entry map from the current directory walk.
+
+Sidecar `.lrc` files are user-owned inputs and are never written by LyriX. Per-track source choices
+are independent of the library cache, so they survive rescans and path-preserving tag updates.
 
 ---
 
@@ -969,13 +1055,16 @@ the entry map from the current directory walk.
 - **No renderer paths**: ids only; main resolves and validates.
 - **Path containment** in `media://` uses `realpath` on both the file and the root, then
   `isPathInside`.
-- **Symlinks are skipped** during scanning, preventing cycles and escapes.
-- **Only `.flac` regular files** are served.
-- **IPC input validation**: track ids must be non-empty strings; volume is clamped; UI state is
-  normalized; malformed lyric ids return `null`.
-- **Tolerant persistence**: bad JSON, wrong cache versions, and malformed entries degrade to defaults
-  instead of crashing.
-- **Atomic writes** avoid partially written settings/cache/cover files.
+- **Symlinks are skipped** during scanning and sidecar discovery, preventing cycles and escapes.
+- **Only `.flac` regular files** are served; sidecar reads accept only regular files in the track's
+  own directory and skip anything over 1 MiB.
+- **IPC input validation**: track ids must be 40-character lowercase SHA-1 hex strings; volume is
+  clamped; UI state is normalized; malformed lyric ids return `null`; lyric choice ids must be
+  `embedded` or `sidecar:<file name>` with no path separators; preferences accept only known values.
+- **No sidecar paths cross IPC**: `LyricSourceOption.detail` and ids carry file names only.
+- **Tolerant persistence**: bad JSON, wrong cache/choice versions, and malformed entries degrade to
+  defaults instead of crashing.
+- **Atomic writes** avoid partially written settings/cache/choice/cover files.
 - **Cancellable scans** prevent stale results from overwriting newer libraries.
 - **Stale async responses** are ignored in both the scan coordinator and the lyric controller.
 - **Playback failure isolation**: one unreadable track is logged and skipped, not fatal.
@@ -991,7 +1080,7 @@ the entry map from the current directory walk.
 - Covers: full and small JPEGs cached; small derived from full; in-flight requests deduplicated.
 - Track list: virtualized; only visible rows plus overscan exist in the DOM.
 - Library queries: index built once per snapshot; each keystroke only filters and sorts.
-- Lyrics: fetched on demand; parsed documents cached (LRU, 10); one rAF loop while visible.
+- Lyrics: fetched on demand; parsed source entries cached (LRU, 10); one rAF loop while visible.
 - Lyric DOM: built once per document; each frame reads the position once, runs the binary searches,
   and does one O(lines) flag pass whose DOM writes happen only for changed state.
 - Auto-scroll: one smooth scroll per primary-line change; manual scrolling pauses it for 4 s.
@@ -1011,14 +1100,18 @@ environment; nothing mocks Electron or the DOM. The tested modules either have n
 | `tests/cache.test.ts` | Empty/missing cache; malformed JSON; wrong version; invalid folder and tracks containers; malformed entries dropped individually; nullable track/disc/year fields; save/load round-trip. |
 | `tests/ids.test.ts` | Known SHA-1 digests; determinism; 40 lowercase hex characters; different inputs produce different ids. |
 | `tests/json-file.test.ts` | Missing and malformed JSON fall back; valid JSON parses; atomic string and binary writes; parent-directory creation; overwrite; no temporary files left behind; pretty-printed JSON. |
+| `tests/lyricChoices.test.ts` | Round-trip; tolerant reads (bad JSON, wrong version, malformed containers); invalid id rejection; 5000-entry cap and oldest eviction. |
+| `tests/lyricSourceProviders.test.ts` | Canonical slot assembly; exact-sidecar id vs actual file name; variant ordering; provider failure isolation; saved-choice/preference echo. |
+| `tests/lyricSources.test.ts` | Saved vs auto selection; sidecar/embedded preference order; missing and unusable saved choices; variant fallback; custom usability predicate; nothing usable. |
 | `tests/lyrics.test.ts` | Both fixtures; format detection; metadata; word segments and agents; fractional timestamps; overlapping lines; gap behavior; offsets; warnings; sync helpers and progress clamps. |
-| `tests/lyricsController.test.ts` | Stale-response guard; parsed-document reuse; LRU eviction; cached “none”; empty text; timed parsing; reset behavior. |
+| `tests/lyricsController.test.ts` | Auto vs saved selection; embedded/sidecar preference; unusable source skipping; manual switch without refetch; clearing a choice; preference recomputation; reload bypassing the cache; stale-response guard; LRU eviction; cached “none”; reset behavior. |
+| `tests/sidecar.test.ts` | Exact/variant matching; case-insensitive names and extension; ignored names and directories; 1 MiB cap; UTF-8/UTF-16 BOM decoding; symlink skip where supported; unreadable directory. |
 | `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
 | `tests/queue.test.ts` | Start-index clamping (negative, past end, fractional, non-finite); empty queue; next/previous at both ends; `hasNext`/`hasPrevious`; input-array copy; `getTracks`/`getCurrentIndex`. |
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
 | `tests/routeStack.test.ts` | `topRoute`; non-mutating push/pop; pruning invalid routes from the top only; back-label selection for each view and parent route. |
 | `tests/segmentGroups.test.ts` | Syllable grouping; `spaceAfter` boundaries; trailing final group; empty input. |
-| `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder and view fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
+| `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder, view, and lyric-preference fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
 
 Tests that pin behavior which conflicts with a stated invariant are marked with an inline comment
 rather than changing production code.
@@ -1060,7 +1153,11 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 | Window creation and renderer sends | `src/main/window.ts` |
 | Scan generation, progress, background refresh | `src/main/scanCoordinator.ts` |
 | IPC channels or preload surface | `src/main/ipc.ts`, `src/preload/index.ts`, `src/shared/types.ts` |
-| Persistence format or validation | `src/main/settings.ts`, `src/main/cache.ts`, `src/main/json-file.ts` |
+| Persistence format or validation | `src/main/settings.ts`, `src/main/cache.ts`, `src/main/lyrics/choices.ts`, `src/main/json-file.ts` |
+| Embedded lyric tags | `src/main/lyrics/embedded.ts` |
+| Sidecar discovery, decoding, size/symlink rules | `src/main/lyrics/sidecar.ts` |
+| Lyric provider list, option order, selection context | `src/main/lyrics/sources.ts`, `src/shared/lyrics/sources.ts` |
+| Per-track lyric choices | `src/main/lyrics/choices.ts` |
 | Views, search, sort definitions | `src/renderer/library/query.ts` |
 | Renderer wiring / controller composition | `src/renderer/src/main.ts` |
 | Routing and the detail back stack | `src/renderer/src/navigation.ts`, `src/renderer/src/routeStack.ts` |
@@ -1071,26 +1168,43 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 | Bottom player bar rendering | `src/renderer/src/playerBar.ts` |
 | Section choice and view rendering | `src/renderer/src/screen.ts`, `src/renderer/src/views/` |
 | Playback backend or queue behavior | `src/renderer/player/engine.ts`, `src/renderer/player/queue.ts` |
-| Lyric fetch, parse state, LRU cache | `src/renderer/lyrics/lyricsController.ts` |
+| Lyric source fetch, parsing, selection, LRU cache | `src/renderer/lyrics/lyricsController.ts` |
 | Lyric parsing/sync (stable core) | `src/shared/lyrics/` |
 | Lyric DOM, class toggles, scroll, seek | `src/renderer/ui/lyricView.ts` |
 | Lyric/Now Playing visual styling | `src/renderer/styles/lyrics.css` |
 | App shell markup, CSP, element ids | `src/renderer/index.html` |
 
-### Add a lyric source (e.g. sidecar `.lrc`)
+### Add a lyric source
 
-1. Implement `LyricResolver` in `src/main/lyricsSource.ts`:
+1. Implement a `LyricSourceProvider` in `src/main/lyrics/`:
 
    ```ts
-   async function sidecarResolver(track: LyricsTrack): Promise<LyricsResult | null> {
-     // read `${track.filePath}.lrc` or a sibling `.lrc`
-     return text ? { text, source: 'sidecar' } : null
+   async function extraFileProvider(track: LyricsTrack): Promise<LyricSourceOption[]> {
+     const text = await readExtraFile(track) // return [] when unavailable
+     return text
+       ? [{
+           id: `sidecar:${extraFileName(track.filePath)}`,
+           kind: 'sidecar',
+           label: 'Extra file',
+           detail: extraFileName(track.filePath),
+           available: true,
+           text
+         }]
+       : []
    }
    ```
 
-2. Add it to `RESOLVERS` in the desired priority order.
-3. Return `null` (or an empty string) when unavailable; do not throw for expected misses.
-4. No IPC or renderer changes are needed.
+2. Add it to `PROVIDERS` in `src/main/lyrics/sources.ts` in the desired order.
+3. Return `[]` for expected misses; do not throw. Provider failures are logged and skipped.
+4. Keep ids file-name-only (`embedded` or `sidecar:<file name>`). A provider that fits those kinds
+   needs no IPC or renderer changes: the controller parses every available option and applies the
+   saved-choice / preference rules automatically.
+5. A genuinely new kind (for example online lookup) also requires extending `LyricSourceKind`, the
+   auto-selection order in `src/shared/lyrics/sources.ts`, and source-id validation in
+   `src/main/lyrics/choices.ts`.
+
+The sidecar provider is the reference implementation: same-directory discovery, regular files only,
+1 MiB cap, NFC/case-insensitive matching, and UTF-8/UTF-16 BOM decoding.
 
 ### Add a library view
 
@@ -1127,7 +1241,11 @@ only needs `getPosition` and `seek`; the rest of the UI uses the interface.
   as separate voices.
 - Translations and TTML are typed/reserved but not parsed.
 - Plain lyrics are static: no highlighting and no click-to-seek.
-- No sidecar `.lrc`, online lookup, lyric editing, or tag writing.
+- Sidecars are limited to the track's own directory and the `<base>.lrc` / `<base>.<variant>.lrc`
+  names. Files over 1 MiB, symlinks, directories, and non-UTF-8/UTF-16 encodings are skipped.
+- No online lookup, lyric editing, sidecar writing, or tag writing.
+- The lyric-source picker menu is not implemented yet; automatic selection and persisted choices
+  exist in the data layer.
 - No shuffle, repeat, gapless playback, crossfade, queue panel, or media-key integration.
 - No packaging/distribution configuration.
 - Album/artist grids are not virtualized.

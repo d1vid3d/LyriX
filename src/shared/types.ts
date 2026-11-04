@@ -1,3 +1,5 @@
+import type { LyricPreference, LyricSources } from './lyrics/sources'
+
 export interface Track {
   id: string
   title: string
@@ -49,6 +51,7 @@ export interface UiState {
 export interface Settings extends UiState {
   lastFolder: string | null
   volume: number
+  lyricPreference: LyricPreference
 }
 
 export interface ScanProgress {
@@ -61,12 +64,6 @@ export interface LibrarySnapshot {
   albums: Album[]
 }
 
-/** Raw lyric text and the tag/resolver that supplied it. */
-export interface LyricsResult {
-  text: string
-  source: string
-}
-
 /** API exposed to the renderer through contextBridge. */
 export interface LibraryApi {
   getState(): Promise<LibrarySnapshot>
@@ -75,7 +72,9 @@ export interface LibraryApi {
   getSettings(): Promise<Settings>
   saveVolume(volume: number): Promise<void>
   saveUiState(state: UiState): Promise<void>
-  getLyrics(trackId: string): Promise<LyricsResult | null>
+  getLyricSources(trackId: string): Promise<LyricSources | null>
+  saveLyricChoice(trackId: string, sourceId: string | null): Promise<void>
+  saveLyricPreference(preference: LyricPreference): Promise<void>
   onScanProgress(listener: (progress: ScanProgress) => void): () => void
   onLibraryUpdated(listener: (snapshot: LibrarySnapshot) => void): () => void
 }

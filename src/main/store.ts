@@ -7,6 +7,7 @@ export interface AppStore {
   cache: LibraryCache
   settingsFile: string
   cacheFile: string
+  lyricChoicesFile: string
 }
 
 export function createAppStore(): AppStore {
@@ -15,10 +16,12 @@ export function createAppStore(): AppStore {
       lastFolder: null,
       volume: 1,
       lastView: 'albums',
-      sortByView: {}
+      sortByView: {},
+      lyricPreference: 'sidecar'
     },
     cache: emptyLibraryCache(),
     settingsFile: '',
-    cacheFile: ''
+    cacheFile: '',
+    lyricChoicesFile: ''
   }
 }

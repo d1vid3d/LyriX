@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
+import type { LyricPreference, LyricSources } from '../shared/lyrics/sources'
 import type {
   LibraryApi,
   LibrarySnapshot,
@@ -25,7 +26,12 @@ const library: LibraryApi = {
     ipcRenderer.invoke('settings:set-volume', volume),
   saveUiState: (state: UiState): Promise<void> =>
     ipcRenderer.invoke('settings:set-ui', state),
-  getLyrics: (trackId: string) => ipcRenderer.invoke('lyrics:get', trackId),
+  getLyricSources: (trackId: string): Promise<LyricSources | null> =>
+    ipcRenderer.invoke('lyrics:get-sources', trackId),
+  saveLyricChoice: (trackId: string, sourceId: string | null): Promise<void> =>
+    ipcRenderer.invoke('lyrics:set-choice', trackId, sourceId),
+  saveLyricPreference: (preference: LyricPreference): Promise<void> =>
+    ipcRenderer.invoke('settings:set-lyric-preference', preference),
   onScanProgress: (listener) => subscribe<ScanProgress>('library:scan-progress', listener),
   onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener)
 }
