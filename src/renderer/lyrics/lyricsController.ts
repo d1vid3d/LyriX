@@ -186,6 +186,26 @@ export class LyricsController {
     void this.load(trackId, generation, savedChoice)
   }
 
+  /**
+   * Drop every cached source entry and refetch the current track. The current track's saved
+   * choice is preserved so a library rescan never silently clears a manual selection.
+   */
+  clearCacheAndReload(): void {
+    const trackId = this.state.trackId
+    if (!trackId) {
+      this.cache.clear()
+      return
+    }
+
+    const cached = this.cache.get(trackId)
+    const savedChoice = cached ? cached.savedChoice : undefined
+    const generation = ++this.requestGeneration
+    this.cache.clear()
+
+    this.setState({ ...this.state, status: 'loading', doc: null })
+    void this.load(trackId, generation, savedChoice)
+  }
+
   private async load(
     trackId: string,
     generation: number,

@@ -1,5 +1,6 @@
 import './style.css'
 import '../styles/lyrics.css'
+import '../styles/lyricSourceMenu.css'
 import { LyricsController } from '../lyrics/lyricsController'
 import { HtmlAudioEngine } from '../player/engine'
 import { PlaybackQueue } from '../player/queue'
@@ -105,6 +106,9 @@ nowPlaying = new NowPlayingController({
   getAlbumForTrack: (track) => library.findAlbumForTrack(track),
   lyricsState: () => lyricsController.getState(),
   subscribeLyrics: (listener) => lyricsController.subscribe(listener),
+  selectLyricSource: (sourceId) => lyricsController.selectSource(sourceId),
+  setLyricPreference: (preference) => lyricsController.setPreference(preference),
+  reloadLyrics: () => lyricsController.reload(),
   lyricView,
   showSection: (section) => navigation.showSection(section),
   currentSection: () => navigation.currentSection(),
@@ -159,7 +163,8 @@ library = new LibraryController({
     elements.volumeSlider.value = String(settings.volume)
     toolbar.applyUiSettings(settings)
     lyricsController.setPreference(settings.lyricPreference, { persist: false })
-  }
+  },
+  refreshLyrics: () => lyricsController.clearCacheAndReload()
 })
 
 function saveUiState(): void {
@@ -178,6 +183,7 @@ void library.initialize()
 window.addEventListener('beforeunload', () => {
   for (const dispose of disposers) dispose()
   toolbar.dispose()
+  nowPlaying.destroy()
   lyricView.destroy()
   tracksList.destroy()
 })

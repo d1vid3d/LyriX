@@ -1,6 +1,10 @@
 import type { LyricDocument } from '../../shared/lyrics'
+import type { LyricPreference } from '../../shared/lyrics/sources'
 import type { Album, Track } from '../../shared/types'
 import type { LyricsState } from '../lyrics/lyricsController'
+import { buildSourceMenuModel } from '../lyrics/sourceMenuModel'
+import type { SourceMenuModel } from '../lyrics/sourceMenuModel'
+import { LyricSourceMenu } from '../ui/lyricSourceMenu'
 import type { AppElements } from './dom'
 import { setCoverImage } from './format'
 
@@ -17,6 +21,9 @@ export interface NowPlayingDeps {
   getAlbumForTrack(track: Track): Album | null
   lyricsState(): LyricsState
   subscribeLyrics(listener: (state: LyricsState) => void): () => void
+  selectLyricSource(sourceId: string | null): void
+  setLyricPreference(preference: LyricPreference): void
+  reloadLyrics(): void
   lyricView: LyricViewLike
   showSection(section: HTMLElement): void
   currentSection(): HTMLElement
@@ -24,14 +31,20 @@ export interface NowPlayingDeps {
   renderNowPlaying(): void
 }
 
-/** Owns the Now Playing section lifecycle and its lyric subscription. */
+/** Owns the Now Playing section lifecycle, its lyric subscription, and the source menu. */
 export class NowPlayingController {
   private readonly deps: NowPlayingDeps
+  private readonly menu: LyricSourceMenu
   private open = false
   private dirty = false
 
   constructor(deps: NowPlayingDeps) {
     this.deps = deps
+    this.menu = new LyricSourceMenu(deps.elements.lyricSourceMenu, {
+      onSelect: (sourceId) => deps.selectLyricSource(sourceId),
+      onPreference: (preference) => deps.setLyricPreference(preference),
+      onReload: () => deps.reloadLyrics()
+    })
 
     deps.elements.nowPlayingTarget.addEventListener('click', () => this.openNowPlaying())
     deps.elements.nowPlayingTarget.addEventListener('keydown', (event) => {
@@ -80,13 +93,14 @@ export class NowPlayingController {
     this.open = true
     this.deps.renderNowPlaying()
     this.deps.showSection(this.deps.elements.nowPlayingSection)
-    this.renderLyricsState(this.deps.lyricsState())
+    this.applyLyricsState(this.deps.lyricsState())
   }
 
   closeNowPlaying(): void {
     if (!this.open) return
 
     this.open = false
+    this.menu.close()
     this.deps.lyricView.stop()
 
     if (this.dirty) {
@@ -104,11 +118,12 @@ export class NowPlayingController {
 
     this.open = false
     this.dirty = false
+    this.menu.close()
     this.deps.lyricView.stop()
   }
 
   handleLyricsState(state: LyricsState): void {
-    if (this.open) this.renderLyricsState(state)
+    this.applyLyricsState(state)
   }
 
   /** Subscribes to lyric state; returns the unsubscribe function. */
@@ -116,7 +131,19 @@ export class NowPlayingController {
     return this.deps.subscribeLyrics((state) => this.handleLyricsState(state))
   }
 
-  private renderLyricsState(state: LyricsState): void {
+  destroy(): void {
+    this.menu.close()
+    this.menu.destroy()
+  }
+
+  private applyLyricsState(state: LyricsState): void {
+    const model = buildSourceMenuModel(state)
+    this.menu.update(model)
+
+    if (this.open) this.renderLyricsState(state, model)
+  }
+
+  private renderLyricsState(state: LyricsState, model: SourceMenuModel): void {
     if (state.status === 'ready' && state.doc) {
       this.deps.lyricView.setDocument(state.doc)
       this.deps.lyricView.start()
@@ -125,7 +152,7 @@ export class NowPlayingController {
 
     this.deps.lyricView.stop()
     this.deps.lyricView.showMessage(
-      state.status === 'loading' ? 'Loading lyrics…' : 'No lyrics found'
+      state.status === 'loading' ? model.loadingMessage : model.emptyState.text
     )
   }
 }

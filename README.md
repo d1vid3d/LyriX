@@ -61,8 +61,12 @@ npm test            # run the Vitest suite
 | `src/renderer/player/queue.ts` | Pure album queue with a current index and bounded next/previous. |
 | `src/renderer/lyrics/lyricsController.ts` | On-demand lyric source fetch/parse/selection, stale-response guard and LRU source cache (no DOM). |
 | `src/renderer/lyrics/segmentGroups.ts` | Pure grouping of word-timed segments into nowrap word containers. |
+| `src/renderer/lyrics/sourceMenuModel.ts` | Pure lyric-source menu view model, user-facing strings, disabled reasons, badges and keyboard helper. |
 | `src/renderer/ui/lyricView.ts` | Builds lyric DOM once, syncs line/segment classes and progress, centers and seeks. |
+| `src/renderer/ui/lyricSourceMenu.ts` | Source chip and popover DOM, keyboard navigation, ARIA and focus handling. |
+| `src/renderer/ui/lyricSourceMenuView.ts` | Stateless popover row, badge and preference DOM builders. |
 | `src/renderer/styles/lyrics.css` | Lyric colors, sizes, transitions, progress fill and Now Playing layout. |
+| `src/renderer/styles/lyricSourceMenu.css` | Source chip/popover styling, with restyle variables at the top. |
 | `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, scanning UI and UI-state persistence. |
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
@@ -83,6 +87,7 @@ npm test            # run the Vitest suite
 | `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, reload, stale responses, caching and eviction. |
 | `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
 | `tests/sidecar.test.ts` | Vitest coverage for sidecar matching, size limits, BOM decoding and symlink skipping. |
+| `tests/sourceMenuModel.test.ts` | Vitest coverage for source-menu labels, badges, reasons, empty hints and keyboard navigation. |
 
 ## How the library works
 
@@ -180,8 +185,22 @@ stays visible. The close button or **Escape** restores the previous view without
 search text and scroll positions survive. The view updates live as tracks change, shows
 “Loading lyrics…” / “No lyrics found”, and stacks the cover above the lyrics on narrow windows. All
 lyric styling lives in `src/renderer/styles/lyrics.css`; JavaScript only sets classes and the
-`--progress` variable. The source picker menu is not implemented yet; selection is automatic and
-saved choices are stored by the data layer.
+`--progress` variable.
+
+A source chip sits above the lyrics and opens a popover listing the automatic choice and every
+source in canonical order (embedded, exact sidecar, then variant sidecars). The chip shows the active
+source, a small **Auto** tag when the choice is automatic, **No lyrics** when nothing is usable, or
+**Loading…** while sources load. Rows show the saved-choice radio, the tag/file name, and badges for
+format, line count, singer labels and parser warnings; the displayed source gets an **In use** pill.
+Unavailable or unreadable rows are disabled with a reason. The **Auto** row shows what is currently
+in use, and the preference group switches between **Sidecar** and **Embedded** when both exist.
+**Reload sources** re-reads the current track's tags and sidecars. Selecting a source closes the
+menu; changing the preference or reloading keeps it open. The menu closes on outside clicks, and
+keyboard support covers open, arrow/Home/End navigation, activation, Escape and Tab; an open menu
+consumes Escape so it does not also close Now Playing. A rescan or `library:updated` clears the
+lyric cache and reloads the current track's sources, so edited tags and sidecars appear without
+losing a saved choice. When nothing is found, the empty state keeps “No lyrics found” and adds a
+hint naming the expected sidecar file (or a generic version when the name is unavailable).
 
 ## How local playback works
 
@@ -210,5 +229,5 @@ track. The last folder, volume, view, per-view sort and lyric preference are sto
 
 Shuffle, repeat modes, gapless playback, crossfade, a visible queue panel, queue editing, fuzzy
 search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
-virtualization, online lyric lookup, the lyric-source picker menu, singer-specific lyric styling,
-translations, TTML, tag editing and packaging are intentionally not implemented.
+virtualization, online lyric lookup, singer-specific lyric styling, translations, TTML, tag editing
+and packaging are intentionally not implemented.

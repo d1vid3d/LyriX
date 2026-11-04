@@ -69,8 +69,7 @@ open/close, search/view/scroll preservation, and console cleanliness.
 
 Shuffle, repeat, gapless playback, crossfade, queue panel/editing, fuzzy search, search history,
 filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online lyric
-lookup, the lyric-source picker menu, singer-specific styling, translations, TTML, tag editing,
-packaging.
+lookup, singer-specific styling, translations, TTML, tag editing, packaging.
 
 ### Invariants
 
@@ -215,12 +214,14 @@ LyriX/
 │  │  │  ├─ style.css          theme + app layout
 │  │  │  └─ views/             album grid, artist list, tracks, details
 │  │  ├─ styles/lyrics.css     lyric + Now Playing styling
+│  │  ├─ styles/lyricSourceMenu.css  source chip/popover styling
 │  │  ├─ library/query.ts      pure view/sort/search registry
 │  │  ├─ player/engine.ts      playback abstraction
 │  │  ├─ player/queue.ts       pure queue
 │  │  ├─ lyrics/lyricsController.ts  source fetch/parse/select/state/cache
 │  │  ├─ lyrics/segmentGroups.ts
-│  │  └─ ui/{lyricView,virtualList}.ts
+│  │  ├─ lyrics/sourceMenuModel.ts   pure source-menu view model + keyboard helper
+│  │  └─ ui/{lyricView,lyricSourceMenu,lyricSourceMenuView,virtualList}.ts
 │  └─ shared/
 │     ├─ types.ts              cross-process data + API types
 │     └─ lyrics/
@@ -248,6 +249,7 @@ LyriX/
    ├─ segmentGroups.test.ts
    ├─ settings.test.ts
    ├─ sidecar.test.ts
+   ├─ sourceMenuModel.test.ts
    └─ fixtures/{LineByLine.txt,TimedWordByWord.txt}
 ```
 
@@ -643,9 +645,11 @@ Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, and `activeAtte
 - `openNowPlaying` renders the current track, shows the Now Playing section, and applies the current
   lyric state.
 - `closeNowPlaying` restores the previous section, or re-renders first when the library changed while
-  it was open.
+  it was open; both close paths also close the source menu.
 - `leaveForNavigation` closes it silently for actions that will render another view.
-- It subscribes to the lyric controller and only renders while open.
+- It subscribes to the lyric controller and only renders while open, but it always updates the
+  source-menu view model. The menu callbacks are wired to `selectSource`, `setPreference`, and
+  `reload` through `NowPlayingDeps`; the controller itself stays DOM-free.
 
 `PlayerBar` owns the bottom bar: now-playing title/artist/cover, play/pause labels and disabled
 states, duration, seek value, and time labels. It reads the current track and playing state through
@@ -778,6 +782,9 @@ Behavior:
   application passes `{ persist: false }`.
 - `reload()` bypasses the cache, refetches the current track, and keeps its saved choice so an
   edited sidecar is picked up.
+- `clearCacheAndReload()` drops every cached entry, then refetches the current track while preserving
+  its saved choice. The library controller calls it after a rescan or `library:updated`, so changed
+  tags and sidecars are picked up without clearing a manual selection.
 - Each fetch captures a generation; a response is applied only if the generation is still current,
   so slow responses for a previous track are ignored.
 - Caches whole parsed source entries (including “none”), up to **10**, evicting the least recently
@@ -825,7 +832,56 @@ Behavior:
   play/pause.
 - `destroy()` cancels the frame, removes listeners, and clears the DOM.
 
-### 9.18 Styles
+### 9.18 `src/renderer/lyrics/sourceMenuModel.ts` — pure source-menu view model
+
+`buildSourceMenuModel(state)` converts `LyricsState` into every string and flag the menu needs. It
+has no DOM or controller references and is covered by `tests/sourceMenuModel.test.ts`.
+
+Model:
+
+- `trigger` — label (`Lyrics: <source>`, `No lyrics`, or `Loading…`), optional `Auto` tag, and
+  loading/disabled flags.
+- `autoRow` — label, `Using: <active source>` subtext, and checked state (checked unless the current
+  selection is saved).
+- `rows` — one per `state.sources` in canonical order, with label/detail, saved-choice `checked`,
+  `inUse`, disabled/reason, and badges. Badges are format, line count, `Singers`, and warning count
+  with the parser warnings as the tooltip.
+- `preference` — the `Sidecar` / `Embedded` options and their checked state.
+- `reload` — `Reload sources` or `Reloading…`, disabled while loading.
+- `emptyState` — `No lyrics found` plus a hint using `expectedSidecarName` or a generic fallback.
+- `loadingMessage` — the lyric-view loading text.
+
+Pure keyboard helpers:
+
+- `nextEnabledIndex(enabled, current, step)` wraps and skips disabled entries; `current = -1`
+  starts at the first or last enabled entry depending on direction.
+- `firstEnabledIndex` / `lastEnabledIndex` back Home/End.
+
+### 9.19 `src/renderer/ui/lyricSourceMenu.ts` — source chip and popover
+
+Constructed with a container and `{ onSelect, onPreference, onReload }`. It knows nothing about the
+controller.
+
+- `update(model)` refreshes the chip and, while open, re-renders the popover in place. Focus is
+  restored by item key when possible.
+- `open()` shows the popover, sets `aria-expanded="true"`, and focuses the first enabled item.
+- `close()` hides it and resets `aria-expanded`. `isOpen()` and `destroy()` complete the lifecycle.
+- The chip is a `aria-haspopup="menu"` button. The popover is `role="menu"` with a labelled source
+  `role="group"` and preference `role="group"`.
+- Source and preference rows are `role="menuitemradio"` with `aria-checked`; Reload is
+  `role="menuitem"`. Disabled rows get `disabled` and `aria-disabled="true"`.
+- Source selection closes the menu; preference changes and Reload leave it open.
+- Keyboard: Enter/Space/ArrowDown on the chip opens and focuses the first enabled item;
+  ArrowUp/ArrowDown wrap over enabled items, Home/End jump, Enter/Space activate, Escape closes and
+  returns focus to the chip, and Tab closes. Escape is consumed while the menu is open so it does
+  not also close Now Playing or clear search.
+- A capture-phase pointerdown listener closes the popover on outside clicks.
+
+`src/renderer/ui/lyricSourceMenuView.ts` builds the popover body (title, source rows, badges,
+preference group, Reload) from the model. It is stateless; the component owns events, focus, and
+open/close state.
+
+### 9.20 Styles
 
 **`src/renderer/src/style.css`** — theme variables (`--bg`, `--panel`, `--border`, `--text`,
 `--muted`, `--accent`), toolbar, views, album grid, artist rows, track lists, detail views, player
@@ -845,7 +901,25 @@ bar, and scrollbars.
 | `--lyric-transition` | color/opacity/font-size/transform 180 ms ease | Line transitions. |
 | `--lyric-transition-fast` | color 120 ms linear | Segment transitions. |
 
-Visual rules:
+**`src/renderer/styles/lyricSourceMenu.css`** — source chip and popover presentation. It defines
+its own variables at the top, all derived from the theme where possible: `--lsm-font-size`,
+`--lsm-small-font-size`, `--lsm-background`, `--lsm-border`, `--lsm-text`, `--lsm-muted`,
+`--lsm-accent`, `--lsm-warning`, `--lsm-hover`, `--lsm-badge-background`, `--lsm-radius`,
+`--lsm-radius-small`, `--lsm-radius-pill`, `--lsm-shadow`, `--lsm-padding`, `--lsm-row-padding`,
+`--lsm-gap`, `--lsm-popover-min-width`, `--lsm-popover-max-width`, `--lsm-popover-max-height`,
+`--lsm-z-index`, and `--lsm-disabled-opacity`.
+
+Menu visual rules:
+
+- The trigger is a quiet pill above the lyric scroller; the `Auto` tag is a small muted pill.
+- The popover is right-aligned under the chip, has a border/shadow, scrolls when taller than
+  `--lsm-popover-max-height`, and stays above the lyric area via `--lsm-z-index`.
+- Rows are comfortable padded radio rows; badges are small muted pills; the `In use` pill uses the
+  accent color; warning badges use `--lsm-warning`.
+- Disabled rows use `--lsm-disabled-opacity` and no hover/cursor affordance.
+- Focus-visible outlines use the accent color on the chip, rows, preference options, and Reload.
+
+Lyric visual rules:
 
 - Upcoming lines are dim; past lines are dimmer; the current line is full opacity, slightly larger,
   and shifted right.
@@ -1002,7 +1076,8 @@ This module is pure: no DOM, Electron, audio, or filesystem APIs.
 - **Tracks view** — virtualized track list + empty state.
 - **Album detail** — back button, cover, title/artist/year, ordered track list.
 - **Artist detail** — back button, artist name/counts, album grid.
-- **Now Playing** — close button, large cover, title/artist/album, lyric status/scroller.
+- **Now Playing** — close button, large cover, title/artist/album, lyric source chip + popover,
+  lyric status/scroller.
 - **Player bar** — clickable current-track target, Previous/Play/Pause/Next, time, seek, duration,
   volume.
 - **Audio element** — hidden `<audio id="audio">`.
@@ -1013,14 +1088,24 @@ Keyboard:
 | --- | --- |
 | `Ctrl/Cmd+F` | Focus and select search. |
 | `/` | Focus search when not in a text input. |
-| `Escape` | Close Now Playing if open; otherwise clear search if focused/non-empty. |
+| `Escape` | Close the source menu if open (consumed); otherwise close Now Playing if open; otherwise clear search if focused/non-empty. |
 | `Enter`/`Space` | Activate the bottom-bar target or a focused lyric line. |
+| `Enter`/`Space`/`ArrowDown` on the source chip | Open the source menu and focus its first enabled item. |
+| `ArrowUp`/`ArrowDown` in the source menu | Move focus through enabled items, skipping disabled ones and wrapping. |
+| `Home`/`End` in the source menu | Focus the first/last enabled item. |
+| `Enter`/`Space` in the source menu | Activate the focused source, preference, or Reload action. |
+| `Escape` in the source menu | Close the menu and return focus to the chip; does not close Now Playing or clear search. |
+| `Tab` in the source menu | Close the menu. |
 
 Accessibility details:
 
 - View buttons use `aria-pressed`.
 - Playing tracks use `aria-current="true"`.
 - Lyric lines are focusable buttons only when timed.
+- The source chip uses `aria-haspopup="menu"` and a synchronized `aria-expanded`.
+- The source popover is `role="menu"` with labelled `role="group"` sections; source and preference
+  rows use `role="menuitemradio"` + `aria-checked`, Reload uses `role="menuitem"`, and disabled rows
+  use `disabled` + `aria-disabled="true"`.
 - Focus-visible outlines use the accent color.
 - Status/progress elements use `role="status"`.
 
@@ -1105,6 +1190,7 @@ environment; nothing mocks Electron or the DOM. The tested modules either have n
 | `tests/lyricSources.test.ts` | Saved vs auto selection; sidecar/embedded preference order; missing and unusable saved choices; variant fallback; custom usability predicate; nothing usable. |
 | `tests/lyrics.test.ts` | Both fixtures; format detection; metadata; word segments and agents; fractional timestamps; overlapping lines; gap behavior; offsets; warnings; sync helpers and progress clamps. |
 | `tests/lyricsController.test.ts` | Auto vs saved selection; embedded/sidecar preference; unusable source skipping; manual switch without refetch; clearing a choice; preference recomputation; reload bypassing the cache; stale-response guard; LRU eviction; cached “none”; reset behavior. |
+| `tests/sourceMenuModel.test.ts` | Trigger/auto/saved states; canonical row order; badges (format, line count, singers, warnings); disabled reasons; loading labels; preference options; empty-state hints with and without `expectedSidecarName`; pure keyboard wrap/skip/edge helpers. |
 | `tests/sidecar.test.ts` | Exact/variant matching; case-insensitive names and extension; ignored names and directories; 1 MiB cap; UTF-8/UTF-16 BOM decoding; symlink skip where supported; unreadable directory. |
 | `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
 | `tests/queue.test.ts` | Start-index clamping (negative, past end, fractional, non-finite); empty queue; next/previous at both ends; `hasNext`/`hasPrevious`; input-array copy; `getTracks`/`getCurrentIndex`. |
@@ -1169,6 +1255,12 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 | Section choice and view rendering | `src/renderer/src/screen.ts`, `src/renderer/src/views/` |
 | Playback backend or queue behavior | `src/renderer/player/engine.ts`, `src/renderer/player/queue.ts` |
 | Lyric source fetch, parsing, selection, LRU cache | `src/renderer/lyrics/lyricsController.ts` |
+| Lyric source menu labels, badges, disabled reasons, empty hint | `src/renderer/lyrics/sourceMenuModel.ts` |
+| Source chip/popover DOM, keyboard, ARIA, focus | `src/renderer/ui/lyricSourceMenu.ts` |
+| Source popover row/badge DOM builders | `src/renderer/ui/lyricSourceMenuView.ts` |
+| Lyric source menu styling | `src/renderer/styles/lyricSourceMenu.css` |
+| Now Playing source-menu wiring / close behavior | `src/renderer/src/nowPlaying.ts` |
+| Lyric cache refresh after rescan or `library:updated` | `src/renderer/lyrics/lyricsController.ts` (`clearCacheAndReload`), `src/renderer/src/libraryController.ts`, `src/renderer/src/main.ts` |
 | Lyric parsing/sync (stable core) | `src/shared/lyrics/` |
 | Lyric DOM, class toggles, scroll, seek | `src/renderer/ui/lyricView.ts` |
 | Lyric/Now Playing visual styling | `src/renderer/styles/lyrics.css` |
@@ -1198,7 +1290,7 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 3. Return `[]` for expected misses; do not throw. Provider failures are logged and skipped.
 4. Keep ids file-name-only (`embedded` or `sidecar:<file name>`). A provider that fits those kinds
    needs no IPC or renderer changes: the controller parses every available option and applies the
-   saved-choice / preference rules automatically.
+   saved-choice / preference rules automatically, and the source menu lists the new option.
 5. A genuinely new kind (for example online lookup) also requires extending `LyricSourceKind`, the
    auto-selection order in `src/shared/lyrics/sources.ts`, and source-id validation in
    `src/main/lyrics/choices.ts`.
@@ -1244,8 +1336,6 @@ only needs `getPosition` and `seek`; the rest of the UI uses the interface.
 - Sidecars are limited to the track's own directory and the `<base>.lrc` / `<base>.<variant>.lrc`
   names. Files over 1 MiB, symlinks, directories, and non-UTF-8/UTF-16 encodings are skipped.
 - No online lookup, lyric editing, sidecar writing, or tag writing.
-- The lyric-source picker menu is not implemented yet; automatic selection and persisted choices
-  exist in the data layer.
 - No shuffle, repeat, gapless playback, crossfade, queue panel, or media-key integration.
 - No packaging/distribution configuration.
 - Album/artist grids are not virtualized.

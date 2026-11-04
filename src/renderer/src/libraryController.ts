@@ -37,6 +37,7 @@ export interface LibraryDeps {
   updateControls(): void
   leaveNowPlaying(): void
   applySettings(settings: Settings): void
+  refreshLyrics(): void
 }
 
 /** Owns the library snapshot, status text, scanning state, and startup ordering. */
@@ -94,6 +95,7 @@ export class LibraryController {
 
     if (this.deps.nowPlaying.isOpen()) this.deps.nowPlaying.markDirty()
 
+    this.deps.refreshLyrics()
     this.deps.refreshScreen()
     this.deps.updateNowPlaying()
     this.deps.updateTrackHighlight()

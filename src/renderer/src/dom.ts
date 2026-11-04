@@ -52,6 +52,7 @@ export interface AppElements {
   nowPlayingTitle: HTMLHeadingElement
   nowPlayingArtist: HTMLParagraphElement
   nowPlayingAlbum: HTMLParagraphElement
+  lyricSourceMenu: HTMLDivElement
   lyricsStatus: HTMLParagraphElement
   lyricScroll: HTMLDivElement
   lyricLines: HTMLDivElement
@@ -121,6 +122,7 @@ export function getAppElements(): AppElements {
     nowPlayingTitle: getElement<HTMLHeadingElement>('now-playing-title'),
     nowPlayingArtist: getElement<HTMLParagraphElement>('now-playing-artist'),
     nowPlayingAlbum: getElement<HTMLParagraphElement>('now-playing-album'),
+    lyricSourceMenu: getElement<HTMLDivElement>('lyric-source-menu'),
     lyricsStatus: getElement<HTMLParagraphElement>('lyrics-status'),
     lyricScroll: getElement<HTMLDivElement>('lyric-scroll'),
     lyricLines: getElement<HTMLDivElement>('lyric-lines')
