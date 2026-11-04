@@ -44,7 +44,7 @@ state, and lyric presentation.**
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 180 tests pass across 11 files. |
+| `npm test` | 191 tests pass across 12 files. |
 | `npm run build` | Passes; emits `out/main`, `out/preload`, `out/renderer`. |
 | `npm run dev` | Starts electron-vite and Electron. |
 
@@ -98,17 +98,20 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Main process (Node.js, full privileges)                              │
 │                                                                      │
-│  index.ts ── startup, IPC, scan coordination, background refresh     │
-│    ├─ library.ts ── scan, cache reuse, snapshot, path index           │
-│    │    ├─ tags.ts ── music-metadata tag reads + fallbacks            │
-│    │    ├─ albums.ts ── pure album grouping/sorting                   │
+│  index.ts ── app lifecycle + startup wiring                          │
+│    ├─ window.ts ── BrowserWindow + renderer sends                    │
+│    ├─ ipc.ts ── library:*, settings:*, lyrics:get handlers           │
+│    ├─ scanCoordinator.ts ── generation, progress, folder persistence │
+│    ├─ store.ts ── settings/cache state                               │
+│    ├─ library.ts ── scan, cache reuse, snapshot, path index          │
+│    │    ├─ tags.ts ── music-metadata tag reads + fallbacks           │
+│    │    ├─ albums.ts ── pure album grouping/sorting                  │
 │    │    └─ ids.ts ── SHA-1 ids                                       │
 │    ├─ cache.ts / settings.ts / json-file.ts ── persistence           │
 │    ├─ covers.ts ── embedded/folder art → cached JPEGs                │
 │    ├─ lyricsSource.ts ── ordered embedded lyric resolvers            │
 │    └─ media-protocol.ts + range.ts ── media:// serving + ranges      │
 │                                                                      │
-│  IPC handlers: library:*, settings:*, lyrics:get                     │
 │  Events out: library:scan-progress, library:updated                  │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ contextBridge (typed, minimal)
@@ -122,10 +125,16 @@ loading, online lyric lookup, singer-specific styling, translations, TTML, tag e
 ┌───────────────────────────────┴──────────────────────────────────────┐
 │ Renderer (DOM only)                                                  │
 │                                                                      │
-│  src/main.ts ── routing, rendering, search/sort, queue/transport,    │
-│                 Now Playing lifecycle, lyric controller subscription │
+│  src/main.ts ── composition root only                                │
+│    ├─ dom.ts ── typed element lookup                                 │
+│    ├─ navigation.ts + routeStack.ts ── views + detail stack          │
+│    ├─ toolbar.ts ── search, sort, view switcher, shortcuts           │
+│    ├─ libraryController.ts ── snapshot, scan state, startup          │
+│    ├─ transport.ts ── queue + engine + seek + volume                 │
+│    ├─ nowPlaying.ts + playerBar.ts ── playback views                 │
+│    ├─ screen.ts + views/* ── section choice + rendering              │
 │    ├─ library/query.ts ── pure index + view/sort registry + search   │
-│    ├─ player/engine.ts ── PlaybackEngine + HtmlAudioEngine            │
+│    ├─ player/engine.ts ── PlaybackEngine + HtmlAudioEngine           │
 │    ├─ player/queue.ts ── pure current-index queue                    │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
 │    ├─ lyrics/lyricsController.ts ── fetch/parse/state/cache          │
@@ -161,7 +170,11 @@ LyriX/
 ├─ TechnicalSpecs.md
 ├─ src/
 │  ├─ main/
-│  │  ├─ index.ts              app lifecycle, IPC, scan orchestration
+│  │  ├─ index.ts              app lifecycle + startup wiring
+│  │  ├─ window.ts             BrowserWindow creation + renderer sends
+│  │  ├─ ipc.ts                IPC channel registration + validation
+│  │  ├─ scanCoordinator.ts    scan generation, progress, folder persistence
+│  │  ├─ store.ts              shared settings/cache state container
 │  │  ├─ library.ts            scanning, cache reuse, snapshots, path index
 │  │  ├─ tags.ts               tag reading + fallbacks
 │  │  ├─ albums.ts             pure album grouping/sorting
@@ -178,16 +191,27 @@ LyriX/
 │  │  └─ index.d.ts            global Window typing
 │  ├─ renderer/
 │  │  ├─ index.html            app shell + CSP
-│  │  ├─ src/main.ts           UI controller
-│  │  ├─ src/style.css         theme + app layout
+│  │  ├─ src/
+│  │  │  ├─ main.ts            composition root
+│  │  │  ├─ dom.ts             typed element lookup
+│  │  │  ├─ format.ts          shared DOM/time helpers
+│  │  │  ├─ routeStack.ts      pure route-stack operations
+│  │  │  ├─ navigation.ts      active view + detail stack
+│  │  │  ├─ toolbar.ts         search, sort, view switcher, shortcuts
+│  │  │  ├─ libraryController.ts snapshot, scan state, startup ordering
+│  │  │  ├─ transport.ts       queue, engine, seek, volume
+│  │  │  ├─ nowPlaying.ts      Now Playing lifecycle + lyric subscription
+│  │  │  ├─ playerBar.ts       bottom bar + transport control view
+│  │  │  ├─ screen.ts          section choice + view rendering
+│  │  │  ├─ style.css          theme + app layout
+│  │  │  └─ views/             album grid, artist list, tracks, details
 │  │  ├─ styles/lyrics.css     lyric + Now Playing styling
 │  │  ├─ library/query.ts      pure view/sort/search registry
 │  │  ├─ player/engine.ts      playback abstraction
 │  │  ├─ player/queue.ts       pure queue
 │  │  ├─ lyrics/lyricsController.ts
 │  │  ├─ lyrics/segmentGroups.ts
-│  │  └─ ui/lyricView.ts
-│  │  └─ ui/virtualList.ts
+│  │  └─ ui/{lyricView,virtualList}.ts
 │  └─ shared/
 │     ├─ types.ts              cross-process data + API types
 │     └─ lyrics/
@@ -207,6 +231,7 @@ LyriX/
    ├─ query.test.ts
    ├─ queue.test.ts
    ├─ range.test.ts
+   ├─ routeStack.test.ts
    ├─ segmentGroups.test.ts
    ├─ settings.test.ts
    └─ fixtures/{LineByLine.txt,TimedWordByWord.txt}
@@ -275,58 +300,20 @@ Ids are 40-character lowercase SHA-1 hex strings:
 
 ## 7. Main process modules
 
-### 7.1 `src/main/index.ts` — application shell and IPC
+### 7.1 `src/main/index.ts` — application lifecycle
 
-**Startup sequence**
+Startup wiring only:
 
 1. `registerMediaScheme()` runs before `app.whenReady()` (required by Electron).
-2. On ready: set app user model id, resolve `userData/settings.json` and
-   `userData/library-cache.json`.
-3. Load settings and cache (tolerant; invalid data falls back to defaults).
-4. `realpath` the last folder when possible, then `restoreLibrary(root, cache)` to show cached data
+2. On ready: set the app user model id, resolve `userData/settings.json` and
+   `userData/library-cache.json`, and load settings/cache into the shared `AppStore`.
+3. `realpath` the last folder when possible, then `restoreLibrary(root, cache)` to show cached data
    immediately without reading audio files.
-5. Create `CoverService(userData/covers)` and install the `media://` handler.
-6. Register IPC, create the window, handle macOS re-activation.
-7. On non-macOS, quit when all windows close.
+4. Create `CoverService(userData/covers)` and install the `media://` handler.
+5. Create the `ScanCoordinator`, register IPC, create the window, and handle macOS re-activation.
+6. On non-macOS, quit when all windows close.
 
-**Scan orchestration**
-
-- `runScan(folder, persistFolder)` increments `scanGeneration`; the `isCancelled` closure compares
-  the captured generation with the current one.
-- Delegates walking/tagging to `scanLibrary`, applies the result with `applyLibrary`, saves the cache,
-  and optionally persists the folder.
-- Progress events are throttled to one per 100 ms except for the final tick.
-- `chooseFolder()` opens the directory dialog, canonicalizes the path when possible, and scans.
-- `rescan()` re-scans the current root without changing the persisted folder.
-- `refreshInBackground()` scans the restored root on startup and emits `library:updated` only when
-  the scan was not superseded.
-- `library:get-state` starts the one-time startup refresh only when a last folder exists, after the
-  renderer has had a chance to subscribe.
-
-**IPC handlers**
-
-| Channel | Input | Output |
-| --- | --- | --- |
-| `library:get-state` | — | `LibrarySnapshot` |
-| `library:open-folder` | — | `LibrarySnapshot \| null` (null on cancel/empty) |
-| `library:rescan` | — | `LibrarySnapshot \| null` (null when no root) |
-| `lyrics:get` | `trackId: unknown` | `LyricsResult \| null` |
-| `settings:get` | — | `Settings` |
-| `settings:set-volume` | `volume: unknown` | `void` (clamped) |
-| `settings:set-ui` | `UiState` candidate | `void` (normalized) |
-
-**Events to renderer**
-
-| Channel | Payload | When |
-| --- | --- | --- |
-| `library:scan-progress` | `ScanProgress` | During scans, throttled. |
-| `library:updated` | `LibrarySnapshot` | After a successful background refresh. |
-
-**Lyrics handler details**
-
-- Rejects non-string/empty ids with `null`.
-- Resolves the file path through `resolveTrackFile(trackId)`; the renderer cannot supply a path.
-- Catches every error and returns `null`.
+The scan generation counter, IPC handlers, and window creation live in §7.11–§7.14.
 
 ### 7.2 `src/main/library.ts` — scanning, snapshots, path index
 
@@ -448,6 +435,55 @@ ready.
   removes the temp file on failure.
 - `writeJsonAtomic` writes pretty-printed JSON via the same path.
 
+### 7.11 `src/main/window.ts` — window creation
+
+`WindowManager` owns the single `BrowserWindow`:
+
+- `createWindow()` builds it with the existing security settings (`contextIsolation`, no Node
+  integration, sandbox), shows it on `ready-to-show`, clears the reference on `closed`, and loads
+  either `ELECTRON_RENDERER_URL` or the built `index.html`.
+- `getWindow()` exposes the current window for dialogs.
+- `send(channel, payload)` no-ops when the window or its web contents are destroyed.
+
+### 7.12 `src/main/store.ts` — shared state
+
+`AppStore` holds `settings`, `cache`, `settingsFile`, and `cacheFile`. The startup code fills it and
+the scan coordinator / IPC handlers mutate it. Keeping it in one object preserves the previous
+module-level state without spreading it across modules.
+
+### 7.13 `src/main/scanCoordinator.ts` — scans and background refresh
+
+- `runScan(folder, persistFolder)` increments the private generation counter; the `isCancelled`
+  closure compares the captured generation with the current one.
+- Delegates walking/tagging to `scanLibrary`, applies the result with `applyLibrary`, saves the cache,
+  and optionally persists the folder.
+- Progress events are throttled to one per 100 ms except for the final tick.
+- `chooseFolder()` opens the directory dialog, canonicalizes the path when possible, and scans.
+- `rescan()` re-scans the current root without changing the persisted folder.
+- `refreshInBackground()` scans the restored root on startup and emits `library:updated` only when
+  the scan was not superseded.
+
+### 7.14 `src/main/ipc.ts` — IPC handlers
+
+`registerIpc(store, scan)` registers the existing channels. `library:get-state` starts the one-time
+startup refresh only when a last folder exists, after the renderer has had a chance to subscribe.
+
+| Channel | Input | Output |
+| --- | --- | --- |
+| `library:get-state` | — | `LibrarySnapshot` |
+| `library:open-folder` | — | `LibrarySnapshot \| null` (null on cancel/empty) |
+| `library:rescan` | — | `LibrarySnapshot \| null` (null when no root) |
+| `lyrics:get` | `trackId: unknown` | `LyricsResult \| null` |
+| `settings:get` | — | `Settings` |
+| `settings:set-volume` | `volume: unknown` | `void` (clamped) |
+| `settings:set-ui` | `UiState` candidate | `void` (normalized) |
+
+Events to renderer: `library:scan-progress` (throttled) and `library:updated` (after a successful
+background refresh).
+
+The lyrics handler rejects non-string/empty ids with `null`, resolves the path through
+`resolveTrackFile(trackId)`, and catches every error.
+
 ---
 
 ## 8. Preload bridge (`src/preload/index.ts`)
@@ -475,77 +511,130 @@ object, and returns a function that removes exactly that listener.
 
 ## 9. Renderer modules
 
-### 9.1 `src/renderer/src/main.ts` — UI controller
+### 9.1 `src/renderer/src/main.ts` — composition root
 
-This is the composition root for the renderer. It:
+`main.ts` is deliberately thin (under 180 lines, composition only). It:
 
-- Wires DOM elements by id (throwing early if markup is missing).
-- Creates the `HtmlAudioEngine`, `PlaybackQueue`, `LyricsController`, `LyricView`, and the tracks
-  `VirtualList`.
-- Owns view routing, rendering, search, sort, playback transport, Now Playing lifecycle, and settings
-  persistence.
-- Subscribes to engine, library, and lyric events and cleans them up on `beforeunload`.
+- Looks up all DOM elements once through `getAppElements()`.
+- Creates the `HtmlAudioEngine`, `PlaybackQueue`, `LyricsController`, `LyricView`, `PlayerBar`, and
+  the tracks `TracksList`.
+- Constructs every controller with explicit dependency interfaces and wires cross-controller calls
+  through callbacks.
+- Subscribes to engine, library, and lyric events, starts `library.initialize()`, and cleans up on
+  `beforeunload`.
 
-**Renderer state**
+It owns no routing, playback, search, or rendering state; those live in the controllers below.
 
-| Variable | Meaning |
-| --- | --- |
-| `albums`, `libraryIndex`, `folderName` | Current snapshot and precomputed index. |
-| `activeView` | `albums` \| `artists` \| `tracks`. |
-| `sortByView` | Selected sort key per view. |
-| `detailStack` | Stack of `{ kind: 'album', albumId }` or `{ kind: 'artist', artistName }`. |
-| `appliedSearch` | Debounced search text currently applied. |
-| `visibleTrackItems` | Tracks currently visible in the tracks view; used for queueing. |
-| `isSeeking` | Suppresses time-label updates while dragging the seek bar. |
-| `libraryEventReceived` | Prevents an older `getState` response from overwriting a newer event. |
-| `activeAttempt` | Token for the current `play()` attempt so stale failures are ignored. |
-| `nowPlayingOpen` | Whether Now Playing owns the main content area. |
-| `libraryDirtyWhileNowPlaying` | A snapshot arrived while Now Playing was open; refresh on close. |
+### 9.2 `src/renderer/src/dom.ts` — element lookup
 
-**View routing**
+`getAppElements()` returns a typed `AppElements` object. It looks up every required element by id
+once and throws `Missing element #<id>` immediately when the markup is incomplete.
+
+### 9.3 `src/renderer/src/routeStack.ts` — pure route operations
+
+- `topRoute`, `pushRoute`, `popRoute`, and `pruneRoutes` are pure: they return new arrays and never
+  mutate the input stack.
+- `backLabel(activeView, stack)` chooses the Back button label from the parent route and view.
+- Covered by `tests/routeStack.test.ts`.
+
+### 9.4 `src/renderer/src/navigation.ts` — view and detail routing
+
+Owns `activeView` and `detailStack`.
 
 - `showSection(section)` hides every view except the given one.
 - `currentSection()` returns the top detail view or the active library view.
-- `refreshScreen()` syncs controls and renders the current section; while Now Playing is open it only
-  shows the Now Playing section and leaves the hidden library DOM untouched.
 - `openAlbum` / `openArtist` push routes; `goBack` pops; `switchView` resets the stack.
-- `leaveNowPlayingForNavigation()` closes Now Playing for actions that will render another view.
-- `closeNowPlaying()` restores the previous section, or re-renders first when the library changed
-  while it was open.
+- `popRoute`, `resetStack`, and `pruneInvalidRoutes` let the screen and library controllers adjust
+  routes without importing the navigation controller.
+- `backLabel()` delegates to the pure `routeStack` helper.
 
-**Search and sort**
+### 9.5 `src/renderer/src/toolbar.ts` — search, sort, view switcher
 
-- Search is debounced by **150 ms**.
-- `applySearch` closes Now Playing if necessary, re-renders the active library view, then restores the
-  appropriate section.
+Owns `sortByView`, `appliedSearch`, and the 150 ms search debounce.
+
+- `applyUiSettings` validates persisted view/sort keys and selects defaults.
+- `syncViewControls` updates `aria-pressed`, the sort options, and the selected value.
+- `applySearch` closes Now Playing if necessary, re-renders the active library view, then restores
+  the appropriate section.
 - `Ctrl/Cmd+F` and `/` focus the search box; `Escape` clears it (Now Playing `Escape` takes
   priority).
-- Changing sort updates `sortByView[activeView]`, re-renders, and persists.
-- View/sort changes are persisted through `saveUiState()`.
+- Sort and view changes persist through the `saveUiState` callback.
 
-**Playback**
+### 9.6 `src/renderer/src/libraryController.ts` — snapshot and scan state
 
-- `playQueue(tracks, index)` sets the queue; clicking the already-current track resumes instead of
-  reloading.
-- `playAlbumTrack` queues the album in album order.
-- `playVisibleTrack` queues the current filtered/sorted tracks list.
-- `startCurrentTrack(autoplay)` loads the track, calls `lyricsController.setTrack(track.id)`, resets
-  time UI, updates Now Playing/highlight/controls, and optionally plays.
-- `handleEnded` advances or stops at the end.
-- `handlePlaybackFailure` ignores `AbortError` (pause interrupts `play()`), logs the failure, skips
-  forward when possible, and otherwise pauses.
+Owns `albums`, `libraryIndex`, `folderName`, and `libraryEventReceived`.
+
+- `applySnapshot` replaces the snapshot/index, reconciles the queue through the transport interface,
+  prunes invalid detail routes, marks Now Playing dirty, refreshes the screen, and updates
+  status/controls.
+- `openFolder` / `rescanLibrary` drive the scan buttons and progress label.
+- `initialize` loads settings first, then `getState`; a `library:updated` event that arrives first
+  wins.
+- `start()` subscribes to scan progress and library updates and returns one disposer.
+- `emptyMessage`, `updateStatus`, and `findAlbumForTrack` keep view text and cover lookup out of the
+  renderers.
+
+### 9.7 `src/renderer/src/transport.ts` — queue and playback
+
+Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, and `activeAttempt`.
+
+- `playQueue` sets the queue; clicking the already-current track resumes instead of reloading.
+- `playAlbumTrack` queues the album in album order; `playVisibleTrack` queues the visible track list.
+- `startCurrentTrack` loads the track, requests lyrics, resets time UI, and optionally plays.
+- `handleEnded` advances or stops; `handlePlaybackFailure` ignores `AbortError`, skips forward when
+  possible, and otherwise pauses.
 - `previous` restarts the track when position > 3 s, otherwise moves back.
-- `resetPlayback` clears the queue, pauses, clears lyrics, and resets UI.
+- `reconcileQueue` rebuilds the queue from current track ids and resets playback when the current
+  track disappeared.
+- Seek bar, volume, and engine event wiring live here. `start()` subscribes to engine events and
+  returns one disposer.
 
-**Live library updates**
+### 9.8 `src/renderer/src/nowPlaying.ts` and `playerBar.ts` — playback views
 
-- `applySnapshot` replaces albums/index, reconciles the queue, drops invalid detail routes, marks
-  Now Playing dirty if open, refreshes the screen, and updates status/controls.
-- `reconcileQueue` rebuilds the queue from current track ids; if the current track disappeared, it
-  resets playback.
-- On startup, `getState` is applied only if no `library:updated` event already arrived.
+`NowPlayingController` owns `nowPlayingOpen` and `libraryDirtyWhileNowPlaying`:
 
-### 9.2 `src/renderer/library/query.ts` — pure index, views, search, sort
+- `openNowPlaying` renders the current track, shows the Now Playing section, and applies the current
+  lyric state.
+- `closeNowPlaying` restores the previous section, or re-renders first when the library changed while
+  it was open.
+- `leaveForNavigation` closes it silently for actions that will render another view.
+- It subscribes to the lyric controller and only renders while open.
+
+`PlayerBar` owns the bottom bar: now-playing title/artist/cover, play/pause labels and disabled
+states, duration, seek value, and time labels. It reads the current track and playing state through
+callbacks.
+
+### 9.9 `src/renderer/src/screen.ts` — section choice and rendering
+
+`ScreenController.refresh()` syncs the toolbar controls, then:
+
+- While Now Playing is open it shows the Now Playing section and leaves the hidden library DOM
+  untouched, so closing restores scroll position.
+- With a detail route it re-renders the hidden library view first (so Back restores search and sort),
+  then shows and renders the album or artist detail.
+- Otherwise it shows the active library section and renders it.
+
+`renderLibraryView(view)` runs `queryLibrary` with the applied search and per-view sort and hands the
+results to the matching view renderer. `updateTrackHighlight()` toggles the album-detail row highlight
+and refreshes the virtualized tracks list.
+
+### 9.10 `src/renderer/src/views/*` — view renderers
+
+Each renderer takes data plus callbacks and owns no global state:
+
+| File | Responsibility |
+| --- | --- |
+| `views/albumCards.ts` | Album card and card-grid DOM shared by albums and artist detail. |
+| `views/albumGrid.ts` | Albums grid plus empty state. |
+| `views/artistList.ts` | Artist rows with album/track counts plus empty state. |
+| `views/tracksList.ts` | Virtualized tracks list; owns the visible track list used for queueing. |
+| `views/albumDetail.ts` | Album header, cover/year, and ordered track list. |
+| `views/artistDetail.ts` | Artist header and album grid. |
+
+`src/renderer/src/format.ts` holds the shared `formatTime`, `smallCoverUrl`, `createCover`, and
+`setCoverImage` DOM helpers.
+
+### 9.11 `src/renderer/library/query.ts` — pure index, views, search, sort
 
 - `normalizeText` strips diacritics, lowercases, trims, and collapses whitespace.
 - `filterBySearch` requires **every** query word to appear in the item's precomputed `searchText`.
@@ -560,7 +649,7 @@ This is the composition root for the renderer. It:
   validate persisted values.
 - Artists are grouped by the exact album-artist string; no multi-artist splitting.
 
-### 9.3 `src/renderer/player/engine.ts` — playback abstraction
+### 9.12 `src/renderer/player/engine.ts` — playback abstraction
 
 `PlaybackEngine` exposes `load`, `play`, `pause`, `seek`, `setVolume`, `getPosition`, `getDuration`,
 `isPlaying`, and typed `on` subscriptions for `ended`, `timeupdate`, `error`, `play`, `pause`, and
@@ -576,7 +665,7 @@ This is the composition root for the renderer. It:
   not trigger a false failure.
 - `on` returns an unsubscribe function.
 
-### 9.4 `src/renderer/player/queue.ts` — pure queue
+### 9.13 `src/renderer/player/queue.ts` — pure queue
 
 `PlaybackQueue` stores a copied track array and an index.
 
@@ -584,7 +673,7 @@ This is the composition root for the renderer. It:
 - `current`, `next`, `previous`, `hasNext`, `hasPrevious`, `getTracks`, `getCurrentIndex`.
 - No playback, DOM, or persistence concerns.
 
-### 9.5 `src/renderer/ui/virtualList.ts` — fixed-row virtual scroller
+### 9.14 `src/renderer/ui/virtualList.ts` — fixed-row virtual scroller
 
 - Builds a spacer with the full height and an absolutely positioned window inside it.
 - Renders only the visible rows plus an overscan buffer (default 4) above and below.
@@ -593,7 +682,7 @@ This is the composition root for the renderer. It:
   playing highlight changes); `destroy` removes listeners and DOM.
 - Used only by the tracks view, with 52 px rows.
 
-### 9.6 `src/renderer/lyrics/lyricsController.ts` — on-demand lyric state
+### 9.15 `src/renderer/lyrics/lyricsController.ts` — on-demand lyric state
 
 No DOM, Electron, or filesystem references. Constructed with a fetch function
 (`window.library.getLyrics`).
@@ -618,7 +707,7 @@ Behavior:
   unsubscribe function.
 - Fetch/parse errors are logged and cached as `none`.
 
-### 9.7 `src/renderer/lyrics/segmentGroups.ts` — pure word grouping
+### 9.16 `src/renderer/lyrics/segmentGroups.ts` — pure word grouping
 
 `groupSegments(segments)` splits a line's segments into `LyricWordGroup` objects:
 
@@ -626,7 +715,7 @@ Behavior:
 - A trailing group without whitespace is still emitted.
 - The renderer inserts one literal space between groups, so syllables inside a word never wrap.
 
-### 9.8 `src/renderer/ui/lyricView.ts` — lyric DOM and synchronization
+### 9.17 `src/renderer/ui/lyricView.ts` — lyric DOM and synchronization
 
 **DOM construction (once per document instance)**
 
@@ -656,7 +745,7 @@ Behavior:
   play/pause.
 - `destroy()` cancels the frame, removes listeners, and clears the DOM.
 
-### 9.9 Styles
+### 9.18 Styles
 
 **`src/renderer/src/style.css`** — theme variables (`--bg`, `--panel`, `--border`, `--text`,
 `--muted`, `--accent`), toolbar, views, album grid, artist rows, track lists, detail views, player
@@ -927,6 +1016,7 @@ environment; nothing mocks Electron or the DOM. The tested modules either have n
 | `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
 | `tests/queue.test.ts` | Start-index clamping (negative, past end, fractional, non-finite); empty queue; next/previous at both ends; `hasNext`/`hasPrevious`; input-array copy; `getTracks`/`getCurrentIndex`. |
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
+| `tests/routeStack.test.ts` | `topRoute`; non-mutating push/pop; pruning invalid routes from the top only; back-label selection for each view and parent route. |
 | `tests/segmentGroups.test.ts` | Syllable grouping; `spaceAfter` boundaries; trailing final group; empty input. |
 | `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder and view fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
 
@@ -966,10 +1056,20 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 | Album grouping/order | `src/main/albums.ts` |
 | Cover extraction, resizing, cache | `src/main/covers.ts` |
 | `media://` URLs, range responses | `src/main/media-protocol.ts`, `src/main/range.ts` |
-| IPC channels or preload surface | `src/main/index.ts`, `src/preload/index.ts`, `src/shared/types.ts` |
+| App lifecycle, startup order | `src/main/index.ts` |
+| Window creation and renderer sends | `src/main/window.ts` |
+| Scan generation, progress, background refresh | `src/main/scanCoordinator.ts` |
+| IPC channels or preload surface | `src/main/ipc.ts`, `src/preload/index.ts`, `src/shared/types.ts` |
 | Persistence format or validation | `src/main/settings.ts`, `src/main/cache.ts`, `src/main/json-file.ts` |
 | Views, search, sort definitions | `src/renderer/library/query.ts` |
-| Routing, transport wiring, Now Playing lifecycle | `src/renderer/src/main.ts` |
+| Renderer wiring / controller composition | `src/renderer/src/main.ts` |
+| Routing and the detail back stack | `src/renderer/src/navigation.ts`, `src/renderer/src/routeStack.ts` |
+| Search box, sort dropdown, view switcher, shortcuts | `src/renderer/src/toolbar.ts` |
+| Snapshot, scan state, startup ordering | `src/renderer/src/libraryController.ts` |
+| Playback transport, seeking, volume | `src/renderer/src/transport.ts` |
+| Now Playing lifecycle / lyric subscription | `src/renderer/src/nowPlaying.ts` |
+| Bottom player bar rendering | `src/renderer/src/playerBar.ts` |
+| Section choice and view rendering | `src/renderer/src/screen.ts`, `src/renderer/src/views/` |
 | Playback backend or queue behavior | `src/renderer/player/engine.ts`, `src/renderer/player/queue.ts` |
 | Lyric fetch, parse state, LRU cache | `src/renderer/lyrics/lyricsController.ts` |
 | Lyric parsing/sync (stable core) | `src/shared/lyrics/` |
@@ -996,8 +1096,8 @@ the built app against generated FLAC fixtures. They are not part of `npm test`.
 
 1. Extend `LibraryView` and add an entry to `VIEWS` in `src/renderer/library/query.ts` with a label,
    default sort, sort map, and item builder.
-2. Add a section to `index.html`, include it in `showSection`/`currentSection`, and render it in
-   `main.ts`.
+2. Add a section to `index.html`, include it in `NavigationController.showSection`/`currentSection`,
+   and render it in `src/renderer/src/screen.ts` (plus a `src/renderer/src/views/` renderer).
 3. Add a view button with `data-view` and a `LibraryView` value.
 
 ### Add a sort option
@@ -1050,7 +1150,7 @@ npm run dev        # manual smoke: open a folder, play tracks, open Now Playing
 Expected:
 
 - Type-check passes for both projects.
-- All Vitest files pass (currently 180 tests across 11 files).
+- All Vitest files pass (currently 191 tests across 12 files).
 - Production bundles build into `out/`.
 - `npm run dev` opens the app with no console errors.
 - Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.
