@@ -26,6 +26,8 @@ Other scripts:
 npm run typecheck   # type-check main/preload and renderer
 npm run build       # bundle into out/
 npm start           # preview the production bundle
+npm run package     # package the app without creating an installer
+npm run make        # build a Windows .exe installer with Electron Forge
 npm test            # run the Vitest suite
 ```
 
