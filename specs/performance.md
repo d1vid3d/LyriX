@@ -1,0 +1,45 @@
+# Performance Characteristics
+
+**Purpose:** the mechanisms that keep scans, list rendering, and lyric synchronization cheap. Exact
+limits and constants are owned by the module specs linked below; this file records the performance
+intent without duplicating volatile values.
+
+**Owning source paths:** cross-cutting; see linked specs.
+
+**Last verified:** 2026-11-06 against LyriX 0.1.0.
+
+**Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/library-scanning.md](main/library-scanning.md),
+[main/covers-and-media.md](main/covers-and-media.md),
+[renderer/library-query-and-lists.md](renderer/library-query-and-lists.md),
+[renderer/lyrics-controller.md](renderer/lyrics-controller.md),
+[renderer/lyric-view.md](renderer/lyric-view.md),
+[testing-and-verification.md](testing-and-verification.md).
+
+- **Tag reads:** bounded concurrency, owned by
+  [main/library-scanning.md](main/library-scanning.md).
+- **Cache reuse:** unchanged files are not parsed again; reuse is keyed by `mtimeMs` + `size` and is
+  owned by [main/library-scanning.md](main/library-scanning.md) and
+  [persistence.md](persistence.md).
+- **Progress events:** throttled to one per fixed interval, with the final event always sent; owned
+  by [main/library-scanning.md](main/library-scanning.md).
+- **Covers:** full and small JPEGs are cached; the small variant is derived from the full cover; and
+  in-flight requests are deduplicated. Sizes and quality are owned by
+  [main/covers-and-media.md](main/covers-and-media.md).
+- **Track list:** virtualized; only visible rows plus an overscan buffer exist in the DOM. Row height
+  and overscan are owned by [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md).
+- **Library queries:** the index is built once per snapshot; each keystroke only filters and sorts.
+  See [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md).
+- **Lyrics:** fetched on demand; parsed source entries are cached with an LRU limit; one rAF loop runs
+  while the view is visible. See [renderer/lyrics-controller.md](renderer/lyrics-controller.md) and
+  [renderer/lyric-view.md](renderer/lyric-view.md).
+- **Lyric DOM:** built once per document; each frame reads the position once, runs the binary
+  searches, and does one O(lines) flag pass whose DOM writes happen only for changed state. See
+  [renderer/lyric-view.md](renderer/lyric-view.md).
+- **Auto-scroll:** one smooth scroll per primary-line change; manual scrolling pauses it for a fixed
+  window owned by [renderer/lyric-view.md](renderer/lyric-view.md).
+- **Cover images:** lazy-loaded/async-decoded where applicable; see
+  [renderer/shell-and-navigation.md](renderer/shell-and-navigation.md) and
+  [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md).
+
+The invariant that drives all of this is invariant 10 in [TechnicalSpecs.md](TechnicalSpecs.md):
+UI updates are minimal, and virtual rows / lyric lines update only when their state changes.

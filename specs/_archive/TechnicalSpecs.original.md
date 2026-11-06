@@ -1,0 +1,1532 @@
+# LyriX — Technical Specification
+
+> Status: as-built reference for LyriX 0.1.0. This document describes what the code currently does,
+> where responsibilities live, and how to extend it safely. It is intentionally separate from the
+> user-facing `README.md`.
+
+**How to use this document**
+
+- **Contributors** — read §2 (invariants) and §3 (architecture) first, then the module section for
+  the area you are changing.
+- **Agents** — §4 (repository layout) and §17 (extension guide and change map) are the fastest way to
+  find the right file; §19 lists the checks required before handing work back.
+- **Source of truth** — the code wins. When behavior changes, update this document in the same
+  change so it stays as-built rather than aspirational.
+
+---
+
+## 1. Executive summary
+
+LyriX is a minimal desktop player for local FLAC libraries built with **Electron**, **electron-vite**,
+**TypeScript**, and plain **HTML/CSS**. It has no UI framework, no runtime state library, and no
+dependencies beyond `music-metadata` (main process) plus the Electron/Vite/Vitest toolchain.
+
+Current capabilities:
+
+- Recursively scan a chosen folder for `.flac` files.
+- Read tags with `music-metadata`, cache results, and reuse them when file `mtime` and size match.
+- Group tracks into albums by album artist + album title, with disc/track ordering.
+- Extract embedded or folder cover art, resize it, and cache JPEGs.
+- Browse **Albums**, **Artists**, and **Tracks** views with search and per-view sorting.
+- Play tracks through a `media://` protocol with byte-range seeking.
+- Queue an album (album detail) or the visible filtered list (tracks view).
+- Load embedded lyrics on demand and display them in a **Now Playing** view.
+- Render line-timed LRC, word-timed enhanced LRC, and plain untimed lyrics.
+- Render an aligned translation under each lyric line, with a menu picker and quick toggle.
+- Synchronize lyrics from `requestAnimationFrame` using only the playback engine position.
+- Persist the last folder, volume, active view, and per-view sort between launches.
+
+Architecture in one line: **the main process owns the filesystem, tags, covers, persistence, and the
+`media://` protocol; the preload exposes a small typed bridge; the renderer owns all UI, playback
+state, and lyric presentation.**
+
+### Current verification status
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck` | Passes (main/preload and renderer projects). |
+| `npm test` | 356 tests pass across 20 files. |
+| `npm run build` | Passes; emits `out/main`, `out/preload`, `out/renderer`. |
+| `npm run dev` | Starts electron-vite and Electron. |
+
+An Electron/CDP end-to-end smoke test (kept outside the repo) also exercises library scanning,
+playback, all three lyric formats, missing lyrics, line seeking, live track changes, Now Playing
+open/close, search/view/scroll preservation, and console cleanliness.
+
+---
+
+## 2. Goals, non-goals, and invariants
+
+### Goals
+
+- Keep the codebase small, typed, and easy to reason about.
+- Keep the renderer free of Node.js and filesystem APIs.
+- Keep pure logic (querying, parsing, grouping, queues) independent of the DOM so it can be tested.
+- Load lyrics only when needed; never during library scanning.
+- Preserve user context (search text, selected view, scroll position) when opening and closing
+  Now Playing.
+
+### Non-goals (current scope)
+
+Shuffle, repeat, gapless playback, crossfade, queue panel/editing, fuzzy search, search history,
+filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online lyric or
+translation lookup, singer-specific styling, translation editing, swapping original/translation,
+side-by-side translation layout, word-level translation timing, per-language fonts, translation
+keyboard shortcuts, TTML, tag editing, packaging.
+
+### Invariants
+
+1. **Renderer never sees real file paths.** It receives track and album ids plus `media://` URLs.
+2. **Main process validates every id and every path.** Track paths are looked up from the scanned
+   library, never accepted from the renderer.
+3. **`media://` enforces path containment** using `realpath` + relative-path checks, and only serves
+   regular `.flac` files or cached cover JPEGs.
+4. **Lyrics are on-demand only.** They are not read during scan and not stored in the library cache.
+5. **Lyric source IPC never throws across the boundary.** Invalid ids, missing files, and parse
+   failures resolve to `null`; choice writes validate their input and no-op on failure.
+6. **Disk writes are atomic.** Settings, library cache, lyric choices, and cover files use
+   temp-file + rename.
+7. **Scans are cancellable.** A generation counter makes stale scans stop reporting and never
+   overwrite newer state.
+8. **Persisted values are validated** by the main process before use, and again by the renderer for
+   view/sort keys.
+9. **The renderer reads playback position only through `PlaybackEngine`**, never by reaching into the
+   `<audio>` element for lyric sync.
+10. **UI updates are minimal.** Virtual rows and lyric lines update only when their state changes.
+11. **Sidecar reads stay inside the track's directory.** Only regular files are read; symlinks,
+    directories, and files over 1 MiB are skipped.
+
+---
+
+## 3. System architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ Main process (Node.js, full privileges)                              │
+│                                                                      │
+│  index.ts ── app lifecycle + startup wiring                          │
+│    ├─ window.ts ── BrowserWindow + renderer sends                    │
+│    ├─ ipc.ts ── library:*, settings:*, lyrics:* handlers             │
+│    ├─ scanCoordinator.ts ── generation, progress, folder persistence │
+│    ├─ store.ts ── settings/cache state                               │
+│    ├─ library.ts ── scan, cache reuse, snapshot, path index          │
+│    │    ├─ tags.ts ── music-metadata tag reads + fallbacks           │
+│    │    ├─ albums.ts ── pure album grouping/sorting                  │
+│    │    └─ ids.ts ── SHA-1 ids                                       │
+│    ├─ cache.ts / settings.ts / json-file.ts ── persistence           │
+│    ├─ covers.ts ── embedded/folder art → cached JPEGs                │
+│    ├─ lyrics/ ── embedded + sidecar providers, choice store          │
+│    └─ media-protocol.ts + range.ts ── media:// serving + ranges      │
+│                                                                      │
+│  Events out: library:scan-progress, library:updated                  │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ contextBridge (typed, minimal)
+┌───────────────────────────────┴──────────────────────────────────────┐
+│ Preload (contextIsolation, sandbox)                                  │
+│  window.library: getState, openFolder, rescan, getSettings,          │
+│                  saveVolume, saveUiState, getLyricSources,           │
+│                  saveLyricChoice, saveLyricPreference,               │
+│                  saveTranslationChoice, saveTranslationSettings,     │
+│                  onScanProgress, onLibraryUpdated                    │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ no Node APIs in renderer
+┌───────────────────────────────┴──────────────────────────────────────┐
+│ Renderer (DOM only)                                                  │
+│                                                                      │
+│  src/main.ts ── composition root only                                │
+│    ├─ dom.ts ── typed element lookup                                 │
+│    ├─ navigation.ts + routeStack.ts ── views + detail stack          │
+│    ├─ toolbar.ts ── search, sort, view switcher, shortcuts           │
+│    ├─ libraryController.ts ── snapshot, scan state, startup          │
+│    ├─ transport.ts ── queue + engine + seek + volume                 │
+│    ├─ nowPlaying.ts + playerBar.ts ── playback views                 │
+│    ├─ screen.ts + views/* ── section choice + rendering              │
+│    ├─ library/query.ts ── pure index + view/sort registry + search   │
+│    ├─ player/engine.ts ── PlaybackEngine + HtmlAudioEngine           │
+│    ├─ player/queue.ts ── pure current-index queue                    │
+│    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
+│    ├─ lyrics/lyricsController.ts ── fetch/parse/select/state/cache   │
+│    ├─ lyrics/translationState.ts ── pure translation-layer state     │
+│    ├─ lyrics/translationMenuModel.ts ── translation menu/toggle model│
+│    ├─ lyrics/translationLabels.ts ── language + sidecar examples     │
+│    ├─ lyrics/translationText.ts ── per-line translation lookup       │
+│    ├─ lyrics/segmentGroups.ts ── pure word grouping                  │
+│    ├─ ui/lyricView.ts ── lyric DOM + rAF sync + scroll + seek        │
+│    ├─ ui/translationToggle.ts ── translation quick-toggle pill       │
+│    └─ styles/lyrics.css + src/style.css ── all presentation          │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Process boundaries
+
+| Concern | Owner | Renderer access |
+| --- | --- | --- |
+| Filesystem walking, stat, tags | Main | None |
+| Library cache/settings files | Main | None |
+| Cover extraction/resizing/cache | Main | Only via `media://cover/<id>` |
+| Audio bytes | Main (`media://track/<id>`) | `<audio src>` only |
+| Lyrics from embedded tags and sidecars | Main | `getLyricSources(trackId)` |
+| Translation alignment/attachment | Renderer (pure shared module) | Direct |
+| Playback position/transport | Renderer | Direct |
+| Library queries, search, sort | Renderer | Direct |
+| UI state persistence values | Renderer proposes, main validates/stores | Via IPC |
+
+---
+
+## 4. Repository layout
+
+```
+LyriX/
+├─ package.json
+├─ electron.vite.config.ts
+├─ tsconfig.json / tsconfig.node.json / tsconfig.web.json
+├─ README.md
+├─ TechnicalSpecs.md
+├─ src/
+│  ├─ main/
+│  │  ├─ index.ts              app lifecycle + startup wiring
+│  │  ├─ window.ts             BrowserWindow creation + renderer sends
+│  │  ├─ ipc.ts                IPC channel registration + validation
+│  │  ├─ scanCoordinator.ts    scan generation, progress, folder persistence
+│  │  ├─ store.ts              shared settings/cache state container
+│  │  ├─ library.ts            scanning, cache reuse, snapshots, path index
+│  │  ├─ tags.ts               tag reading + fallbacks
+│  │  ├─ albums.ts             pure album grouping/sorting
+│  │  ├─ cache.ts              versioned library cache
+│  │  ├─ settings.ts           settings normalization + persistence
+│  │  ├─ covers.ts             cover extraction/resizing/cache
+│  │  ├─ media-protocol.ts     media:// handler
+│  │  ├─ range.ts              Range header parser
+│  │  ├─ lyrics/
+│  │  │  ├─ embedded.ts        embedded tag resolver
+│  │  │  ├─ sidecar.ts         sidecar discovery + decoding
+│  │  │  ├─ sources.ts         provider list + canonical options
+│  │  │  └─ choices.ts         per-track lyric + translation choice store
+│  │  ├─ ids.ts                SHA-1 ids
+│  │  └─ json-file.ts          tolerant reads, atomic writes
+│  ├─ preload/
+│  │  ├─ index.ts              contextBridge API
+│  │  └─ index.d.ts            global Window typing
+│  ├─ renderer/
+│  │  ├─ index.html            app shell + CSP
+│  │  ├─ src/
+│  │  │  ├─ main.ts            composition root
+│  │  │  ├─ dom.ts             typed element lookup
+│  │  │  ├─ format.ts          shared DOM/time helpers
+│  │  │  ├─ routeStack.ts      pure route-stack operations
+│  │  │  ├─ navigation.ts      active view + detail stack
+│  │  │  ├─ toolbar.ts         search, sort, view switcher, shortcuts
+│  │  │  ├─ libraryController.ts snapshot, scan state, startup ordering
+│  │  │  ├─ transport.ts       queue, engine, seek, volume
+│  │  │  ├─ nowPlaying.ts      Now Playing lifecycle + lyric subscription
+│  │  │  ├─ playerBar.ts       bottom bar + transport control view
+│  │  │  ├─ screen.ts          section choice + view rendering
+│  │  │  ├─ style.css          theme + app layout
+│  │  │  └─ views/             album grid, artist list, tracks, details
+│  │  ├─ styles/lyrics.css     lyric + Now Playing styling
+│  │  ├─ styles/lyricSourceMenu.css  source chip/popover + translation toggle styling
+│  │  ├─ library/query.ts      pure view/sort/search registry
+│  │  ├─ player/engine.ts      playback abstraction
+│  │  ├─ player/queue.ts       pure queue
+│  │  ├─ lyrics/lyricsController.ts  source fetch/parse/select/state/cache
+│  │  ├─ lyrics/translationState.ts  pure translation layer + document attachment
+│  │  ├─ lyrics/translationMenuModel.ts pure translation section + quick-toggle model
+│  │  ├─ lyrics/translationLabels.ts language labels + sidecar example names
+│  │  ├─ lyrics/translationText.ts   per-line translation text lookup
+│  │  ├─ lyrics/segmentGroups.ts
+│  │  ├─ lyrics/sourceMenuModel.ts   pure source-menu view model + keyboard helper
+│  │  └─ ui/{lyricView,lyricSourceMenu,lyricSourceMenuView,translationToggle,virtualList}.ts
+│  └─ shared/
+│     ├─ types.ts              cross-process data + API types
+│     └─ lyrics/
+│        ├─ types.ts
+│        ├─ sources.ts         source types + pure main/translation selection
+│        ├─ translation.ts     pure alignment + attachment
+│        ├─ parse.ts
+│        ├─ time.ts
+│        ├─ sync.ts
+│        ├─ index.ts
+│        └─ parsers/{shared,plain,lrc,enhanced-lrc}.ts
+└─ tests/
+   ├─ albums.test.ts
+   ├─ cache.test.ts
+   ├─ ids.test.ts
+   ├─ json-file.test.ts
+   ├─ lyricChoices.test.ts
+   ├─ lyricSourceProviders.test.ts
+   ├─ lyricSources.test.ts
+   ├─ lyrics.test.ts
+   ├─ lyricsController.test.ts
+   ├─ query.test.ts
+   ├─ queue.test.ts
+   ├─ range.test.ts
+   ├─ routeStack.test.ts
+   ├─ segmentGroups.test.ts
+   ├─ settings.test.ts
+   ├─ sidecar.test.ts
+   ├─ sourceMenuModel.test.ts
+   ├─ translation.test.ts
+   ├─ translationLabels.test.ts
+   ├─ translationText.test.ts
+   └─ fixtures/{LineByLine.txt,TimedWordByWord.txt}
+```
+
+---
+
+## 5. Build, tooling, and configuration
+
+### Scripts (`package.json`)
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | electron-vite dev server + Electron. |
+| `npm run build` | Production bundle into `out/`. |
+| `npm start` | Preview the production bundle. |
+| `npm run typecheck` | `typecheck:node` then `typecheck:web`. |
+| `npm run typecheck:node` | `tsc` over main, preload, shared, config. |
+| `npm run typecheck:web` | `tsc` over renderer, preload `.d.ts`, shared. |
+| `npm test` | `vitest run`. |
+
+### TypeScript projects
+
+- `tsconfig.node.json` — ES2022, `moduleResolution: Bundler`, Node + electron-vite types; includes
+  `src/main/**`, `src/preload/**`, `src/shared/**`, and the Vite config.
+- `tsconfig.web.json` — ES2022 + DOM libs, Vite client types; includes `src/renderer/**/*.ts`,
+  `src/preload/*.d.ts`, `src/shared/**`.
+- `tsconfig.json` — solution file with project references.
+- Strict mode, `isolatedModules`, `verbatimModuleSyntax`, and `skipLibCheck` are enabled.
+
+### electron-vite
+
+`electron.vite.config.ts` excludes `music-metadata` from dependency externalization so the ESM-only
+package is bundled into the CJS main process.
+
+### Renderer security settings
+
+`BrowserWindow` uses `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`.
+`index.html` sets a CSP allowing only self scripts, self/inline styles, `data:`/`media:` images, and
+`self`/`media:` audio.
+
+---
+
+## 6. Shared data model (`src/shared/types.ts`)
+
+| Type | Fields / purpose |
+| --- | --- |
+| `Track` | `id`, `title`, `artist`, `album`, `albumArtist`, `trackNumber`, `discNumber`, `year`, `duration`, `url` (`media://track/<id>`). |
+| `Album` | `id`, `title`, `artist` (album artist), `year`, `coverUrl` (`media://cover/<id>`), `tracks`. |
+| `CachedTrack` | Tag values plus `mtimeMs` and `size` for cache validation. |
+| `LibraryCache` | `version`, `folder`, `tracks: Record<absolutePath, CachedTrack>`. |
+| `UiState` | `lastView`, `sortByView`. |
+| `Settings` | `UiState` + `lastFolder`, `volume`, `lyricPreference`, `translationEnabled`, `translationLanguage`. |
+| `TranslationSettingsInput` | `enabled: boolean`, `language: string \| null` for the translation IPC. |
+| `ScanProgress` | `scanned`, `total`. |
+| `LibrarySnapshot` | `folderName`, `albums`. |
+| `LyricPreference` | `"sidecar"` or `"embedded"` (global auto-selection default). |
+| `LyricSourceKind` | `"embedded"` or `"sidecar"`. |
+| `LyricSourceOption` | `id`, `kind`, `label`, `detail`, `available`, `text`, `variant`; ids are `"embedded"` or `"sidecar:<file name>"` (file name only). `variant` is the text between the base name and `.lrc` as written, or `null` for embedded and the exact sidecar. |
+| `LyricSources` | `trackId`, ordered `options`, `savedChoice`, `savedTranslationChoice`, `preference`, `expectedSidecarName` (file name only). |
+| `LibraryApi` | Typed preload surface (see §8). |
+
+Ids are 40-character lowercase SHA-1 hex strings:
+
+- Track id = SHA-1 of the absolute file path.
+- Album id = SHA-1 of `albumArtist + "\u0000" + album`.
+- Both are validated with `/^[a-f0-9]{40}$/` before use.
+
+---
+
+## 7. Main process modules
+
+### 7.1 `src/main/index.ts` — application lifecycle
+
+Startup wiring only:
+
+1. `registerMediaScheme()` runs before `app.whenReady()` (required by Electron).
+2. On ready: set the app user model id, resolve `userData/settings.json` and
+   `userData/library-cache.json`, and load settings/cache into the shared `AppStore`.
+3. `realpath` the last folder when possible, then `restoreLibrary(root, cache)` to show cached data
+   immediately without reading audio files.
+4. Create `CoverService(userData/covers)` and install the `media://` handler.
+5. Create the `ScanCoordinator`, register IPC, create the window, and handle macOS re-activation.
+6. On non-macOS, quit when all windows close.
+
+The scan generation counter, IPC handlers, and window creation live in §7.11–§7.14.
+
+### 7.2 `src/main/library.ts` — scanning, snapshots, path index
+
+State is a module-level object:
+
+- `root`, `folderName`, `snapshot`, `trackPaths: Map<id, absolutePath>`,
+  `albumTrackPaths: Map<albumId, absolutePath[]>`.
+
+Key functions:
+
+- `restoreLibrary(folder, cache)` — resets state and rebuilds from cached entries when the cache
+  folder matches; otherwise starts empty.
+- `applyLibrary(folder, entries)` — sets the active root and rebuilds from a fresh scan.
+- `applyEntries(entries)` — creates `Track` objects, builds path maps, groups albums with
+  `groupTracks`, and stores the snapshot.
+- `scanLibrary(folder, previous, onProgress, isCancelled)` — recursively collects `.flac` files,
+  reuses entries whose `mtimeMs` and `size` match, reads changed files with up to **8** concurrent
+  workers, reports progress for cached and parsed files alike, and stops when cancelled.
+- `collectFlacFiles(dir)` — skips symbolic links, ignores unreadable folders/files with a warning,
+  matches `.flac` case-insensitively.
+- `getSnapshot()`, `getLibraryRoot()`, `resolveTrackFile(id)`, `getAlbumTrackPaths(albumId)`.
+- `isPathInside(root, target)` — relative-path containment used by the media protocol.
+
+### 7.3 `src/main/tags.ts` — tag reading and fallbacks
+
+`readTrackTags(filePath, mtimeMs, size)` calls `parseFile` with duration and skips covers.
+
+- Title falls back to the filename without extension.
+- Artist falls back to `Unknown Artist`; album to `Unknown Album`; album artist to the artist.
+- Track/disc/year become `null` when missing or non-finite; duration becomes `0`.
+- Any read error is logged and returns the same filename/unknown fallbacks, so one bad file cannot
+  abort a scan.
+
+### 7.4 `src/main/albums.ts` — pure grouping
+
+- Groups by `${albumArtist}\u0000${album}` so same-titled albums by different artists stay separate.
+- Album id = `hashId(key)`.
+- Album year = first non-null track year.
+- Tracks sort by disc (null → 1), then track number (null → last), then title.
+- Albums sort by title with `localeCompare(..., { sensitivity: 'base', numeric: true })`.
+
+### 7.5 `src/main/cache.ts` — library cache
+
+- Schema version `1`.
+- `loadLibraryCache` validates the version, folder type, and every entry; malformed entries are
+  dropped individually. Invalid top-level data yields an empty cache.
+- `saveLibraryCache` writes atomically.
+
+### 7.6 `src/main/settings.ts` — settings normalization
+
+- Defaults: `lastFolder: null`, `volume: 1`, `lastView: 'albums'`, `sortByView: {}`,
+  `lyricPreference: 'sidecar'`, `translationEnabled: false`, `translationLanguage: null`.
+- `clampVolume` keeps `[0, 1]` and replaces non-finite values with `1`.
+- `normalizeUiState` keeps only string view names and non-empty string sort values.
+- `normalizeTranslationLanguage` accepts only `/^[A-Za-z0-9_-]{1,32}$/`; anything else becomes `null`.
+- `translationEnabled` is true only for the boolean `true`.
+- `normalize` validates the folder string, clamps volume, merges normalized UI state, validates the
+  lyric preference, and normalizes both translation fields.
+- Reads use `readJsonFile`; writes use `writeJsonAtomic` with normalization.
+
+### 7.7 `src/main/covers.ts` — cover art
+
+`CoverService` caches generated JPEGs in `userData/covers`.
+
+- Full cover target width: **300 px**; small cover: **96 px**.
+- Cache filenames: `<albumId>.jpg` and `<albumId>-small.jpg`.
+- `getCover(albumId, size)` validates the album id, returns an existing file, and deduplicates
+  in-flight generation by `albumId:size`.
+- Full cover source order: embedded picture from up to the first **3** album tracks, then
+  `cover.jpg`, `folder.jpg`, or `front.jpg` in album folders (case-insensitive).
+- Small covers are generated from the full cached cover, not re-extracted.
+- JPEG quality 85; images are only downscaled when wider than the target.
+- Albums without usable art return `null`, and the renderer shows a `♪` placeholder.
+
+### 7.8 `src/main/media-protocol.ts` and `range.ts`
+
+The `media` scheme is registered as **standard, secure, fetch-capable, and streaming** before app
+ready.
+
+`media://track/<id>`:
+
+1. Validates the 40-hex id.
+2. Resolves the indexed path and the library root.
+3. `realpath`s both and rejects anything outside the root.
+4. Requires a regular `.flac` file.
+5. Supports `HEAD`.
+6. Serves `200` with the whole file when there is no `Range`, `206` with `Content-Range` for a valid
+   range, `416` for an unsatisfiable range, and `404` for bad ids/paths.
+7. Malformed `Range` headers are ignored and the whole file is served.
+8. Streams with `createReadStream` and aborts the stream when the request signal aborts.
+9. Sends `Content-Type: audio/flac`, `Accept-Ranges: bytes`, `Cache-Control: no-store`.
+
+`media://cover/<id>?size=small`:
+
+1. Validates the album id.
+2. Asks `CoverService` for the full or small JPEG.
+3. Serves `image/jpeg` with `Cache-Control: no-store`, or `404`.
+
+`parseByteRange(header, size)` supports `start-end`, `start-`, and `-suffix`, returning
+`{ start, end }`, `'invalid'`, or `'unsatisfiable'`.
+
+### 7.9 `src/main/lyrics/` — lyric sources
+
+`LyricsTrack = { id, filePath }`; `LyricSourceProvider = (track) => Promise<LyricSourceOption[]>`.
+The renderer only sends a track id; the path always comes from the scanned library.
+
+- `embedded.ts` — `readEmbeddedLyrics(filePath)` returns `{ text, tag }` or `null`.
+  - Calls `parseFile(filePath, { duration: false, skipCovers: true })`.
+  - Lookup order: `common.lyrics` (string or `{ text }` / `{ syncText }` entries), then native tags
+    whose id is `LYRICS` or `UNSYNCEDLYRICS`, case-insensitive.
+  - `music-metadata` strips timestamps from `common.lyrics[].text` but retains millisecond entries
+    in `syncText`; the resolver reconstructs line-timed LRC (`[mm:ss.cc]`) when the text itself has
+    no timestamps. This preserves timed and enhanced word lyrics.
+  - Handles strings, arrays, `{ text }`, `{ value }`, and `{ syncText }` shapes defensively.
+- `sidecar.ts` — `findSidecars(trackFilePath)`.
+  - Looks only in the track's own directory for `<base>.lrc` (exact) and `<base>.<variant>.lrc`
+    (variants). Names are compared case-insensitively after Unicode NFC normalization; `.lrc` is
+    case-insensitive too.
+  - Uses `lstat` and reads only regular files; symlinks and directories are skipped. Files larger
+    than 1 MiB are skipped.
+  - Decodes UTF-8 (BOM stripped) and UTF-16 LE/BE when their BOM is present.
+  - Per-file read/decode errors are logged and that file is skipped; an unreadable directory yields
+    an empty list.
+- `sources.ts` — `PROVIDERS` is the ordered provider list (`embedded`, `sidecar`). Adding a provider
+  that uses an existing source kind is one list entry.
+  - `getLyricSources(track, { savedChoice, savedTranslationChoice, preference })` runs every
+    provider in `try/catch`; a failing provider is logged and contributes nothing.
+  - Always returns the `embedded` slot and the exact sidecar slot with id
+    `sidecar:<expectedSidecarName>`, marking missing slots `available: false`. Variant sidecars
+    follow, sorted alphabetically. `expectedSidecarName` is a file name such as `Song.lrc`.
+  - Each option carries `variant`: the text between the base name and `.lrc` exactly as written
+    (`"EN"` for `Song.EN.lrc`), or `null` for embedded and the exact sidecar.
+  - `detail` is the tag name used or the actual sidecar file name; it is never a full path.
+  - The response echoes `savedChoice` and `savedTranslationChoice` for the renderer.
+- `choices.ts` — `LyricChoiceStore` for `userData/lyric-choices.json`.
+  - Shape: `{ version: 1, tracks: Record<trackId, sourceId>, translations?: Record<trackId, sourceId> }`.
+  - A missing `translations` map is treated as empty; existing `tracks` choices survive.
+  - Tolerant read: bad JSON, wrong version, or malformed containers become empty maps.
+  - Source ids must be `embedded` or `sidecar:` followed by a file name with no path separators,
+    at most 255 characters. Invalid ids are ignored.
+  - Writes atomically and caps each map independently at 5000 entries by dropping the oldest.
+    API: `get`, `set`, `clear`, `getTranslation`, `setTranslation`, `clearTranslation`.
+
+### 7.10 `src/main/ids.ts` and `json-file.ts`
+
+- `hashId(value)` → lowercase SHA-1 hex.
+- `readJsonFile(path, fallback)` returns the fallback on any read/parse error and only logs non-ENOENT
+  failures.
+- `writeFileAtomic(path, data)` writes a temp file in the same directory, renames it into place, and
+  removes the temp file on failure.
+- `writeJsonAtomic` writes pretty-printed JSON via the same path.
+
+### 7.11 `src/main/window.ts` — window creation
+
+`WindowManager` owns the single `BrowserWindow`:
+
+- `createWindow()` builds it with the existing security settings (`contextIsolation`, no Node
+  integration, sandbox), shows it on `ready-to-show`, clears the reference on `closed`, and loads
+  either `ELECTRON_RENDERER_URL` or the built `index.html`.
+- `getWindow()` exposes the current window for dialogs.
+- `send(channel, payload)` no-ops when the window or its web contents are destroyed.
+
+### 7.12 `src/main/store.ts` — shared state
+
+`AppStore` holds `settings`, `cache`, `settingsFile`, `cacheFile`, and `lyricChoicesFile`. The startup
+code fills it and the scan coordinator / IPC handlers mutate it. Keeping it in one object preserves
+the previous module-level state without spreading it across modules.
+
+### 7.13 `src/main/scanCoordinator.ts` — scans and background refresh
+
+- `runScan(folder, persistFolder)` increments the private generation counter; the `isCancelled`
+  closure compares the captured generation with the current one.
+- Delegates walking/tagging to `scanLibrary`, applies the result with `applyLibrary`, saves the cache,
+  and optionally persists the folder.
+- Progress events are throttled to one per 100 ms except for the final tick.
+- `chooseFolder()` opens the directory dialog, canonicalizes the path when possible, and scans.
+- `rescan()` re-scans the current root without changing the persisted folder.
+- `refreshInBackground()` scans the restored root on startup and emits `library:updated` only when
+  the scan was not superseded.
+
+### 7.14 `src/main/ipc.ts` — IPC handlers
+
+`registerIpc(store, scan, choices)` registers the existing channels. `library:get-state` starts the
+one-time startup refresh only when a last folder exists, after the renderer has had a chance to
+subscribe.
+
+| Channel | Input | Output |
+| --- | --- | --- |
+| `library:get-state` | — | `LibrarySnapshot` |
+| `library:open-folder` | — | `LibrarySnapshot \| null` (null on cancel/empty) |
+| `library:rescan` | — | `LibrarySnapshot \| null` (null when no root) |
+| `lyrics:get-sources` | `trackId: unknown` | `LyricSources \| null` |
+| `lyrics:set-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
+| `lyrics:set-translation-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
+| `settings:get` | — | `Settings` |
+| `settings:set-volume` | `volume: unknown` | `void` (clamped) |
+| `settings:set-ui` | `UiState` candidate | `void` (normalized) |
+| `settings:set-lyric-preference` | `preference: unknown` | `void` (validated) |
+| `settings:set-translation` | `{ enabled: unknown, language: unknown }` | `void` (validated) |
+
+Events to renderer: `library:scan-progress` (throttled) and `library:updated` (after a successful
+background refresh).
+
+`lyrics:get-sources` rejects non-string/empty ids with `null`, resolves the path through
+`resolveTrackFile(trackId)`, and catches every error. `lyrics:set-choice` and
+`lyrics:set-translation-choice` validate the track id and source id; `null` clears the saved choice,
+and invalid input is a no-op. Preference writes accept only `"sidecar"` or `"embedded"`.
+`settings:set-translation` requires a boolean `enabled` and a `language` that is `null` or matches
+the language pattern; invalid input is a no-op. Write failures are logged and never thrown across the
+boundary.
+
+---
+
+## 8. Preload bridge (`src/preload/index.ts`)
+
+The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
+
+| Method | IPC channel | Notes |
+| --- | --- | --- |
+| `getState()` | `library:get-state` | Returns the current snapshot. |
+| `openFolder()` | `library:open-folder` | `null` when the dialog is cancelled. |
+| `rescan()` | `library:rescan` | `null` when no folder is open. |
+| `getSettings()` | `settings:get` | Returns normalized settings. |
+| `saveVolume(volume)` | `settings:set-volume` | Main clamps the value. |
+| `saveUiState(state)` | `settings:set-ui` | Main normalizes the value. |
+| `getLyricSources(trackId)` | `lyrics:get-sources` | Returns ordered source options and selection context, or `null`. |
+| `saveLyricChoice(trackId, sourceId)` | `lyrics:set-choice` | `null` clears the per-track choice. |
+| `saveLyricPreference(preference)` | `settings:set-lyric-preference` | Main accepts only `"sidecar"` / `"embedded"`. |
+| `saveTranslationChoice(trackId, sourceId)` | `lyrics:set-translation-choice` | `null` clears the per-track translation choice. |
+| `saveTranslationSettings({ enabled, language })` | `settings:set-translation` | Main validates both fields and writes atomically. |
+| `onScanProgress(listener)` | `library:scan-progress` | Returns an unsubscribe function. |
+| `onLibraryUpdated(listener)` | `library:updated` | Returns an unsubscribe function. |
+
+`subscribe()` wraps the IPC listener so the renderer callback never receives the Electron event
+object, and returns a function that removes exactly that listener.
+
+`src/preload/index.d.ts` declares `Window.library: LibraryApi` for the renderer project.
+
+---
+
+## 9. Renderer modules
+
+### 9.1 `src/renderer/src/main.ts` — composition root
+
+`main.ts` is deliberately thin (under 180 lines, composition only). It:
+
+- Looks up all DOM elements once through `getAppElements()`.
+- Creates the `HtmlAudioEngine`, `PlaybackQueue`, `LyricsController`, `LyricView`, `PlayerBar`, and
+  the tracks `TracksList`.
+- Constructs every controller with explicit dependency interfaces and wires cross-controller calls
+  through callbacks.
+- Subscribes to engine, library, and lyric events, starts `library.initialize()`, and cleans up on
+  `beforeunload`.
+
+It owns no routing, playback, search, or rendering state; those live in the controllers below.
+
+### 9.2 `src/renderer/src/dom.ts` — element lookup
+
+`getAppElements()` returns a typed `AppElements` object. It looks up every required element by id
+once and throws `Missing element #<id>` immediately when the markup is incomplete.
+
+### 9.3 `src/renderer/src/routeStack.ts` — pure route operations
+
+- `topRoute`, `pushRoute`, `popRoute`, and `pruneRoutes` are pure: they return new arrays and never
+  mutate the input stack.
+- `backLabel(activeView, stack)` chooses the Back button label from the parent route and view.
+- Covered by `tests/routeStack.test.ts`.
+
+### 9.4 `src/renderer/src/navigation.ts` — view and detail routing
+
+Owns `activeView` and `detailStack`.
+
+- `showSection(section)` hides every view except the given one.
+- `currentSection()` returns the top detail view or the active library view.
+- `openAlbum` / `openArtist` push routes; `goBack` pops; `switchView` resets the stack.
+- `popRoute`, `resetStack`, and `pruneInvalidRoutes` let the screen and library controllers adjust
+  routes without importing the navigation controller.
+- `backLabel()` delegates to the pure `routeStack` helper.
+
+### 9.5 `src/renderer/src/toolbar.ts` — search, sort, view switcher
+
+Owns `sortByView`, `appliedSearch`, and the 150 ms search debounce.
+
+- `applyUiSettings` validates persisted view/sort keys and selects defaults.
+- `syncViewControls` updates `aria-pressed`, the sort options, and the selected value.
+- `applySearch` closes Now Playing if necessary, re-renders the active library view, then restores
+  the appropriate section.
+- `Ctrl/Cmd+F` and `/` focus the search box; `Escape` clears it (Now Playing `Escape` takes
+  priority).
+- Sort and view changes persist through the `saveUiState` callback.
+
+### 9.6 `src/renderer/src/libraryController.ts` — snapshot and scan state
+
+Owns `albums`, `libraryIndex`, `folderName`, and `libraryEventReceived`.
+
+- `applySnapshot` replaces the snapshot/index, reconciles the queue through the transport interface,
+  prunes invalid detail routes, marks Now Playing dirty, refreshes the screen, and updates
+  status/controls.
+- `openFolder` / `rescanLibrary` drive the scan buttons and progress label.
+- `initialize` loads settings first, then `getState`; a `library:updated` event that arrives first
+  wins.
+- `start()` subscribes to scan progress and library updates and returns one disposer.
+- `emptyMessage`, `updateStatus`, and `findAlbumForTrack` keep view text and cover lookup out of the
+  renderers.
+
+### 9.7 `src/renderer/src/transport.ts` — queue and playback
+
+Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, and `activeAttempt`.
+
+- `playQueue` sets the queue; clicking the already-current track resumes instead of reloading.
+- `playAlbumTrack` queues the album in album order; `playVisibleTrack` queues the visible track list.
+- `startCurrentTrack` loads the track, requests lyrics, resets time UI, and optionally plays.
+- `handleEnded` advances or stops; `handlePlaybackFailure` ignores `AbortError`, skips forward when
+  possible, and otherwise pauses.
+- `previous` restarts the track when position > 3 s, otherwise moves back.
+- `reconcileQueue` rebuilds the queue from current track ids and resets playback when the current
+  track disappeared.
+- Seek bar, volume, and engine event wiring live here. `start()` subscribes to engine events and
+  returns one disposer.
+
+### 9.8 `src/renderer/src/nowPlaying.ts` and `playerBar.ts` — playback views
+
+`NowPlayingController` owns `nowPlayingOpen` and `libraryDirtyWhileNowPlaying`:
+
+- `openNowPlaying` renders the current track, shows the Now Playing section, and applies the current
+  lyric state.
+- `closeNowPlaying` restores the previous section, or re-renders first when the library changed while
+  it was open; both close paths also close the source menu.
+- `leaveForNavigation` closes it silently for actions that will render another view.
+- It subscribes to the lyric controller and only renders while open, but it always updates the
+  source-menu and translation-toggle view models. The menu callbacks are wired to `selectSource`,
+  `setPreference`, `setTranslationEnabled`, `selectTranslation`, and `reload` through
+  `NowPlayingDeps`; the controller itself stays DOM-free.
+
+`PlayerBar` owns the bottom bar: now-playing title/artist/cover, play/pause labels and disabled
+states, duration, seek value, and time labels. It reads the current track and playing state through
+callbacks.
+
+### 9.9 `src/renderer/src/screen.ts` — section choice and rendering
+
+`ScreenController.refresh()` syncs the toolbar controls, then:
+
+- While Now Playing is open it shows the Now Playing section and leaves the hidden library DOM
+  untouched, so closing restores scroll position.
+- With a detail route it re-renders the hidden library view first (so Back restores search and sort),
+  then shows and renders the album or artist detail.
+- Otherwise it shows the active library section and renders it.
+
+`renderLibraryView(view)` runs `queryLibrary` with the applied search and per-view sort and hands the
+results to the matching view renderer. `updateTrackHighlight()` toggles the album-detail row highlight
+and refreshes the virtualized tracks list.
+
+### 9.10 `src/renderer/src/views/*` — view renderers
+
+Each renderer takes data plus callbacks and owns no global state:
+
+| File | Responsibility |
+| --- | --- |
+| `views/albumCards.ts` | Album card and card-grid DOM shared by albums and artist detail. |
+| `views/albumGrid.ts` | Albums grid plus empty state. |
+| `views/artistList.ts` | Artist rows with album/track counts plus empty state. |
+| `views/tracksList.ts` | Virtualized tracks list; owns the visible track list used for queueing. |
+| `views/albumDetail.ts` | Album header, cover/year, and ordered track list. |
+| `views/artistDetail.ts` | Artist header and album grid. |
+
+`src/renderer/src/format.ts` holds the shared `formatTime`, `smallCoverUrl`, `createCover`, and
+`setCoverImage` DOM helpers.
+
+### 9.11 `src/renderer/library/query.ts` — pure index, views, search, sort
+
+- `normalizeText` strips diacritics, lowercases, trims, and collapses whitespace.
+- `filterBySearch` requires **every** query word to appear in the item's precomputed `searchText`.
+- `VIEWS` is the registry for albums, artists, and tracks:
+  - Each view has a label, default sort, sort map, and item builder.
+  - Albums: title, artist, year.
+  - Artists: name, track count.
+  - Tracks: title, artist, album.
+- `buildLibraryIndex(albums)` precomputes items for all views once per snapshot.
+- `queryLibrary(index, { view, search, sort })` filters and sorts without touching the DOM.
+- `getViewIds`, `getSortOptions`, `getDefaultSort`, `isLibraryView`, `isSortKey` support the UI and
+  validate persisted values.
+- Artists are grouped by the exact album-artist string; no multi-artist splitting.
+
+### 9.12 `src/renderer/player/engine.ts` — playback abstraction
+
+`PlaybackEngine` exposes `load`, `play`, `pause`, `seek`, `setVolume`, `getPosition`, `getDuration`,
+`isPlaying`, and typed `on` subscriptions for `ended`, `timeupdate`, `error`, `play`, `pause`, and
+`loadedmetadata`.
+
+`HtmlAudioEngine` wraps a single `<audio>` element:
+
+- `load` sets `src` to the track URL.
+- `seek` ignores non-finite values and clamps to ≥ 0.
+- `setVolume` clamps to `[0, 1]`.
+- `isPlaying` is `!paused && !ended`.
+- The `error` listener ignores events with no media error (stale source), so replacing a track does
+  not trigger a false failure.
+- `on` returns an unsubscribe function.
+
+### 9.13 `src/renderer/player/queue.ts` — pure queue
+
+`PlaybackQueue` stores a copied track array and an index.
+
+- `setQueue(tracks, startIndex)` clamps the index and returns the current track.
+- `current`, `next`, `previous`, `hasNext`, `hasPrevious`, `getTracks`, `getCurrentIndex`.
+- No playback, DOM, or persistence concerns.
+
+### 9.14 `src/renderer/ui/virtualList.ts` — fixed-row virtual scroller
+
+- Builds a spacer with the full height and an absolutely positioned window inside it.
+- Renders only the visible rows plus an overscan buffer (default 4) above and below.
+- Re-renders on scroll via `requestAnimationFrame` and on container resize via `ResizeObserver`.
+- `setItems` resets scroll and invalidates; `refresh` re-renders the current window (used when the
+  playing highlight changes); `destroy` removes listeners and DOM.
+- Used only by the tracks view, with 52 px rows.
+
+### 9.15 `src/renderer/lyrics/lyricsController.ts` — on-demand lyric sources
+
+No DOM, Electron, or filesystem references. Constructed with explicit dependencies:
+
+```ts
+{
+  fetchSources(trackId), saveChoice(trackId, sourceId), savePreference(preference),
+  saveTranslationChoice(trackId, sourceId), saveTranslationSettings({ enabled, language }),
+  preference, translationEnabled, translationLanguage, cacheLimit?
+}
+```
+
+State:
+
+```ts
+{
+  status: 'loading' | 'ready' | 'none',
+  doc: LyricDocument | null,
+  trackId: string | null,
+  sources: Array<{
+    option: LyricSourceOption,
+    doc: LyricDocument | null,
+    format: LyricFormat | null,
+    lineCount: number,
+    warningCount: number,
+    usable: boolean
+  }>,
+  selectedId: string | null,
+  mode: 'auto' | 'saved' | null,
+  preference: LyricPreference,
+  expectedSidecarName: string,
+  translation: {
+    enabled: boolean,
+    language: string | null,
+    selectedId: string | null,
+    mode: 'auto' | 'saved' | null,
+    key: string | null,
+    available: boolean,
+    options: Array<{
+      option: LyricSourceOption,
+      eligible: boolean,
+      reason: 'primary' | 'unavailable' | 'unusable' | null,
+      report: AlignmentReport | null
+    }>
+  }
+}
+```
+
+Behavior:
+
+- `setTrack(id)` ignores a repeated id; `null` clears state.
+- Cache hit (including cached “none”) returns immediately and refreshes LRU order.
+- Otherwise emits `loading`, fetches `LyricSources`, and parses every available option with
+  `parseLyrics`. An entry is usable only when it produces at least one line.
+- Selection uses the pure `selectLyricSource` with an `isUsable` predicate backed by those parsed
+  entries. `mode` is `"saved"` when the persisted per-track choice won and `"auto"` otherwise.
+- `status` is `"none"` when nothing is usable, but `sources` still exposes every option.
+- `selectSource(id)` switches immediately from the current entries without refetching and persists
+  the choice. `selectSource(null)` clears the choice and returns to auto. Unavailable or unusable
+  ids are ignored.
+- `setPreference(pref)` persists the preference and recomputes the current track. Startup settings
+  application passes `{ persist: false }`.
+- Translation state is derived by the pure `buildTranslation` helper in `translationState.ts` on
+  every recompute; only parsed source entries are cached. Eligible options are available, usable,
+  and not the current primary; each carries its alignment report.
+- `state.doc` is the primary document with `attachTranslation` applied (key = translation option id)
+  only when translation is enabled and a translation is selected. Otherwise it is exactly the plain
+  primary document. `key` is null while nothing is attached. The derived instance is memoized by
+  primary-document identity + translation key, so unchanged recomputations keep the same `state.doc`
+  and the lyric view does not rebuild its DOM.
+- `setTranslationEnabled(enabled)` persists through `saveTranslationSettings` and recomputes.
+  `applyTranslationSettings({ enabled, language })` applies both fields; startup uses
+  `{ persist: false }`.
+- `selectTranslation(id)` accepts only an eligible id, persists the per-track choice, and updates the
+  sticky language (plus settings) when the option has a `variant`. `selectTranslation(null)` clears
+  the per-track choice and returns to auto; neither changes `enabled`. A saved translation that
+  becomes ineligible (for example it is now the primary) is kept and treated as auto.
+- Translation selection is recomputed whenever the primary source changes, on reload, and on a new
+  track.
+- `reload()` bypasses the cache, refetches the current track, and keeps both saved choices so an
+  edited sidecar is picked up.
+- `clearCacheAndReload()` drops every cached entry, then refetches the current track while preserving
+  both saved choices. The library controller calls it after a rescan or `library:updated`, so changed
+  tags and sidecars are picked up without clearing a manual selection.
+- Each fetch captures a generation; a response is applied only if the generation is still current,
+  so slow responses for a previous track are ignored.
+- Caches whole parsed source entries (including “none”), up to **10**, evicting the least recently
+  used.
+- `subscribe(listener)` adds a listener, immediately emits the current state, and returns an
+  unsubscribe function.
+- Fetch/parse errors are logged and cached as `none`. Options and the selection are logged with
+  `console.debug` once per fetched track; translation changes log the selected id, mode, and
+  alignment report once.
+
+### 9.16 `src/renderer/lyrics/segmentGroups.ts` — pure word grouping
+
+`groupSegments(segments)` splits a line's segments into `LyricWordGroup` objects:
+
+- Consecutive segments stay in one group until a segment with `spaceAfter: true` closes it.
+- A trailing group without whitespace is still emitted.
+- The renderer inserts one literal space between groups, so syllables inside a word never wrap.
+
+### 9.17 `src/renderer/ui/lyricView.ts` — lyric DOM and synchronization
+
+**DOM construction (once per document instance)**
+
+- One `.lyric-line` div per line with `data-index`.
+- `data-agent` is set only when the line has an agent label.
+- Timed documents add `.lyric-line--seekable`, `tabindex="0"`, and `role="button"`.
+- Lines with segments build `.lyric-word` containers (nowrap) containing `.lyric-seg` spans with
+  `data-segment-index`; lines without segments set `textContent` directly.
+- When a translation key is active and a line has non-empty text for it, a `div.lyric-translation`
+  is appended as the **last** child of that line. Lines without a translation get no element. The
+  translation is plain line-level text, never word-split; `lang` is set only when the selected
+  option's variant matches `/^[a-z]{2,3}(-[A-Za-z0-9]+)*$/i`.
+- Plain documents add `.lyric-lines--static` and no click/seek behavior.
+
+**Synchronization**
+
+- `start()`/`stop()` control a single `requestAnimationFrame` loop.
+- Each frame reads `engine.getPosition()` and computes:
+  - primary line via `findActiveLineIndex`,
+  - active set via `findActiveLineIndexes`,
+  - active segment via `findActiveSegmentIndex`.
+- Line classes toggled only when flags change: `lyric-line--current`, `--active`, `--past`,
+  `--upcoming`, `--ended` (primary line whose end has passed).
+- Segment classes toggled only when flags change: `lyric-seg--sung`, `--active`, `--upcoming`.
+- The active segment gets `--progress` from `segmentProgress`; the previous active element's
+  `--progress` is removed. Segment state is cleared when a line leaves the active set.
+- Translation state is inherited through ancestor line classes only; JavaScript never toggles
+  classes or styles on `.lyric-translation`.
+- The current line is centered with smooth scrolling when the primary line changes.
+- A rebuild caused by toggling translation or switching the translation source on the same track
+  centers the current line immediately (no smooth animation, no jump to the top). Track changes keep
+  their existing behavior.
+- Manual wheel/touch/drag pauses auto-centering for **4 seconds**; the pending target is applied after
+  the pause.
+- Clicking a timed line (or pressing Enter/Space on it) seeks to `line.start`; it does not change
+  play/pause.
+- `destroy()` cancels the frame, removes listeners, and clears the DOM.
+
+### 9.18 `src/renderer/lyrics/sourceMenuModel.ts` — pure source-menu view model
+
+`buildSourceMenuModel(state)` converts `LyricsState` into every string and flag the menu needs. It
+has no DOM or controller references and is covered by `tests/sourceMenuModel.test.ts`.
+
+Model:
+
+- `trigger` — label (`Lyrics: <source>`, `No lyrics`, or `Loading…`), optional `Auto` tag, and
+  loading/disabled flags.
+- `autoRow` — label, `Using: <active source>` subtext, and checked state (checked unless the current
+  selection is saved).
+- `rows` — one per `state.sources` in canonical order, with label/detail, saved-choice `checked`,
+  `inUse`, disabled/reason, and badges. Badges are format, line count, `Singers`, and warning count
+  with the parser warnings as the tooltip.
+- `preference` — the `Sidecar` / `Embedded` options and their checked state.
+- `reload` — `Reload sources` or `Reloading…`, disabled while loading.
+- `emptyState` — `No lyrics found` plus a hint using `expectedSidecarName` or a generic fallback.
+- `loadingMessage` — the lyric-view loading text.
+- `translation` — `label`, `status` (`off` / `active` / `unavailable` / `needs-choice`), a switch
+  (`Show translation`, checked, disabled only while off with no eligible option, hint), an Auto row
+  (`Language: <LANG>` when sticky, else `Using: <label>`), and rows only while enabled. Rows carry
+  the saved-choice `checked`, `inUse`, disabled/reason (`Currently used as lyrics`, the same
+  source-missing reasons, or `Couldn't read any lyric lines`), a muted `Intl.DisplayNames` language
+  badge with raw-variant fallback, and an alignment badge. Alignment text is `Matched n/total` for
+  time, `Paired by line order` for index, and `Partial match n/total` for partial; a warning tone and
+  a one-sentence tooltip appear when `matched < total` or the method is index/partial.
+- `translationToggle` — `Translation`, `pressed`, disabled while loading, when there are no lyrics,
+  or when translation is off with no eligible option, plus a state-explaining tooltip.
+
+The translation section and quick-toggle model are built by
+`src/renderer/lyrics/translationMenuModel.ts`; the language and sidecar-example helpers live in
+`translationLabels.ts`, and the per-line text lookup in `translationText.ts`.
+
+Pure keyboard helpers:
+
+- `nextEnabledIndex(enabled, current, step)` wraps and skips disabled entries; `current = -1`
+  starts at the first or last enabled entry depending on direction.
+- `firstEnabledIndex` / `lastEnabledIndex` back Home/End.
+
+### 9.19 `src/renderer/ui/lyricSourceMenu.ts` — source chip and popover
+
+Constructed with a container and `{ onSelect, onPreference, onTranslationToggle,
+onTranslationSelect, onReload }`. It knows nothing about the controller.
+
+- `update(model)` refreshes the chip and, while open, re-renders the popover in place. Focus is
+  restored by item key when possible.
+- `open()` shows the popover, sets `aria-expanded="true"`, and focuses the first enabled item.
+- `close()` hides it and resets `aria-expanded`. `isOpen()` and `destroy()` complete the lifecycle.
+- The chip is a `aria-haspopup="menu"` button. The popover is `role="menu"` with a labelled source
+  `role="group"`, the preference `role="group"`, and a Translation section.
+- Source and preference rows are `role="menuitemradio"` with `aria-checked`; Reload is
+  `role="menuitem"`. Disabled rows get `disabled` and `aria-disabled="true"`.
+- The Translation section starts with a `role="menuitemcheckbox"` switch row carrying its hint.
+  While enabled it renders a labelled `role="group"` with the Auto row and every translation option
+  (`role="menuitemradio"`), using the same badges, `In use` pill, and disabled reasons as source
+  rows. Toggling the switch leaves the menu open so the rows can appear/disappear; picking a
+  translation row or Auto closes it.
+- Source selection closes the menu; preference changes and Reload leave it open.
+- Keyboard: Enter/Space/ArrowDown on the chip opens and focuses the first enabled item;
+  ArrowUp/ArrowDown wrap over enabled items, Home/End jump, Enter/Space activate, Escape closes and
+  returns focus to the chip, and Tab closes. The translation switch and enabled translation rows are
+  part of the same navigation ring; disabled rows are skipped. Escape is consumed while the menu is
+  open so it does not also close Now Playing or clear search.
+- A capture-phase pointerdown listener closes the popover on outside clicks.
+
+`src/renderer/ui/lyricSourceMenuView.ts` builds the popover body (title, source rows, badges,
+preference group, Translation section, Reload) from the model. It is stateless; the component owns
+events, focus, and open/close state.
+
+### 9.19.1 `src/renderer/ui/translationToggle.ts` — quick translation pill
+
+- Constructed with a container and `{ onToggle(enabled) }`; `update(model)` sets the label,
+  `aria-pressed`, disabled state, `title`, and accessible label from the model.
+- It knows nothing about the controller and reports the next pressed state on click.
+- It sits next to the lyric source chip in the Now Playing header; the pressed state uses the
+  accent color.
+
+### 9.20 Styles
+
+**`src/renderer/src/style.css`** — theme variables (`--bg`, `--panel`, `--border`, `--text`,
+`--muted`, `--accent`), toolbar, views, album grid, artist rows, track lists, detail views, player
+bar, and scrollbars.
+
+**`src/renderer/styles/lyrics.css`** — all lyric and Now Playing presentation. Variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `--lyric-font-size` | `20px` | Base lyric size. |
+| `--lyric-font-size-current` | `23px` | Current-line size. |
+| `--lyric-color-upcoming` | `#70707a` | Dim future lines/words. |
+| `--lyric-color-past` | `#55555d` | Past/ended lines. |
+| `--lyric-color-active` | `#f1f1f4` | Bright current-line text. |
+| `--lyric-color-sung` | `var(--accent)` | Sung words and fill. |
+| `--lyric-line-gap` | `14px` | Space between lines. |
+| `--lyric-translation-font-size` | `calc(var(--lyric-font-size) * 0.8)` | Translation size under each line. |
+| `--lyric-translation-color-upcoming` | `#5a5a63` | Dim future translations. |
+| `--lyric-translation-color-past` | `#45454c` | Past/ended translations. |
+| `--lyric-translation-color-active` | `#c9c9d2` | Current/overlapping translations. |
+| `--lyric-translation-gap` | `4px` | Space between a line and its translation. |
+| `--lyric-transition` | color/opacity/font-size/transform 180 ms ease | Line transitions. |
+| `--lyric-transition-fast` | color 120 ms linear | Segment transitions. |
+
+**`src/renderer/styles/lyricSourceMenu.css`** — source chip and popover presentation. It defines
+its own variables at the top, all derived from the theme where possible: `--lsm-font-size`,
+`--lsm-small-font-size`, `--lsm-background`, `--lsm-border`, `--lsm-text`, `--lsm-muted`,
+`--lsm-accent`, `--lsm-warning`, `--lsm-hover`, `--lsm-badge-background`, `--lsm-radius`,
+`--lsm-radius-small`, `--lsm-radius-pill`, `--lsm-shadow`, `--lsm-padding`, `--lsm-row-padding`,
+`--lsm-gap`, `--lsm-popover-min-width`, `--lsm-popover-max-width`, `--lsm-popover-max-height`,
+`--lsm-z-index`, and `--lsm-disabled-opacity`.
+
+Menu visual rules:
+
+- The trigger is a quiet pill above the lyric scroller; the `Auto` tag is a small muted pill.
+- The popover is right-aligned under the chip, has a border/shadow, scrolls when taller than
+  `--lsm-popover-max-height`, and stays above the lyric area via `--lsm-z-index`.
+- Rows are comfortable padded radio rows; badges are small muted pills; the `In use` pill uses the
+  accent color; warning badges use `--lsm-warning`.
+- Disabled rows use `--lsm-disabled-opacity` and no hover/cursor affordance.
+- The Translation section reuses the preference-title styling, adds a small switch control
+  (`--lsm-switch-*`), a muted hint line, and the same row/badge visuals as sources. Language badges
+  are muted; alignment warnings reuse `--lsm-warning`.
+- The quick translation pill reuses the trigger padding/border/radius variables and uses the accent
+  color for its pressed (`aria-pressed="true"`) state.
+- Focus-visible outlines use the accent color on the chip, rows, preference options, translation
+  switch/rows, quick toggle, and Reload.
+
+Lyric visual rules:
+
+- Upcoming lines are dim; past lines are dimmer; the current line is full opacity, slightly larger,
+  and shifted right.
+- Ended primary lines are dimmed.
+- The current line's unsung words use `--lyric-color-active`, so the whole line reads as highlighted
+  while the accent fill sweeps through it.
+- Sung segments use `--lyric-color-sung`.
+- The active segment uses `background-clip: text` with a left-to-right gradient: sung color up to
+  `--progress`, active color after it. `-webkit-text-fill-color: transparent` reveals the gradient;
+  `color` stays opaque so leaving the active state never flashes dark.
+- `.lyric-translation` is a block under the line text, smaller, wrapping normally. It follows the
+  line state through ancestor classes: the current line is bright, other overlapping active lines
+  are slightly dimmer, and past/upcoming/ended translations stay dim. It inherits the line's
+  movement/scale and transitions through the DOM hierarchy.
+- Plain documents are static: no highlight, no seek cursor.
+- Now Playing uses a 280 px cover column beside the lyrics; at ≤ 820 px it stacks the cover/meta above
+  the lyrics.
+- The bottom-bar track target gets hover/focus styling and a pointer cursor.
+
+For lyric presentation, JavaScript never sets inline visual styles except the `--progress` custom
+property. (The virtual list and layout code still set structural inline styles such as position and
+transform.)
+
+---
+
+## 10. Shared lyric core (`src/shared/lyrics`)
+
+This module is pure: no DOM, Electron, audio, or filesystem APIs.
+
+### Types
+
+- `LyricFormat = 'plain' | 'lrc' | 'enhanced-lrc'`.
+- `LyricSegment { text, start, end, spaceAfter }` — times in seconds; `text` has no trailing
+  whitespace.
+- `LyricLine { index, start, end, endIsEstimated, text, segments?, agent?, translations? }`.
+- `LyricMetadata { title?, artist?, album?, author?, offsetMs?, raw }`.
+- `LyricDocument { format, timed, metadata, lines, warnings }`.
+- `LyricParseOptions { applyOffset?, maxEstimatedLineSeconds?, lastLineSeconds? }`.
+
+### Parsing (`parse.ts`)
+
+- Normalizes BOM and CRLF/CR to LF.
+- Parser registry order: enhanced LRC → LRC → plain (plain always matches).
+- Defaults: `applyOffset: true`, `maxEstimatedLineSeconds: 10`, `lastLineSeconds: 5`.
+- `detectLyricFormat(text)` and `parseLyrics(text, options?)` are the public entry points.
+
+### Timestamps (`time.ts`)
+
+- Line timestamps: `[m:ss]` or `[m:ss.fff]` with 1+ fractional digits.
+- Inline word timestamps: `<m:ss.fff>`.
+- Multiple leading timestamps are supported.
+- Fractional digits are treated as a decimal fraction.
+- `[offset:]` accepts an optional sign and integer milliseconds.
+
+### Parsers
+
+- **Plain** — trims non-empty body lines, `timed: false`, `start = end = 0`.
+- **LRC** — reads every leading timestamp and emits one line per timestamp; text after timestamps is
+  the line text.
+- **Enhanced LRC** — line timestamps plus inline word markers:
+  - Optional `vN:` singer prefix becomes `agent`.
+  - Segments are built from text between markers.
+  - `spaceAfter` is true when the raw segment had trailing whitespace.
+  - A trailing empty marker becomes the line's explicit end.
+  - Multiple line timestamps duplicate the line with shifted segment and end times.
+
+### Finalization (`parsers/shared.ts`)
+
+- Header tags are recognized anywhere as `[letters:value]`, so timed lines never match.
+- Metadata tags: `ti`, `ar`, `al`, `by`, `offset`; every tag is preserved in `metadata.raw`.
+- Invalid offsets produce a warning and are ignored.
+- Lines sort by start, then input order.
+- Line end: explicit end when available; otherwise `min(next.start, start + maxEstimatedLineSeconds)`;
+  the last line gets `start + lastLineSeconds`. `endIsEstimated` records which case applied.
+- Segment end = next segment's start, or the line end for the final segment.
+- Offsets are applied by subtracting `offsetMs / 1000` from line and segment times when
+  `applyOffset` is true.
+- Odd/skipped input becomes a human-readable warning, never an exception.
+
+### Translation alignment (`translation.ts`)
+
+- `AlignmentMethod = 'time' | 'index' | 'partial' | 'none'`.
+- `AlignmentReport { method, matched, total, unmatchedTranslationLines }`; `matched`/`total` count
+  non-blank primary lines, and unmatched counts every unconsumed translation line.
+- Blank text means empty/whitespace, music notes (`♪ ♫ ♬ ♩`), or punctuation only.
+- `alignTranslation(primary, translation, { toleranceSeconds = 0.5, minTimeMatchRatio = 0.8 })`
+  returns one `string | null` per primary line plus a report.
+  - Time matching is greedy in primary order and one-to-one: the unused translation line with the
+    smallest absolute start difference within tolerance wins (ties keep the lowest index). Blank
+    primary lines are skipped; duet lines sharing a timestamp consume separate translations.
+  - When `matched / total >= minTimeMatchRatio`, method is `"time"`.
+  - Otherwise equal line counts (including blanks) pair by index, method `"index"`; this also covers
+    untimed documents.
+  - Otherwise the time matches are kept as `"partial"` when any exist, else `"none"`.
+- `attachTranslation(primary, key, lines)` returns a new document, clones each line, skips null
+  entries, and merges `translations[key]` without touching times, segments, or agents.
+- `selectTranslationSource(options, { primaryId, savedChoice, language, isUsable })` picks the
+  translation layer: an eligible saved choice (`"saved"`), else the first eligible option sorted by
+  id whose variant matches the language case-insensitively (`en` matches `en-US`), else a lone
+  eligible option (`"auto"`), else null. Eligibility excludes the primary, unavailable, and unusable
+  options.
+
+### Sync helpers (`sync.ts`)
+
+| Function | Behavior |
+| --- | --- |
+| `findActiveLineIndex(doc, t)` | Binary search for the last line starting at or before `t`; stays on that line through gaps; `-1` when not timed/empty/non-finite. |
+| `findActiveLineIndexes(doc, t)` | Every line with `start <= t < end`, including overlaps. |
+| `findActiveSegmentIndex(line, t)` | Last segment starting at or before `t`; `-1` when none. |
+| `segmentProgress(segment, t)` | Clamped `0..1` progress through a segment. |
+| `lineProgress(line, t)` | Clamped `0..1` progress through a line. |
+
+---
+
+## 11. Key flows
+
+### 11.1 Startup
+
+1. Main registers the privileged `media` scheme.
+2. Main loads settings and the library cache, then restores the cached snapshot for the last folder.
+3. Main installs the media handler, IPC, and creates the window.
+4. Preload exposes `window.library`.
+5. Renderer subscribes to library events, loads settings, applies view/sort, then calls `getState`.
+6. `getState` triggers a one-time background refresh; the cached library is already visible.
+7. When the refresh finishes, `library:updated` replaces the snapshot and the UI re-renders.
+
+### 11.2 Open folder / rescan
+
+1. Renderer disables scan buttons and calls `openFolder()`/`rescan()`.
+2. Main shows the dialog (open only), canonicalizes the path, and scans.
+3. Main streams throttled progress events.
+4. On completion, main applies the snapshot, writes the cache, optionally persists the folder, and
+   returns the snapshot.
+5. Renderer applies the snapshot, reconciles the queue, refreshes views, and re-enables controls.
+6. Cancelling the folder dialog returns `null`; the renderer re-enables controls and leaves the
+   current view (including Now Playing) untouched.
+
+### 11.3 Track start and playback
+
+1. Clicking a track queues either the album or the visible track list and sets the index.
+2. `startCurrentTrack` loads the URL, calls `lyricsController.setTrack(track.id)`, resets time UI,
+   updates Now Playing/highlight, and starts playback.
+3. Engine events update controls, time labels, duration, and advance on `ended`.
+4. A failed `play()` or media error skips to the next track; `AbortError` is ignored.
+5. If the library refresh removes the current track, `reconcileQueue` resets playback.
+
+### 11.4 Lyric load and display
+
+1. `setTrack` checks the LRU cache; a hit applies immediately.
+2. A miss sets `loading` and invokes `lyrics:get-sources`.
+3. Main resolves the path from the library index, reads embedded tags and same-directory sidecars,
+   and returns ordered `LyricSources` or `null`.
+4. The renderer parses every available option, picks one with the saved-choice / preference rules,
+   and caches the whole source entry.
+5. If Now Playing is open, the controller subscription renders the new state:
+   - `ready` → build/sync the document and start the frame loop,
+   - `loading` → “Loading lyrics…”,
+   - `none` → “No lyrics found”.
+6. Responses for tracks that are no longer current are discarded by the generation check.
+
+### 11.5 Now Playing open/close
+
+1. Clicking the bottom-bar cover/title (or pressing Enter/Space on it) opens Now Playing.
+2. `showSection` displays only the Now Playing view; the player bar stays visible.
+3. The hidden library DOM is not re-rendered, preserving scroll/search/view.
+4. If a library snapshot arrives while open, `libraryDirtyWhileNowPlaying` is set and the screen stays
+   on Now Playing.
+5. The close button or `Escape` closes it; if the library changed, the screen re-renders, otherwise the
+   previous section is shown exactly as it was.
+6. Navigating (open album/artist, back, switch view, search, open folder) closes Now Playing first.
+
+---
+
+## 12. UI structure and interaction map
+
+`src/renderer/index.html` contains:
+
+- **Toolbar** — Open Folder, Rescan, status, scan progress, view switcher, sort select, search.
+- **Albums view** — album grid + empty state.
+- **Artists view** — artist list + empty state.
+- **Tracks view** — virtualized track list + empty state.
+- **Album detail** — back button, cover, title/artist/year, ordered track list.
+- **Artist detail** — back button, artist name/counts, album grid.
+- **Now Playing** — close button, large cover, title/artist/album, translation quick toggle, lyric
+  source chip + popover (including the Translation section), lyric status/scroller.
+- **Player bar** — clickable current-track target, Previous/Play/Pause/Next, time, seek, duration,
+  volume.
+- **Audio element** — hidden `<audio id="audio">`.
+
+Keyboard:
+
+| Key | Action |
+| --- | --- |
+| `Ctrl/Cmd+F` | Focus and select search. |
+| `/` | Focus search when not in a text input. |
+| `Escape` | Close the source menu if open (consumed); otherwise close Now Playing if open; otherwise clear search if focused/non-empty. |
+| `Enter`/`Space` | Activate the bottom-bar target or a focused lyric line. |
+| `Enter`/`Space`/`ArrowDown` on the source chip | Open the source menu and focus its first enabled item. |
+| `ArrowUp`/`ArrowDown` in the source menu | Move focus through enabled items, skipping disabled ones and wrapping. |
+| `Home`/`End` in the source menu | Focus the first/last enabled item. |
+| `Enter`/`Space` in the source menu | Activate the focused source, preference, translation switch, translation row, or Reload action. |
+| `Escape` in the source menu | Close the menu and return focus to the chip; does not close Now Playing or clear search. |
+| `Tab` in the source menu | Close the menu. |
+| Click/Enter/Space on the translation quick toggle | Show or hide the selected translation. |
+
+Accessibility details:
+
+- View buttons use `aria-pressed`.
+- Playing tracks use `aria-current="true"`.
+- Lyric lines are focusable buttons only when timed.
+- The source chip uses `aria-haspopup="menu"` and a synchronized `aria-expanded`.
+- The source popover is `role="menu"` with labelled `role="group"` sections; source and preference
+  rows use `role="menuitemradio"` + `aria-checked`, the translation switch uses
+  `role="menuitemcheckbox"` + `aria-checked`, Reload uses `role="menuitem"`, and disabled rows use
+  `disabled` + `aria-disabled="true"`.
+- The translation quick toggle uses `aria-pressed`, a model-driven `title`, and an accessible label.
+- Translation elements set `lang` only when the selected option's variant is a valid language tag.
+- Focus-visible outlines use the accent color.
+- Status/progress elements use `role="status"`.
+
+---
+
+## 13. Persistence and on-disk layout
+
+All paths are under Electron `userData`.
+
+| Path | Contents | Write strategy |
+| --- | --- | --- |
+| `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`, `lyricPreference`, `translationEnabled`, `translationLanguage`. | Normalized, atomic. |
+| `library-cache.json` | Version, folder, per-path tag entries with `mtimeMs`/`size`. | Validated, atomic. |
+| `lyric-choices.json` | Version 1 plus `tracks` and optional `translations`: `Record<trackId, sourceId>`. | Validated, atomic, capped at 5000 entries per map. |
+| `covers/<albumId>.jpg` | Full cover, max width 300 px, JPEG 85. | Atomic. |
+| `covers/<albumId>-small.jpg` | Small cover, max width 96 px, generated from full. | Atomic. |
+
+The cache is keyed by absolute path. Entries are reused only when both `mtimeMs` and `size` match;
+otherwise tags are re-read. Files that no longer exist are naturally dropped because a scan rebuilds
+the entry map from the current directory walk.
+
+Sidecar `.lrc` files are user-owned inputs and are never written by LyriX. Per-track source and
+translation choices are independent of the library cache, so they survive rescans and
+path-preserving tag updates. A missing `translations` map is equivalent to an empty one.
+
+---
+
+## 14. Security and robustness
+
+- **Context isolation + sandbox + no Node integration** in the renderer.
+- **CSP** restricts scripts to self, styles to self/inline, images to self/data/media, and media to
+  self/media.
+- **No renderer paths**: ids only; main resolves and validates.
+- **Path containment** in `media://` uses `realpath` on both the file and the root, then
+  `isPathInside`.
+- **Symlinks are skipped** during scanning and sidecar discovery, preventing cycles and escapes.
+- **Only `.flac` regular files** are served; sidecar reads accept only regular files in the track's
+  own directory and skip anything over 1 MiB.
+- **IPC input validation**: track ids must be 40-character lowercase SHA-1 hex strings; volume is
+  clamped; UI state is normalized; malformed lyric ids return `null`; lyric and translation choice
+  ids must be `embedded` or `sidecar:<file name>` with no path separators; preferences accept only
+  known values; translation settings require a boolean and a language matching
+  `/^[A-Za-z0-9_-]{1,32}$/` (or null).
+- **No sidecar paths cross IPC**: `LyricSourceOption.detail`, ids, and variants carry file names
+  only.
+- **Tolerant persistence**: bad JSON, wrong cache/choice versions, and malformed entries degrade to
+  defaults instead of crashing; translation alignment is pure and never throws on mismatched counts.
+- **Atomic writes** avoid partially written settings/cache/choice/cover files.
+- **Cancellable scans** prevent stale results from overwriting newer libraries.
+- **Stale async responses** are ignored in both the scan coordinator and the lyric controller.
+- **Playback failure isolation**: one unreadable track is logged and skipped, not fatal.
+- **Image fallbacks**: failed covers hide the `<img>` and show the `♪` placeholder.
+
+---
+
+## 15. Performance characteristics
+
+- Tag reads: up to **8** concurrent files.
+- Cache reuse: unchanged files are not parsed again.
+- Progress events: at most one per 100 ms (final event always sent).
+- Covers: full and small JPEGs cached; small derived from full; in-flight requests deduplicated.
+- Track list: virtualized; only visible rows plus overscan exist in the DOM.
+- Library queries: index built once per snapshot; each keystroke only filters and sorts.
+- Lyrics: fetched on demand; parsed source entries cached (LRU, 10); one rAF loop while visible.
+- Lyric DOM: built once per document; each frame reads the position once, runs the binary searches,
+  and does one O(lines) flag pass whose DOM writes happen only for changed state.
+- Auto-scroll: one smooth scroll per primary-line change; manual scrolling pauses it for 4 s.
+- Cover images: lazy-loaded/async-decoded where applicable.
+
+---
+
+## 16. Testing strategy
+
+Tests use **Vitest** and target pure logic plus the DOM-free controller. They run in the Node
+environment; nothing mocks Electron or the DOM. The tested modules either have no imports beyond
+`node:*` and shared types, or keep their Electron access outside the tested functions.
+
+| File | Coverage |
+| --- | --- |
+| `tests/albums.test.ts` | Grouping by album artist + album title; `albumArtist` used verbatim (the artist fallback happens in `tags.ts`); disc/track/title ordering; album title sorting; first non-null year; deterministic 40-hex ids and cover URLs; input array not reordered. |
+| `tests/cache.test.ts` | Empty/missing cache; malformed JSON; wrong version; invalid folder and tracks containers; malformed entries dropped individually; nullable track/disc/year fields; save/load round-trip. |
+| `tests/ids.test.ts` | Known SHA-1 digests; determinism; 40 lowercase hex characters; different inputs produce different ids. |
+| `tests/json-file.test.ts` | Missing and malformed JSON fall back; valid JSON parses; atomic string and binary writes; parent-directory creation; overwrite; no temporary files left behind; pretty-printed JSON. |
+| `tests/lyricChoices.test.ts` | Main-choice and translation round-trips; missing `translations` tolerance; tolerant reads (bad JSON, wrong version, malformed containers); invalid id rejection; independent 5000-entry caps and oldest eviction; existing choices surviving. |
+| `tests/lyricSourceProviders.test.ts` | Canonical slot assembly; exact-sidecar id vs actual file name; variant ordering and extraction; provider failure isolation; saved-choice/preference/translation echo. |
+| `tests/lyricSources.test.ts` | Saved vs auto selection; sidecar/embedded preference order; missing and unusable saved choices; variant fallback; custom usability predicate; nothing usable; translation saved/auto, language matching, single fallback, ambiguity, and primary exclusion. |
+| `tests/lyrics.test.ts` | Both fixtures; format detection; metadata; word segments and agents; fractional timestamps; overlapping lines; gap behavior; offsets; warnings; sync helpers and progress clamps. |
+| `tests/lyricsController.test.ts` | Auto vs saved selection; embedded/sidecar preference; unusable source skipping; manual switch without refetch; clearing a choice; preference recomputation; reload bypassing the cache; stale-response guard; LRU eviction; cached “none”; reset behavior; translation enable/disable, auto by language, saved choice, sticky language, ineligible saved translation, reload preservation, and stable derived-document identity. |
+| `tests/sourceMenuModel.test.ts` | Trigger/auto/saved states; canonical row order; badges (format, line count, singers, warnings); disabled reasons; loading labels; preference options; empty-state hints with and without `expectedSidecarName`; translation status, switch/hint rules, auto row, hidden/disabled rows, language and alignment badges, quick-toggle states; pure keyboard wrap/skip/edge helpers with translation rows. |
+| `tests/translationLabels.test.ts` | Language-tag detection; English `Intl.DisplayNames` labels; raw-variant fallback for invalid tags; sidecar example names with/without a sticky language. |
+| `tests/translationText.test.ts` | Per-line translation lookup: missing key, missing entry, blank text, matching plain text. |
+| `tests/sidecar.test.ts` | Exact/variant matching; case-insensitive names and extension; ignored names and directories; 1 MiB cap; UTF-8/UTF-16 BOM decoding; symlink skip where supported; unreadable directory. |
+| `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
+| `tests/queue.test.ts` | Start-index clamping (negative, past end, fractional, non-finite); empty queue; next/previous at both ends; `hasNext`/`hasPrevious`; input-array copy; `getTracks`/`getCurrentIndex`. |
+| `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
+| `tests/routeStack.test.ts` | `topRoute`; non-mutating push/pop; pruning invalid routes from the top only; back-label selection for each view and parent route. |
+| `tests/segmentGroups.test.ts` | Syllable grouping; `spaceAfter` boundaries; trailing final group; empty input. |
+| `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder, view, lyric-preference, and translation fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
+| `tests/translation.test.ts` | Time matching within/outside tolerance; equal-count index fallback; partial/none; missing and extra lines; blank and music-note lines; duet timestamps; untimed documents; custom options; non-mutating attachment with merged translations. |
+
+Tests that pin behavior which conflicts with a stated invariant are marked with an inline comment
+rather than changing production code.
+
+Fixtures:
+
+- `tests/fixtures/LineByLine.txt` — line-timed LRC.
+- `tests/fixtures/TimedWordByWord.txt` — enhanced LRC with singer labels and overlapping lines.
+
+Run with:
+
+```bash
+npm test
+```
+
+Type-check both projects with:
+
+```bash
+npm run typecheck
+```
+
+The end-to-end smoke tests live outside the repository (temporary Electron/CDP scripts) and verify
+the built app against generated FLAC fixtures. They are not part of `npm test`.
+
+---
+
+## 17. Extension guide
+
+### Where to make a change
+
+| If you need to change… | Start here |
+| --- | --- |
+| Folder walking, tag reuse, snapshots, path index | `src/main/library.ts` |
+| Tag fields and fallbacks | `src/main/tags.ts` |
+| Album grouping/order | `src/main/albums.ts` |
+| Cover extraction, resizing, cache | `src/main/covers.ts` |
+| `media://` URLs, range responses | `src/main/media-protocol.ts`, `src/main/range.ts` |
+| App lifecycle, startup order | `src/main/index.ts` |
+| Window creation and renderer sends | `src/main/window.ts` |
+| Scan generation, progress, background refresh | `src/main/scanCoordinator.ts` |
+| IPC channels or preload surface | `src/main/ipc.ts`, `src/preload/index.ts`, `src/shared/types.ts` |
+| Persistence format or validation | `src/main/settings.ts`, `src/main/cache.ts`, `src/main/lyrics/choices.ts`, `src/main/json-file.ts` |
+| Embedded lyric tags | `src/main/lyrics/embedded.ts` |
+| Sidecar discovery, decoding, size/symlink rules | `src/main/lyrics/sidecar.ts` |
+| Lyric provider list, option order, selection context | `src/main/lyrics/sources.ts`, `src/shared/lyrics/sources.ts` |
+| Translation alignment, attachment, pure selection | `src/shared/lyrics/translation.ts`, `src/shared/lyrics/sources.ts` |
+| Translation layer state, eligibility, reports | `src/renderer/lyrics/translationState.ts` |
+| Per-track lyric and translation choices | `src/main/lyrics/choices.ts` |
+| Views, search, sort definitions | `src/renderer/library/query.ts` |
+| Renderer wiring / controller composition | `src/renderer/src/main.ts` |
+| Routing and the detail back stack | `src/renderer/src/navigation.ts`, `src/renderer/src/routeStack.ts` |
+| Search box, sort dropdown, view switcher, shortcuts | `src/renderer/src/toolbar.ts` |
+| Snapshot, scan state, startup ordering | `src/renderer/src/libraryController.ts` |
+| Playback transport, seeking, volume | `src/renderer/src/transport.ts` |
+| Now Playing lifecycle / lyric subscription | `src/renderer/src/nowPlaying.ts` |
+| Bottom player bar rendering | `src/renderer/src/playerBar.ts` |
+| Section choice and view rendering | `src/renderer/src/screen.ts`, `src/renderer/src/views/` |
+| Playback backend or queue behavior | `src/renderer/player/engine.ts`, `src/renderer/player/queue.ts` |
+| Lyric source fetch, parsing, selection, LRU cache | `src/renderer/lyrics/lyricsController.ts` |
+| Lyric source menu labels, badges, disabled reasons, empty hint | `src/renderer/lyrics/sourceMenuModel.ts` |
+| Translation menu/toggle labels, status, badges, hints | `src/renderer/lyrics/translationMenuModel.ts` |
+| Language labels, sidecar example names | `src/renderer/lyrics/translationLabels.ts` |
+| Per-line translation text lookup | `src/renderer/lyrics/translationText.ts` |
+| Source chip/popover DOM, keyboard, ARIA, focus | `src/renderer/ui/lyricSourceMenu.ts` |
+| Source popover row/badge/preference/translation DOM builders | `src/renderer/ui/lyricSourceMenuView.ts` |
+| Translation quick-toggle pill | `src/renderer/ui/translationToggle.ts` |
+| Lyric source/translation menu and quick-toggle styling | `src/renderer/styles/lyricSourceMenu.css` |
+| Now Playing source/translation wiring / close behavior | `src/renderer/src/nowPlaying.ts` |
+| Lyric cache refresh after rescan or `library:updated` | `src/renderer/lyrics/lyricsController.ts` (`clearCacheAndReload`), `src/renderer/src/libraryController.ts`, `src/renderer/src/main.ts` |
+| Lyric parsing/sync (stable core) | `src/shared/lyrics/` |
+| Lyric DOM, class toggles, scroll, seek, translation children | `src/renderer/ui/lyricView.ts` |
+| Lyric/Now Playing/translation visual styling | `src/renderer/styles/lyrics.css` |
+| App shell markup, CSP, element ids | `src/renderer/index.html` |
+
+### Add a lyric source
+
+1. Implement a `LyricSourceProvider` in `src/main/lyrics/`:
+
+   ```ts
+   async function extraFileProvider(track: LyricsTrack): Promise<LyricSourceOption[]> {
+     const text = await readExtraFile(track) // return [] when unavailable
+     return text
+       ? [{
+           id: `sidecar:${extraFileName(track.filePath)}`,
+           kind: 'sidecar',
+           label: 'Extra file',
+           detail: extraFileName(track.filePath),
+           available: true,
+           text,
+           variant: null
+         }]
+       : []
+   }
+   ```
+
+2. Add it to `PROVIDERS` in `src/main/lyrics/sources.ts` in the desired order.
+3. Return `[]` for expected misses; do not throw. Provider failures are logged and skipped.
+4. Keep ids file-name-only (`embedded` or `sidecar:<file name>`) and set `variant` to the
+   language/region suffix as written (or `null`). A provider that fits those kinds needs no IPC or
+   renderer changes: the controller parses every available option and applies the saved-choice /
+   preference rules automatically, the source menu lists the new option, and translation selection
+   can use it as a second layer.
+5. A genuinely new kind (for example online lookup) also requires extending `LyricSourceKind`, the
+   auto-selection order in `src/shared/lyrics/sources.ts`, and source-id validation in
+   `src/main/lyrics/choices.ts`.
+
+The sidecar provider is the reference implementation: same-directory discovery, regular files only,
+1 MiB cap, NFC/case-insensitive matching, and UTF-8/UTF-16 BOM decoding.
+
+### Add a library view
+
+1. Extend `LibraryView` and add an entry to `VIEWS` in `src/renderer/library/query.ts` with a label,
+   default sort, sort map, and item builder.
+2. Add a section to `index.html`, include it in `NavigationController.showSection`/`currentSection`,
+   and render it in `src/renderer/src/screen.ts` (plus a `src/renderer/src/views/` renderer).
+3. Add a view button with `data-view` and a `LibraryView` value.
+
+### Add a sort option
+
+1. Add a `SortOption` entry to the relevant `VIEWS[view].sorts`.
+2. The dropdown, validation, and persistence pick it up automatically.
+
+### Replace the playback backend
+
+Implement `PlaybackEngine` and construct it in `main.ts` instead of `HtmlAudioEngine`. The lyric view
+only needs `getPosition` and `seek`; the rest of the UI uses the interface.
+
+### Add a persisted setting
+
+1. Extend `Settings` in `src/shared/types.ts`.
+2. Add validation/defaults in `src/main/settings.ts`.
+3. Add an IPC handler if the renderer writes it, and expose it in the preload `LibraryApi`.
+4. Read it during renderer initialization and save on change.
+
+---
+
+## 18. Known limitations and deliberate omissions
+
+- Lyric line ends are estimated when the file does not provide them (capped at 10 s; final line 5 s).
+- Word-level progress exists only for enhanced LRC with inline markers.
+- Singer labels (`v1:`) are parsed into `agent` and exposed as `data-agent`, but not styled or shown
+  as separate voices.
+- Translations are aligned and attached to lyric lines (time/index/partial/none) and rendered as
+  plain line-level text under each line, chosen through the Translation section or the quick toggle.
+  There is no translation editing/writing, no word-level translation timing, no swapping of
+  original/translation, no side-by-side layout, no per-language fonts, no translation keyboard
+  shortcut, and no online translation lookup. TTML is typed/reserved but not parsed.
+- Plain lyrics are static: no highlighting and no click-to-seek.
+- Sidecars are limited to the track's own directory and the `<base>.lrc` / `<base>.<variant>.lrc`
+  names. Files over 1 MiB, symlinks, directories, and non-UTF-8/UTF-16 encodings are skipped.
+- No online lookup, lyric editing, sidecar writing, or tag writing.
+- No shuffle, repeat, gapless playback, crossfade, queue panel, or media-key integration.
+- No packaging/distribution configuration.
+- Album/artist grids are not virtualized.
+- Search is exact-word substring matching, not fuzzy.
+- Multi-artist strings are not split; they remain one artist key.
+
+---
+
+## 19. Verification checklist
+
+Before merging a change:
+
+```bash
+npm run typecheck
+npm test
+npm run build
+npm run dev        # manual smoke: open a folder, play tracks, open Now Playing
+```
+
+Expected:
+
+- Type-check passes for both projects.
+- All Vitest files pass (currently 356 tests across 20 files).
+- Production bundles build into `out/`.
+- `npm run dev` opens the app with no console errors.
+- Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.
+- Now Playing open/close preserves search, view, and scroll.

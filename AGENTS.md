@@ -11,3 +11,35 @@ Rules:
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
 - A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.
+
+# Agent workflow (mandatory)
+
+## Before starting
+1. Read specs/TechnicalSpecs.md (the index) and the invariants in it.
+2. Load only the spec files the index routes you to for this task.
+3. Use graphify for structural questions (what imports what, where something
+   lives). Do not guess from filenames.
+
+## While working
+- Respect the invariants in the index. If a change would violate one, stop and
+  ask instead of working around it.
+- Keep modules small and single-purpose. Do not grow existing files into
+  monoliths; add a new module instead.
+- Pure logic stays DOM-free and gets unit tests.
+
+## Definition of done (all required, in this order)
+1. npm run typecheck passes (both projects).
+2. npm test passes. New or changed behavior has tests.
+3. npm run build passes.
+4. npm run dev starts with no console errors, and you manually smoke-test the
+   area you changed.
+5. Update the ONE spec file that owns the changed behavior, in the same
+   change. If you added, moved or removed a module, update the index routing
+   table too. Do not touch volatile numbers (test counts etc.) anywhere except
+   specs/testing-and-verification.md.
+6. Re-run graphify so the graph reflects the change.
+
+## Handing work back
+Report: what changed, which spec files you updated, the results of each
+check above, anything you could not verify, and any spec/code mismatch you
+noticed. Never claim a check passed without having run it.
