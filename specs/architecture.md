@@ -216,6 +216,7 @@ than silently folded into the menu specs.
 
 ### Tests
 
-`tests/` contains the Vitest suite and two lyric fixtures. The coverage map, fixture names, and
-current test counts live only in [testing-and-verification.md](testing-and-verification.md); the file
-list is derivable with graphify.
+`tests/` contains the Vitest suite, two unit lyric fixtures, and the in-repo CDP end-to-end suite
+(`tests/e2e/`). The Vitest coverage map, E2E tiers, fixture names, commands, and current counts live
+only in [testing-and-verification.md](testing-and-verification.md); the file list is derivable with
+graphify.

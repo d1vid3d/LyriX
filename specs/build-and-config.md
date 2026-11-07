@@ -6,7 +6,7 @@
 `tsconfig.node.json`, `tsconfig.web.json`, `src/renderer/index.html`, `src/main/window.ts`,
 `forge.config.js`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-07 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [architecture.md](architecture.md),
 [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md), [security-and-robustness.md](security-and-robustness.md).
@@ -16,16 +16,20 @@
 | Script | Purpose |
 | --- | --- |
 | `npm run dev` | electron-vite dev server + Electron. |
-| `npm run build` | Production bundle into `out/`. |
+| `npm run build` | Production bundle into `build/`. |
 | `npm start` | Preview the production bundle. |
 | `npm run typecheck` | `typecheck:node` then `typecheck:web`. |
 | `npm run typecheck:node` | `tsc` over main, preload, shared, config. |
 | `npm run typecheck:web` | `tsc` over renderer, preload `.d.ts`, shared. |
 | `npm test` | `vitest run`. |
+| `npm run test:e2e` | Build, then the required Tier 1 CDP smoke suite. |
+| `npm run test:e2e:full` | Build, then the opt-in Tier 2 CDP regression suite. |
+| `npm run test:e2e:visual` | Build, then the optional Tier 3 CDP visual suite. |
+| `npm run fixtures:e2e` | Regenerate the committed E2E fixtures with ffmpeg. |
 | `npm run package` | Build, then `electron-forge package`. |
 | `npm run make` | Build, then `electron-forge make`. |
 
-UNVERIFIED/POSSIBLY STALE: the original §5 script table listed only the first seven rows.
+UNVERIFIED/POSSIBLY STALE: the original §5 script table listed only the first seven scripts above.
 `package.json` also defines `package` and `make`, and `forge.config.js` configures an asar package
 with a Squirrel maker for Windows. The original §18 claim that there is “no packaging/distribution
 configuration” is therefore stale; see [known-limitations.md](known-limitations.md).

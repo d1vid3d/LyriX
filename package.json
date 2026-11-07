@@ -13,7 +13,11 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "npm run build && node tests/e2e/smoke.mjs",
+    "test:e2e:full": "npm run build && node tests/e2e/full/index.mjs",
+    "test:e2e:visual": "npm run build && node tests/e2e/full/visual.mjs",
+    "fixtures:e2e": "node tests/e2e/fixtures/generate.mjs"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",

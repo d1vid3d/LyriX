@@ -24,11 +24,14 @@ Other scripts:
 
 ```bash
 npm run typecheck   # type-check main/preload and renderer
-npm run build       # bundle into out/
+npm run build       # bundle into build/
 npm start           # preview the production bundle
 npm run package     # package the app without creating an installer
 npm run make        # build a Windows .exe installer with Electron Forge
 npm test            # run the Vitest suite
+npm run test:e2e    # required CDP smoke suite (builds first)
+npm run test:e2e:full   # broader CDP regression suite
+npm run test:e2e:visual # CSS/visual CDP suite
 ```
 
 ## Project structure

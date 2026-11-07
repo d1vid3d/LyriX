@@ -5,7 +5,7 @@ This is the **only** file where volatile verification numbers (test counts, file
 
 **Owning source paths:** `tests/`, `package.json`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-07 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [build-and-config.md](build-and-config.md),
 [shared-lyric-core.md](shared-lyric-core.md), [persistence.md](persistence.md).
@@ -16,18 +16,21 @@ This is the **only** file where volatile verification numbers (test counts, file
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
 | `npm test` | 356 tests pass across 20 files. |
-| `npm run build` | Passes; emits `out/main`, `out/preload`, `out/renderer`. |
+| `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
+| `npm run test:e2e` | Passes; 53 checks (Tier 1 smoke). |
+| `npm run test:e2e:full` | Passes; 149 checks (Tier 2 regression). |
+| `npm run test:e2e:visual` | Passes; 26 checks (Tier 3 visual). |
 | `npm run dev` | Starts electron-vite and Electron. |
-
-An Electron/CDP end-to-end smoke test (kept outside the repo) also exercises library scanning,
-playback, all three lyric formats, missing lyrics, line seeking, live track changes, Now Playing
-open/close, search/view/scroll preservation, and console cleanliness.
 
 ## Strategy
 
 Tests use **Vitest** and target pure logic plus the DOM-free controller. They run in the Node
 environment; nothing mocks Electron or the DOM. The tested modules either have no imports beyond
 `node:*` and shared types, or keep their Electron access outside the tested functions.
+
+A separate in-repo CDP suite (`tests/e2e/`) drives the built Electron app. It complements Vitest:
+unit tests pin pure logic, while the E2E tiers verify the real main/preload/renderer wiring,
+filesystem scanning, audio playback, and DOM behavior. The E2E tiers are not part of `npm test`.
 
 ## Coverage map
 
@@ -59,8 +62,57 @@ rather than changing production code.
 
 ## Fixtures
 
+Unit fixtures:
+
 - `tests/fixtures/LineByLine.txt` — line-timed LRC.
 - `tests/fixtures/TimedWordByWord.txt` — enhanced LRC with singer labels and overlapping lines.
+
+E2E fixtures (committed and canonical):
+
+- `tests/e2e/fixtures/lyrics/` — one album with 20 FLAC tracks: line-timed (`01 - Lyric Test`),
+  word-timed (`02 - Word Test`), untimed plain text (`03 - Plain Test`), missing lyrics
+  (`04 - No Lyrics`), 16 filler tracks, and an album `cover.jpg`.
+- `tests/e2e/fixtures/library/` — 5 albums across 7 `.flac` files: a shared album by two album
+  artists, an embedded cover, a folder `cover.jpg`, an album without art, an untagged track, and
+  one intentionally corrupt file.
+
+`npm run fixtures:e2e` regenerates both trees with ffmpeg. ffmpeg is needed only for regeneration;
+the suites read the committed files. The full suite creates 600 temporary copies at runtime for the
+virtualization/rescan checks and does not commit them.
+
+## End-to-end suites
+
+Three tiers drive the built app through raw Chrome DevTools Protocol (CDP). They use Node's built-in
+`WebSocket` and `fetch`, so they add no runtime dependency. None of them are part of `npm test`.
+
+| Tier | Command | Scope | When to run |
+| --- | --- | --- | --- |
+| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
+| 2 — full | `npm run test:e2e:full` | Startup and cached settings, library metadata, transport wiring, volume persistence, rescan, relaunch, views/search/sort, virtualization with 600 tracks, renderer health. | Opt-in for risky refactors and broad regression coverage. |
+| 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting and player-bar button colors, sizes, icons, and active/upcoming lyric states. | Optional after CSS/UI changes. |
+
+Each script runs `npm run build` first. The harness layout is:
+
+- `tests/e2e/main.cjs` — test-only entry point. It sets Electron's `userData` to a throw-away
+  directory before loading the main entry from `package.json`, so production behavior and the
+  developer's real profile are untouched.
+- `tests/e2e/lib/` — CDP client, app launch/stop, DOM actions and state snapshots, and the shared
+  PASS/FAIL runner with failure artifacts.
+- `tests/e2e/smoke.mjs` — Tier 1.
+- `tests/e2e/full/index.mjs` — Tier 2 orchestrator; `library.mjs`, `playback.mjs`, and `views.mjs`
+  hold the domain checks.
+- `tests/e2e/full/visual.mjs` — Tier 3.
+- `tests/e2e/fixtures/generate.mjs` — fixture regeneration.
+
+The harness launches Electron with `--remote-debugging-port=0`, reads the port from
+`DevToolsActivePort` in the isolated `userData` directory, and seeds `settings.json` with
+`lastFolder` so no native folder dialog is needed. Fixtures are copied into the OS temp directory
+and never scanned in place. Prerequisites are Node 22+ and a graphical desktop session; fixture
+regeneration additionally needs ffmpeg on `PATH`.
+
+On failure, the suites keep the temp root and print its path. `<tempRoot>/artifacts/` contains
+`failure.png`, `renderer-console.log`, `app.log`, `state.json`, and `failures.json` when available.
+Set `LYRIX_E2E_KEEP=1` to keep artifacts after a passing run too.
 
 ## Commands
 
@@ -76,8 +128,19 @@ Type-check both projects with:
 npm run typecheck
 ```
 
-The end-to-end smoke tests live outside the repository (temporary Electron/CDP scripts) and verify
-the built app against generated FLAC fixtures. They are not part of `npm test`.
+Run the end-to-end tiers with:
+
+```bash
+npm run test:e2e          # Tier 1, required
+npm run test:e2e:full     # Tier 2, opt-in
+npm run test:e2e:visual   # Tier 3, optional
+```
+
+Regenerate the committed E2E fixtures (requires ffmpeg) with:
+
+```bash
+npm run fixtures:e2e
+```
 
 ## Verification checklist
 
@@ -87,6 +150,11 @@ Before merging a change:
 npm run typecheck
 npm test
 npm run build
+npm run test:e2e
+# risky refactors:
+npm run test:e2e:full
+# CSS/UI changes:
+npm run test:e2e:visual
 npm run dev        # manual smoke: open a folder, play tracks, open Now Playing
 ```
 
@@ -94,7 +162,10 @@ Expected:
 
 - Type-check passes for both projects.
 - All Vitest files pass (current count in the verification-status table above).
-- Production bundles build into `out/`.
+- Production bundles build into `build/`.
+- The required Tier 1 smoke suite passes (current count in the verification-status table above).
+- `npm run test:e2e:full` passes when run for a risky change; `npm run test:e2e:visual` passes when
+  run for a styling change.
 - `npm run dev` opens the app with no console errors.
 - Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.
 - Now Playing open/close preserves search, view, and scroll.
