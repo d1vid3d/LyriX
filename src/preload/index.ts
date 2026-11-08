@@ -4,6 +4,7 @@ import type { LyricPreference, LyricSources } from '../shared/lyrics/sources'
 import type {
   LibraryApi,
   LibrarySnapshot,
+  PlaybackSettingsInput,
   ScanProgress,
   Settings,
   TranslationSettingsInput,
@@ -27,6 +28,8 @@ const library: LibraryApi = {
     ipcRenderer.invoke('settings:set-volume', volume),
   saveUiState: (state: UiState): Promise<void> =>
     ipcRenderer.invoke('settings:set-ui', state),
+  savePlaybackSettings: (settings: PlaybackSettingsInput): Promise<void> =>
+    ipcRenderer.invoke('settings:set-playback', settings),
   getLyricSources: (trackId: string): Promise<LyricSources | null> =>
     ipcRenderer.invoke('lyrics:get-sources', trackId),
   saveLyricChoice: (trackId: string, sourceId: string | null): Promise<void> =>

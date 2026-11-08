@@ -82,6 +82,9 @@ Menu visual rules:
 - Now Playing uses a 280 px cover column beside the lyrics; at ≤ 820 px it stacks the cover/meta above
   the lyrics.
 - The bottom-bar track target gets hover/focus styling and a pointer cursor.
+- Shuffle and Repeat share `.control-button`; their pressed state (`aria-pressed="true"`) uses the
+  accent border/text color. `.repeat-one-badge` is an absolutely positioned accent "1" shown only for
+  `data-repeat="one"`. Detail-view Play/Shuffle buttons reuse the header button styling.
 
 For lyric presentation, JavaScript never sets inline visual styles except the `--progress` custom
 property. (The virtual list and layout code still set structural inline styles such as position and

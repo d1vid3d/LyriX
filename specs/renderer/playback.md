@@ -5,9 +5,9 @@ Now Playing lifecycle, and the bottom bar.
 
 **Owning source paths:** `src/renderer/src/transport.ts`, `src/renderer/src/nowPlaying.ts`,
 `src/renderer/src/playerBar.ts`, `src/renderer/player/engine.ts`,
-`src/renderer/player/queue.ts`.
+`src/renderer/player/transportDecisions.ts`, `src/renderer/player/queue/`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 9 and 10),
 [renderer/shell-and-navigation.md](shell-and-navigation.md),
@@ -16,21 +16,45 @@ Now Playing lifecycle, and the bottom bar.
 
 ## Transport (`src/renderer/src/transport.ts`)
 
-Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, and `activeAttempt`.
+Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, `activeAttempt`, and
+`consecutiveFailures`.
 
-- `playQueue` sets the queue; clicking the already-current track resumes instead of reloading.
-- `playAlbumTrack` queues the album in album order; `playVisibleTrack` queues the visible track list.
-- `startCurrentTrack` loads the track, requests lyrics, resets time UI, and optionally plays.
-- `handleEnded` advances or stops; `handlePlaybackFailure` ignores `AbortError`, skips forward when
-  possible, and otherwise pauses.
+- `playQueue(tracks, index, context)` sets the queue with a `QueueContext`; clicking the
+  already-current track and index resumes instead of reloading.
+- `playAlbumTrack` queues the album in album order; `playAlbum` starts it from the first track;
+  `shuffleAlbum` enables shuffle and starts from a random index.
+- `playArtist` queues `getArtistTracks(artist)` (album year → title, then disc → track → title);
+  `shuffleArtist` enables shuffle and starts from a random index.
+- `playVisibleTrack` queues the visible track list with a `tracks` context, or a `search` context
+  carrying the applied search text.
+- `startCurrentTrack` loads the track, requests lyrics, resets time UI, optionally plays, and
+  updates Now Playing/highlight/controls.
+- `toggleShuffle` flips the queue shuffle flag; `cycleRepeat` moves `off → all → one → off`. Both
+  save the combined playback settings through the renderer's `savePlaybackSettings` callback.
+- `handleEnded` advances and either plays, restarts the current track for repeat-one, or stops.
+- `handlePlaybackFailure` ignores `AbortError`, skips forward when possible, caps consecutive
+  failures at one per queue entry, and otherwise pauses.
 - `previous` restarts the track when position > 3 s, otherwise moves back.
 - `reconcileQueue` rebuilds the queue from current track ids and resets playback when the current
   track disappeared.
+- `resetPlayback` clears the queue, pauses the engine, clears lyrics, and resets the UI.
 - Seek bar, volume, and engine event wiring live here. `start()` subscribes to engine events and
   returns one disposer.
 
 The visible track list comes from the tracks view ([renderer/shell-and-navigation.md](shell-and-navigation.md));
 lyric loading is started through [renderer/lyrics-controller.md](lyrics-controller.md).
+
+## Pure transport decisions (`src/renderer/player/transportDecisions.ts`)
+
+DOM-free helpers used by the transport:
+
+- `decideEndedAction(current, next)` → `stop` when there is no next entry, `restart` when the queue
+  returned the same entry (repeat-one replay), otherwise `play`.
+- `decidePreviousAction(position, previous)` → `restart` above 3 s, otherwise `play` the previous
+  entry, falling back to `restart`.
+- `decideFailureAction(entryCount, consecutiveFailures)` → `skip` until the failure count reaches
+  the entry count, then `stop`, so repeat-all cannot loop forever over a fully broken queue.
+- `nextRepeatMode(mode)` cycles `off → all → one → off`.
 
 ## Now Playing and player bar (`src/renderer/src/nowPlaying.ts`, `src/renderer/src/playerBar.ts`)
 
@@ -47,8 +71,12 @@ lyric loading is started through [renderer/lyrics-controller.md](lyrics-controll
   `NowPlayingDeps`; the controller itself stays DOM-free.
 
 `PlayerBar` owns the bottom bar: now-playing title/artist/cover, play/pause labels and disabled
-states, duration, seek value, and time labels. It reads the current track and playing state through
-callbacks.
+states, shuffle/repeat state, duration, seek value, and time labels. It reads the current track,
+playing state, queue snapshot, and next/previous availability through callbacks.
+
+- Shuffle sets `aria-pressed` and a `Shuffle: on|off` label/title.
+- Repeat sets `aria-pressed` (true for `all` and `one`), a `Repeat: <mode>` label/title, and
+  `data-repeat`; the inline badge is shown only for `one`.
 
 UNVERIFIED/POSSIBLY STALE: the conceptual fields `nowPlayingOpen` and
 `libraryDirtyWhileNowPlaying` are currently implemented as the private `open` and `dirty` fields on
@@ -78,10 +106,43 @@ The source-menu and translation-toggle components are owned by
 The lyric view reads position only through this interface, never by reaching into the `<audio>`
 element (invariant 9 in [TechnicalSpecs.md](../TechnicalSpecs.md)).
 
-## Pure queue (`src/renderer/player/queue.ts`)
+## Editable queue (`src/renderer/player/queue/`)
 
-`PlaybackQueue` stores a copied track array and an index.
+`PlaybackQueue` is pure: it imports only track/album types and the shuffle helpers, and has no
+playback, DOM, or persistence concerns. The folder exports `PlaybackQueue`, the queue types, and
+the shuffle helpers.
 
-- `setQueue(tracks, startIndex)` clamps the index and returns the current track.
-- `current`, `next`, `previous`, `hasNext`, `hasPrevious`, `getTracks`, `getCurrentIndex`.
-- No playback, DOM, or persistence concerns.
+- `QueueEntry` carries `entryId` (stable per insertion), `track`, and `origin`
+  (`context | playNext | added`). `QueueContext` is `{ kind: album | artist | tracks | search | other,
+  label }`.
+- `getSnapshot()` returns a frozen, memoized `QueueSnapshot` (`entries`, `currentIndex`, `current`,
+  `shuffle`, `repeat`, `context`, `version`). The snapshot is rebuilt and `version` increments only
+  after a mutation; `subscribe(listener)` returns an unsubscribe function.
+- `setQueue(tracks, startIndex, { context })` clamps the start index (non-finite/fractional values
+  normalize to 0/truncation). With shuffle on it keeps the requested start track first and shuffles
+  the rest.
+- `advance(reason)` and `peekNext(reason)` honor repeat-one only for `ended`. `peekNext` wraps to the
+  first entry for repeat-all and caches the shuffled wrap order so a following `advance` returns the
+  same entry.
+- `previous()` moves back, wrapping to the last entry for repeat-all; at the start without repeat it
+  returns `null`. `canGoNext` follows the advance wrap rule; `canGoPrevious` is true whenever the
+  queue is non-empty, so the transport can restart the first track instead of disabling the button.
+- `playNext(tracks)` inserts directly after the current entry and after any existing `playNext`
+  entries; `addToQueue(tracks)` appends. Both assign fresh entry ids.
+- `remove(entryId)` refuses the current entry; `move(entryId, toIndex)` clamps the destination and
+  keeps the current entry selected; `jumpTo(entryId)` selects any entry.
+- `clearUpcoming()` removes everything after the current entry; `clear()` empties the queue and
+  context.
+- `setShuffle(enabled)` shuffles only the entries after the current one; earlier history stays in
+  place. Turning shuffle off rebuilds `originalOrder` with the current entry re-anchored at its
+  natural position, so the next track is the current track's natural successor (not a track that
+  originally came before it). Added/play-next entries stay at their recorded original positions.
+  Manual reordering while shuffled is intentionally not preserved.
+- `setRepeat(mode)` normalizes unknown values to `off`.
+- `reconcile(trackLookup)` drops entries whose ids no longer resolve, returns the current entry when
+  it survived, and clears the queue when it did not.
+- The constructor accepts an injectable RNG (`QueueRandom`) for deterministic shuffle tests; it
+  defaults to `Math.random`.
+
+Shuffle helpers in `shuffle.ts` perform a Fisher-Yates copy (never mutating the input) and avoid
+replaying the just-played track as the first wrap entry when another track exists.

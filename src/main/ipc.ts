@@ -5,7 +5,14 @@ import type { LyricChoiceStore } from './lyrics/choices'
 import { getLyricSources } from './lyrics/sources'
 import type { ScanCoordinator } from './scanCoordinator'
 import type { TranslationSettingsInput } from '../shared/types'
-import { clampVolume, normalizeTranslationLanguage, normalizeUiState, saveSettings } from './settings'
+import {
+  clampVolume,
+  normalizeRepeat,
+  normalizeShuffle,
+  normalizeTranslationLanguage,
+  normalizeUiState,
+  saveSettings
+} from './settings'
 import type { AppStore } from './store'
 
 /** Registers every IPC channel; input validation stays on this side of the bridge. */
@@ -105,6 +112,22 @@ export function registerIpc(
       await saveSettings(store.settingsFile, store.settings)
     } catch (error) {
       console.error('[settings] Could not save UI state', error)
+    }
+  })
+
+  ipcMain.handle('settings:set-playback', async (_event, value: unknown) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return
+
+    const candidate = value as Record<string, unknown>
+    store.settings = {
+      ...store.settings,
+      shuffle: normalizeShuffle(candidate.shuffle),
+      repeat: normalizeRepeat(candidate.repeat)
+    }
+    try {
+      await saveSettings(store.settingsFile, store.settings)
+    } catch (error) {
+      console.error('[settings] Could not save playback settings', error)
     }
   })
 

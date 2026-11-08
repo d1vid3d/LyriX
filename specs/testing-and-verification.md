@@ -5,7 +5,7 @@ This is the **only** file where volatile verification numbers (test counts, file
 
 **Owning source paths:** `tests/`, `package.json`.
 
-**Last verified:** 2026-11-07 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [build-and-config.md](build-and-config.md),
 [shared-lyric-core.md](shared-lyric-core.md), [persistence.md](persistence.md).
@@ -15,11 +15,11 @@ This is the **only** file where volatile verification numbers (test counts, file
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 356 tests pass across 20 files. |
+| `npm test` | 437 tests pass across 22 files. |
 | `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
-| `npm run test:e2e` | Passes; 53 checks (Tier 1 smoke). |
-| `npm run test:e2e:full` | Passes; 149 checks (Tier 2 regression). |
-| `npm run test:e2e:visual` | Passes; 26 checks (Tier 3 visual). |
+| `npm run test:e2e` | Passes; 64 checks (Tier 1 smoke). |
+| `npm run test:e2e:full` | Passes; 150 checks (Tier 2 regression). |
+| `npm run test:e2e:visual` | Passes; 29 checks (Tier 3 visual). |
 | `npm run dev` | Starts electron-vite and Electron. |
 
 ## Strategy
@@ -50,11 +50,13 @@ filesystem scanning, audio playback, and DOM behavior. The E2E tiers are not par
 | `tests/translationText.test.ts` | Per-line translation lookup: missing key, missing entry, blank text, matching plain text. |
 | `tests/sidecar.test.ts` | Exact/variant matching; case-insensitive names and extension; ignored names and directories; 1 MiB cap; UTF-8/UTF-16 BOM decoding; symlink skip where supported; unreadable directory. |
 | `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
-| `tests/queue.test.ts` | Start-index clamping (negative, past end, fractional, non-finite); empty queue; next/previous at both ends; `hasNext`/`hasPrevious`; input-array copy; `getTracks`/`getCurrentIndex`. |
+| `tests/queue.test.ts` | Editable queue: start clamping, empty queue, advance/peek with repeat-one/all, shuffle on/off with injectable RNG, play-next/add ordering, remove/move/jump, clear/clear-upcoming, snapshot freezing/memoization/version, subscriptions, reconcile, and origins. |
+| `tests/transportDecisions.test.ts` | Ended (stop/play/restart), previous (>3 s restart), failure cap, and repeat-mode cycling. |
+| `tests/artistTracks.test.ts` | Artist playback order: album year then title (unknown last), disc then track then title, missing disc as one, input not reordered. |
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
 | `tests/routeStack.test.ts` | `topRoute`; non-mutating push/pop; pruning invalid routes from the top only; back-label selection for each view and parent route. |
 | `tests/segmentGroups.test.ts` | Syllable grouping; `spaceAfter` boundaries; trailing final group; empty input. |
-| `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder, view, lyric-preference, and translation fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
+| `tests/settings.test.ts` | Volume clamping; missing/malformed files; invalid fields; empty sort values dropped; folder, view, lyric-preference, translation, shuffle, and repeat fallbacks; save normalization. Documents that unknown view and sort keys currently pass through main-side normalization and are validated by the renderer. |
 | `tests/translation.test.ts` | Time matching within/outside tolerance; equal-count index fallback; partial/none; missing and extra lines; blank and music-note lines; duet timestamps; untimed documents; custom options; non-mutating attachment with merged translations. |
 
 Tests that pin behavior which conflicts with a stated invariant are marked with an inline comment
@@ -87,9 +89,9 @@ Three tiers drive the built app through raw Chrome DevTools Protocol (CDP). They
 
 | Tier | Command | Scope | When to run |
 | --- | --- | --- | --- |
-| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
+| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
 | 2 — full | `npm run test:e2e:full` | Startup and cached settings, library metadata, transport wiring, volume persistence, rescan, relaunch, views/search/sort, virtualization with 600 tracks, renderer health. | Opt-in for risky refactors and broad regression coverage. |
-| 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting and player-bar button colors, sizes, icons, and active/upcoming lyric states. | Optional after CSS/UI changes. |
+| 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting plus player-bar button colors, sizes, icons, shuffle/repeat active states, and active/upcoming lyric states. | Optional after CSS/UI changes. |
 
 Each script runs `npm run build` first. The harness layout is:
 
@@ -168,4 +170,5 @@ Expected:
   run for a styling change.
 - `npm run dev` opens the app with no console errors.
 - Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.
+- Shuffle and repeat toggle their labels/active states and survive a relaunch.
 - Now Playing open/close preserves search, view, and scroll.

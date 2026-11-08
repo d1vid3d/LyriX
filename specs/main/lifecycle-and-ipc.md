@@ -71,6 +71,7 @@ subscribe.
 | `settings:get` | — | `Settings` |
 | `settings:set-volume` | `volume: unknown` | `void` (clamped) |
 | `settings:set-ui` | `UiState` candidate | `void` (normalized) |
+| `settings:set-playback` | `{ shuffle: unknown, repeat: unknown }` | `void` (normalized) |
 | `settings:set-lyric-preference` | `preference: unknown` | `void` (validated) |
 | `settings:set-translation` | `{ enabled: unknown, language: unknown }` | `void` (validated) |
 
@@ -82,8 +83,9 @@ background refresh).
 `lyrics:set-translation-choice` validate the track id and source id; `null` clears the saved choice,
 and invalid input is a no-op. Preference writes accept only `"sidecar"` or `"embedded"`.
 `settings:set-translation` requires a boolean `enabled` and a `language` that is `null` or matches
-the language pattern; invalid input is a no-op. Write failures are logged and never thrown across the
-boundary.
+the language pattern; invalid input is a no-op. `settings:set-playback` requires a plain object and
+normalizes `shuffle` (only `true` enables it) and `repeat` (`"all"`/`"one"`, otherwise `"off"`).
+Write failures are logged and never thrown across the boundary.
 
 The validators for ids and language patterns live in [data-model.md](../data-model.md) and
 [persistence.md](../persistence.md). Provider behavior behind `lyrics:get-sources` is owned by
@@ -101,6 +103,7 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `getSettings()` | `settings:get` | Returns normalized settings. |
 | `saveVolume(volume)` | `settings:set-volume` | Main clamps the value. |
 | `saveUiState(state)` | `settings:set-ui` | Main normalizes the value. |
+| `savePlaybackSettings({ shuffle, repeat })` | `settings:set-playback` | Main normalizes both fields and writes atomically. |
 | `getLyricSources(trackId)` | `lyrics:get-sources` | Returns ordered source options and selection context, or `null`. |
 | `saveLyricChoice(trackId, sourceId)` | `lyrics:set-choice` | `null` clears the per-track choice. |
 | `saveLyricPreference(preference)` | `settings:set-lyric-preference` | Main accepts only `"sidecar"` / `"embedded"`. |

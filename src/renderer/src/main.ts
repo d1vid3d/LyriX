@@ -66,8 +66,12 @@ const playerBar = new PlayerBar({
   elements,
   getCurrentTrack: () => transport.getCurrentTrack(),
   getAlbumForTrack: (track) => library.findAlbumForTrack(track),
-  hasNext: () => queue.hasNext(),
-  isPlaying: () => engine.isPlaying()
+  getQueueSnapshot: () => queue.getSnapshot(),
+  canGoNext: () => queue.canGoNext(),
+  canGoPrevious: () => queue.canGoPrevious(),
+  isPlaying: () => engine.isPlaying(),
+  toggleShuffle: () => transport.toggleShuffle(),
+  cycleRepeat: () => transport.cycleRepeat()
 })
 
 function renderNowPlaying(): void {
@@ -81,11 +85,17 @@ transport = new TransportController({
   queue,
   getAlbums: () => library.getAlbums(),
   getVisibleTracks: () => tracksList.getVisibleTracks(),
+  getSearchText: () => toolbar.getAppliedSearch(),
   setLyricsTrack: (trackId) => lyricsController.setTrack(trackId),
   setStatus: (text) => {
     elements.statusLabel.textContent = text
   },
   saveVolume: (volume) => void window.library.saveVolume(volume),
+  savePlaybackSettings: (settings) => {
+    void window.library
+      .savePlaybackSettings(settings)
+      .catch((error) => console.error('[renderer] Could not save playback settings', error))
+  },
   updateControls: () => playerBar.updateControls(),
   updateNowPlaying: renderNowPlaying,
   updateTrackHighlight: () => screen.updateTrackHighlight(),
@@ -151,6 +161,10 @@ screen = new ScreenController({
   onOpenArtist: (artistName) => navigation.openArtist(artistName),
   onPlayTrack: (index) => transport.playVisibleTrack(index),
   onPlayAlbumTrack: (album, track) => transport.playAlbumTrack(album, track),
+  onPlayAlbum: (album) => transport.playAlbum(album),
+  onShuffleAlbum: (album) => transport.shuffleAlbum(album),
+  onPlayArtist: (artist) => transport.playArtist(artist),
+  onShuffleArtist: (artist) => transport.shuffleArtist(artist),
   syncViewControls: () => toolbar.syncViewControls()
 })
 
@@ -168,6 +182,8 @@ library = new LibraryController({
   applySettings: (settings) => {
     engine.setVolume(settings.volume)
     elements.volumeSlider.value = String(settings.volume)
+    queue.setShuffle(settings.shuffle)
+    queue.setRepeat(settings.repeat)
     toolbar.applyUiSettings(settings)
     lyricsController.setPreference(settings.lyricPreference, { persist: false })
     lyricsController.applyTranslationSettings(
@@ -189,7 +205,12 @@ function saveUiState(): void {
 
 engine.setVolume(Number(elements.volumeSlider.value))
 
-const disposers = [transport.start(), library.start(), nowPlaying.start()]
+const disposers = [
+  transport.start(),
+  library.start(),
+  nowPlaying.start(),
+  queue.subscribe(() => playerBar.updateControls())
+]
 
 toolbar.syncViewControls()
 void library.initialize()

@@ -13,11 +13,11 @@ that is intentionally out of scope.
 
 ## Non-goals (current scope)
 
-Shuffle, repeat, gapless playback, crossfade, queue panel/editing, fuzzy search, search history,
-filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online lyric or
-translation lookup, singer-specific styling, translation editing, swapping original/translation,
-side-by-side translation layout, word-level translation timing, per-language fonts, translation
-keyboard shortcuts, TTML, tag editing, packaging.
+Gapless playback, crossfade, queue panel/editing UI, queue contents persistence, fuzzy search, search
+history, filters, artist images, multi-artist splitting, genres, grid/artist virtualization, online
+lyric or translation lookup, singer-specific styling, translation editing, swapping
+original/translation, side-by-side translation layout, word-level translation timing, per-language
+fonts, translation keyboard shortcuts, TTML, tag editing, packaging.
 
 ## Limitations
 
@@ -35,7 +35,9 @@ keyboard shortcuts, TTML, tag editing, packaging.
   names. The size cap, symlink/directory skips, and accepted encodings are owned by
   [main/lyric-sources.md](main/lyric-sources.md).
 - No online lookup, lyric editing, sidecar writing, or tag writing.
-- No shuffle, repeat, gapless playback, crossfade, queue panel, or media-key integration.
+- No gapless playback, crossfade, queue panel/editing UI, media-key integration, or queue-contents
+  persistence. Shuffle and repeat modes are persisted; the current queue is rebuilt from the library
+  on launch.
 - No packaging/distribution configuration.
 
   UNVERIFIED/POSSIBLY STALE: `package.json` defines `npm run package` and `npm run make`, and

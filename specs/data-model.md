@@ -19,7 +19,9 @@ albums.
 | `CachedTrack` | Tag values plus `mtimeMs` and `size` for cache validation. |
 | `LibraryCache` | `version`, `folder`, `tracks: Record<absolutePath, CachedTrack>`. |
 | `UiState` | `lastView`, `sortByView`. |
-| `Settings` | `UiState` + `lastFolder`, `volume`, `lyricPreference`, `translationEnabled`, `translationLanguage`. |
+| `Settings` | `UiState` + `lastFolder`, `volume`, `lyricPreference`, `translationEnabled`, `translationLanguage`, `shuffle`, `repeat`. |
+| `RepeatMode` | `"off"`, `"all"`, or `"one"` (shared by settings and the renderer queue). |
+| `PlaybackSettingsInput` | `shuffle: boolean`, `repeat: RepeatMode` for the playback-settings IPC. |
 | `TranslationSettingsInput` | `enabled: boolean`, `language: string \| null` for the translation IPC. |
 | `ScanProgress` | `scanned`, `total`. |
 | `LibrarySnapshot` | `folderName`, `albums`. |
@@ -28,6 +30,9 @@ albums.
 | `LyricSourceOption` | `id`, `kind`, `label`, `detail`, `available`, `text`, `variant`; ids are `"embedded"` or `"sidecar:<file name>"` (file name only). `variant` is the text between the base name and `.lrc` as written, or `null` for embedded and the exact sidecar. |
 | `LyricSources` | `trackId`, ordered `options`, `savedChoice`, `savedTranslationChoice`, `preference`, `expectedSidecarName` (file name only). |
 | `LibraryApi` | Typed preload surface (see [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md)). |
+
+Queue-only types (`QueueEntry`, `QueueContext`, `QueueSnapshot`, `QueueOrigin`) live in
+`src/renderer/player/queue/types.ts`; they are renderer-local and do not cross the process boundary.
 
 The lyric document types (`LyricFormat`, `LyricDocument`, `LyricLine`, `LyricSegment`, and parse
 options) live in [shared-lyric-core.md](shared-lyric-core.md); they are not duplicated here.

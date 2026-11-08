@@ -48,12 +48,22 @@ export interface UiState {
   sortByView: Record<string, string>
 }
 
+export type RepeatMode = 'off' | 'all' | 'one'
+
+/** Playback preferences persisted between launches. */
+export interface PlaybackSettingsInput {
+  shuffle: boolean
+  repeat: RepeatMode
+}
+
 export interface Settings extends UiState {
   lastFolder: string | null
   volume: number
   lyricPreference: LyricPreference
   translationEnabled: boolean
   translationLanguage: string | null
+  shuffle: boolean
+  repeat: RepeatMode
 }
 
 /** Input for the translation toggle and sticky language. */
@@ -80,6 +90,7 @@ export interface LibraryApi {
   getSettings(): Promise<Settings>
   saveVolume(volume: number): Promise<void>
   saveUiState(state: UiState): Promise<void>
+  savePlaybackSettings(settings: PlaybackSettingsInput): Promise<void>
   getLyricSources(trackId: string): Promise<LyricSources | null>
   saveLyricChoice(trackId: string, sourceId: string | null): Promise<void>
   saveLyricPreference(preference: LyricPreference): Promise<void>

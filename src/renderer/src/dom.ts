@@ -27,16 +27,22 @@ export interface AppElements {
   detailTitle: HTMLHeadingElement
   detailArtist: HTMLParagraphElement
   detailYear: HTMLParagraphElement
+  albumPlayButton: HTMLButtonElement
+  albumShuffleButton: HTMLButtonElement
   trackList: HTMLOListElement
 
   artistBackButton: HTMLButtonElement
   artistNameLabel: HTMLHeadingElement
   artistMetaLabel: HTMLParagraphElement
+  artistPlayButton: HTMLButtonElement
+  artistShuffleButton: HTMLButtonElement
   artistAlbumGrid: HTMLDivElement
 
+  shuffleButton: HTMLButtonElement
   previousButton: HTMLButtonElement
   playPauseButton: HTMLButtonElement
   nextButton: HTMLButtonElement
+  repeatButton: HTMLButtonElement
   currentTimeLabel: HTMLSpanElement
   seekBar: HTMLInputElement
   durationLabel: HTMLSpanElement
@@ -98,16 +104,22 @@ export function getAppElements(): AppElements {
     detailTitle: getElement<HTMLHeadingElement>('detail-title'),
     detailArtist: getElement<HTMLParagraphElement>('detail-artist'),
     detailYear: getElement<HTMLParagraphElement>('detail-year'),
+    albumPlayButton: getElement<HTMLButtonElement>('album-play'),
+    albumShuffleButton: getElement<HTMLButtonElement>('album-shuffle'),
     trackList: getElement<HTMLOListElement>('track-list'),
 
     artistBackButton: getElement<HTMLButtonElement>('artist-back'),
     artistNameLabel: getElement<HTMLHeadingElement>('artist-name'),
     artistMetaLabel: getElement<HTMLParagraphElement>('artist-meta'),
+    artistPlayButton: getElement<HTMLButtonElement>('artist-play'),
+    artistShuffleButton: getElement<HTMLButtonElement>('artist-shuffle'),
     artistAlbumGrid: getElement<HTMLDivElement>('artist-album-grid'),
 
+    shuffleButton: getElement<HTMLButtonElement>('shuffle'),
     previousButton: getElement<HTMLButtonElement>('previous'),
     playPauseButton: getElement<HTMLButtonElement>('play-pause'),
     nextButton: getElement<HTMLButtonElement>('next'),
+    repeatButton: getElement<HTMLButtonElement>('repeat'),
     currentTimeLabel: getElement<HTMLSpanElement>('current-time'),
     seekBar: getElement<HTMLInputElement>('seek'),
     durationLabel: getElement<HTMLSpanElement>('duration'),

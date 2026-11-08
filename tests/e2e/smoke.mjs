@@ -42,6 +42,24 @@ async function main(runner, ctx) {
   const opened = await clickAlbum(cdp, 'Lyric Album', 'Lyric Artist')
   runner.check('album opened', opened)
   await cdp.waitFor('detail view', `document.querySelector('#detail-view').hidden === false`)
+  const albumActions = await cdp.evaluate(`(() => {
+    const play = document.querySelector('#album-play')
+    const shuffle = document.querySelector('#album-shuffle')
+    return {
+      playText: play?.textContent.trim() ?? '',
+      playLabel: play?.getAttribute('aria-label') ?? '',
+      shuffleText: shuffle?.textContent.trim() ?? '',
+      shuffleLabel: shuffle?.getAttribute('aria-label') ?? ''
+    }
+  })()`)
+  runner.check(
+    'album header exposes Play and Shuffle',
+    albumActions.playText === 'Play' &&
+      albumActions.playLabel === 'Play album' &&
+      albumActions.shuffleText === 'Shuffle' &&
+      albumActions.shuffleLabel === 'Shuffle album',
+    JSON.stringify(albumActions)
+  )
   const started = await clickTrack(cdp, 'Lyric Test')
   runner.check('line-lyrics track started', started)
   await cdp.waitFor(
@@ -53,6 +71,36 @@ async function main(runner, ctx) {
   runner.equal('now playing artist', ui.nowArtist, 'Lyric Artist')
   runner.equal('play button shows pause', ui.playing, 'true')
   runner.equal('one highlighted track', ui.tracks.filter((track) => track.playing).length, 1)
+
+  runner.step('shuffle and repeat controls')
+  runner.equal('shuffle starts off', ui.shufflePressed, 'false')
+  runner.equal('shuffle starts with an off label', ui.shuffleLabel, 'Shuffle: off')
+  runner.equal('repeat starts off', ui.repeatPressed, 'false')
+  runner.equal('repeat starts with an off label', ui.repeatLabel, 'Repeat: off')
+
+  await clickSelector(cdp, '#shuffle')
+  await cdp.waitFor('shuffle on', `document.querySelector('#shuffle').getAttribute('aria-pressed') === 'true'`)
+  ui = await readState(cdp)
+  runner.equal('shuffle label turns on', ui.shuffleLabel, 'Shuffle: on')
+
+  await clickSelector(cdp, '#repeat')
+  await cdp.waitFor('repeat all', `document.querySelector('#repeat').dataset.repeat === 'all'`)
+  ui = await readState(cdp)
+  runner.equal('repeat label shows all', ui.repeatLabel, 'Repeat: all')
+
+  await clickSelector(cdp, '#repeat')
+  await cdp.waitFor('repeat one', `document.querySelector('#repeat').dataset.repeat === 'one'`)
+  ui = await readState(cdp)
+  runner.equal('repeat label shows one', ui.repeatLabel, 'Repeat: one')
+  runner.check('repeat one shows its badge', ui.repeatBadgeVisible)
+
+  await clickSelector(cdp, '#repeat')
+  await cdp.waitFor('repeat off again', `document.querySelector('#repeat').dataset.repeat === 'off'`)
+  await clickSelector(cdp, '#shuffle')
+  await cdp.waitFor('shuffle off again', `document.querySelector('#shuffle').getAttribute('aria-pressed') === 'false'`)
+  ui = await readState(cdp)
+  runner.equal('repeat returns to off', ui.repeatLabel, 'Repeat: off')
+  runner.equal('shuffle returns to off', ui.shuffleLabel, 'Shuffle: off')
 
   runner.step('open Now Playing and read line-timed lyrics')
   const openedNowPlaying = await clickSelector(cdp, '#now-playing')

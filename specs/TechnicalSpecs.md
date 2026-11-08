@@ -7,7 +7,7 @@
 **Purpose:** entry point for every contributor and agent. Load this file first, then only the spec
 files relevant to the task.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0 (`src/`, `tests/`, `package.json`).
+**Last verified:** 2026-11-08 against LyriX 0.1.0 (`src/`, `tests/`, `package.json`).
 
 ## Summary
 

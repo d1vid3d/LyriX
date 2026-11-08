@@ -6,7 +6,8 @@ handling, section choice, and the stateless view renderers.
 **Owning source paths:** `src/renderer/src/main.ts`, `src/renderer/src/dom.ts`,
 `src/renderer/src/routeStack.ts`, `src/renderer/src/navigation.ts`,
 `src/renderer/src/toolbar.ts`, `src/renderer/src/libraryController.ts`,
-`src/renderer/src/screen.ts`, `src/renderer/src/views/`, `src/renderer/src/format.ts`.
+`src/renderer/src/screen.ts`, `src/renderer/src/views/`, `src/renderer/src/format.ts`,
+`src/renderer/library/artistTracks.ts`.
 
 **Last verified:** 2026-11-06 against LyriX 0.1.0.
 
@@ -24,8 +25,10 @@ handling, section choice, and the stateless view renderers.
   the tracks `TracksList`.
 - Constructs every controller with explicit dependency interfaces and wires cross-controller calls
   through callbacks.
-- Subscribes to engine, library, and lyric events, starts `library.initialize()`, and cleans up on
-  `beforeunload`.
+- Subscribes to engine, library, lyric, and queue events, starts `library.initialize()`, and cleans
+  up on `beforeunload`.
+- `applySettings` restores volume, shuffle/repeat, view/sort, lyric preference, and translation
+  settings without writing them back to disk.
 
 It owns no routing, playback, search, or rendering state; those live in the controllers below.
 
@@ -80,7 +83,7 @@ Owns `albums`, `libraryIndex`, `folderName`, and `libraryEventReceived`.
   status/controls.
 - `openFolder` / `rescanLibrary` drive the scan buttons and progress label.
 - `initialize` loads settings first, then `getState`; a `library:updated` event that arrives first
-  wins.
+  wins. Loaded settings are applied through the composition root's `applySettings`.
 - `start()` subscribes to scan progress and library updates and returns one disposer.
 - `emptyMessage`, `updateStatus`, and `findAlbumForTrack` keep view text and cover lookup out of the
   renderers.
@@ -112,8 +115,11 @@ Each renderer takes data plus callbacks and owns no global state:
 | `views/albumGrid.ts` | Albums grid plus empty state. |
 | `views/artistList.ts` | Artist rows with album/track counts plus empty state. |
 | `views/tracksList.ts` | Virtualized tracks list; owns the visible track list used for queueing. |
-| `views/albumDetail.ts` | Album header, cover/year, and ordered track list. |
-| `views/artistDetail.ts` | Artist header and album grid. |
+| `views/albumDetail.ts` | Album header with Play/Shuffle, cover/year, and ordered track list. |
+| `views/artistDetail.ts` | Artist header with Play/Shuffle, counts, and album grid. |
+
+`src/renderer/library/artistTracks.ts` holds the pure `getArtistTracks(artist)` helper used for
+artist Play/Shuffle ordering (album year → title, then disc → track → title).
 
 `src/renderer/src/format.ts` holds the shared `formatTime`, `smallCoverUrl`, `createCover`, and
 `setCoverImage` DOM helpers.

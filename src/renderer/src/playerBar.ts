@@ -1,4 +1,5 @@
 import type { Album, Track } from '../../shared/types'
+import type { QueueSnapshot, RepeatMode } from '../player/queue'
 import type { AppElements } from './dom'
 import { formatTime, setCoverImage, smallCoverUrl } from './format'
 
@@ -6,8 +7,16 @@ export interface PlayerBarDeps {
   elements: AppElements
   getCurrentTrack(): Track | null
   getAlbumForTrack(track: Track): Album | null
-  hasNext(): boolean
+  getQueueSnapshot(): QueueSnapshot
+  canGoNext(): boolean
+  canGoPrevious(): boolean
   isPlaying(): boolean
+  toggleShuffle(): void
+  cycleRepeat(): void
+}
+
+function repeatLabel(repeat: RepeatMode): string {
+  return `Repeat: ${repeat}`
 }
 
 /** Bottom player bar: now-playing text/cover, transport enabled states, and time labels. */
@@ -16,20 +25,34 @@ export class PlayerBar {
 
   constructor(deps: PlayerBarDeps) {
     this.deps = deps
+    deps.elements.shuffleButton.addEventListener('click', () => this.deps.toggleShuffle())
+    deps.elements.repeatButton.addEventListener('click', () => this.deps.cycleRepeat())
   }
 
   updateControls(): void {
     const { elements } = this.deps
     const hasCurrent = this.deps.getCurrentTrack() !== null
     const playing = this.deps.isPlaying()
+    const snapshot = this.deps.getQueueSnapshot()
 
     const playLabel = playing ? 'Pause' : 'Play'
     elements.playPauseButton.dataset.playing = String(playing)
     elements.playPauseButton.setAttribute('aria-label', playLabel)
     elements.playPauseButton.title = playLabel
     elements.playPauseButton.disabled = !hasCurrent
-    elements.previousButton.disabled = !hasCurrent
-    elements.nextButton.disabled = !this.deps.hasNext()
+    elements.previousButton.disabled = !this.deps.canGoPrevious()
+    elements.nextButton.disabled = !this.deps.canGoNext()
+
+    const shuffleLabel = `Shuffle: ${snapshot.shuffle ? 'on' : 'off'}`
+    elements.shuffleButton.setAttribute('aria-pressed', String(snapshot.shuffle))
+    elements.shuffleButton.setAttribute('aria-label', shuffleLabel)
+    elements.shuffleButton.title = shuffleLabel
+
+    const repeatStateLabel = repeatLabel(snapshot.repeat)
+    elements.repeatButton.setAttribute('aria-pressed', String(snapshot.repeat !== 'off'))
+    elements.repeatButton.setAttribute('aria-label', repeatStateLabel)
+    elements.repeatButton.title = repeatStateLabel
+    elements.repeatButton.dataset.repeat = snapshot.repeat
   }
 
   updateDuration(duration: number): void {

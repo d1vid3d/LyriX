@@ -64,7 +64,9 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/renderer/library/query.ts` | Pure library index, view/sort registry, normalized search and filtering (no DOM). |
 | `src/renderer/ui/virtualList.ts` | Fixed-row virtual scroller used by the tracks view. |
 | `src/renderer/player/engine.ts` | `PlaybackEngine` interface and the single-`HTMLAudioElement` implementation. |
-| `src/renderer/player/queue.ts` | Pure album queue with a current index and bounded next/previous. |
+| `src/renderer/player/queue/` | Editable playback queue with contexts, shuffle, repeat, play-next/add/remove/move and history-preserving snapshots (no DOM). |
+| `src/renderer/player/transportDecisions.ts` | Pure ended/previous/failure/repeat-mode decisions. |
+| `src/renderer/library/artistTracks.ts` | Pure artist playback ordering (album year → title, then disc → track → title). |
 | `src/renderer/lyrics/lyricsController.ts` | On-demand lyric source fetch/parse/selection, translation-layer state, stale-response guard and LRU source cache (no DOM). |
 | `src/renderer/lyrics/translationState.ts` | Pure translation eligibility, alignment reports and document attachment (no DOM). |
 | `src/renderer/lyrics/translationMenuModel.ts` | Pure translation menu section and quick-toggle view model: status, switch, Auto row, badges, hints. |
@@ -255,17 +257,21 @@ it. Requests are served by `protocol.handle` in `src/main/media-protocol.ts`, wh
 - serves covers only from the generated cover cache.
 
 The bottom bar shows the current track, artist and a small cover. Clicking a track in an album queues
-the whole album in disc/track order; clicking one in the tracks view queues the visible list.
-Playback advances automatically when a track ends and stops at the end of the last track.
+the whole album in disc/track order; clicking one in the tracks view queues the visible list. Album
+and artist headers expose **Play** and **Shuffle**. The bar also has **Shuffle** and a **Repeat**
+button that cycles off → all → one (with a "1" badge).
+Playback advances automatically when a track ends; repeat-one replays the track, repeat-all wraps the
+queue, and otherwise playback stops at the end of the last track.
 **Previous** restarts the current track when it is more than three seconds in, otherwise it moves back
 one track. If a file cannot be played, the player logs it and skips forward until it finds a playable
-track. The last folder, volume, view, per-view sort, lyric preference and translation toggle/language
-are stored in `userData/settings.json` and restored on the next launch.
+track (stopping after one failure per queue entry). The last folder, volume, view, per-view sort,
+shuffle, repeat, lyric preference and translation toggle/language are stored in `userData/settings.json`
+and restored on the next launch.
 
 ## Out of scope (for now)
 
-Shuffle, repeat modes, gapless playback, crossfade, a visible queue panel, queue editing, fuzzy
-search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
+Gapless playback, crossfade, a visible queue panel, queue-editing UI, queue-contents persistence,
+fuzzy search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
 virtualization, online lyric or translation lookup, singer-specific lyric styling, translation
 editing, swapping original/translation, side-by-side translation layout, word-level translation
 timing, per-language fonts, TTML, tag editing and packaging are intentionally not implemented.

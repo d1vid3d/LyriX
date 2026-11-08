@@ -1,6 +1,14 @@
-import type { Album, Track } from '../../shared/types'
+import type { Album, PlaybackSettingsInput, Track } from '../../shared/types'
+import { getArtistTracks } from '../library/artistTracks'
+import type { ArtistItem } from '../library/query'
 import type { PlaybackEngine } from '../player/engine'
-import type { PlaybackQueue } from '../player/queue'
+import type { PlaybackQueue, QueueContext, QueueEntry } from '../player/queue'
+import {
+  decideEndedAction,
+  decideFailureAction,
+  decidePreviousAction,
+  nextRepeatMode
+} from '../player/transportDecisions'
 import type { AppElements } from './dom'
 import { formatTime } from './format'
 
@@ -10,9 +18,11 @@ export interface TransportDeps {
   queue: PlaybackQueue
   getAlbums(): readonly Album[]
   getVisibleTracks(): readonly Track[]
+  getSearchText(): string
   setLyricsTrack(trackId: string | null): void
   setStatus(text: string): void
   saveVolume(volume: number): void
+  savePlaybackSettings(settings: PlaybackSettingsInput): void
   updateControls(): void
   updateNowPlaying(): void
   updateTrackHighlight(): void
@@ -25,11 +35,25 @@ interface PlaybackAttempt {
   failed: boolean
 }
 
+function albumContext(album: Album): QueueContext {
+  return { kind: 'album', label: album.title }
+}
+
+function artistContext(artist: ArtistItem): QueueContext {
+  return { kind: 'artist', label: artist.name }
+}
+
+function randomStartIndex(length: number): number {
+  if (length <= 0) return 0
+  return Math.min(length - 1, Math.max(0, Math.floor(Math.random() * length)))
+}
+
 /** Owns the queue, the playback engine, transport controls, seeking, and volume. */
 export class TransportController {
   private readonly deps: TransportDeps
   private isSeeking = false
   private activeAttempt: PlaybackAttempt | null = null
+  private consecutiveFailures = 0
 
   constructor(deps: TransportDeps) {
     this.deps = deps
@@ -37,15 +61,20 @@ export class TransportController {
   }
 
   getCurrentTrack(): Track | null {
-    return this.deps.queue.current()
+    return this.deps.queue.getSnapshot().current?.track ?? null
   }
 
-  playQueue(tracks: readonly Track[], index: number): void {
+  playQueue(
+    tracks: readonly Track[],
+    index: number,
+    context: QueueContext | null = null
+  ): void {
     const track = tracks[index]
     if (!track) return
 
-    const wasCurrent = this.deps.queue.current()?.id === track.id
-    this.deps.queue.setQueue(tracks, index)
+    const wasCurrent = this.deps.queue.getSnapshot().current?.track.id === track.id
+    this.consecutiveFailures = 0
+    this.deps.queue.setQueue(tracks, index, { context })
 
     if (wasCurrent) {
       this.deps.updateTrackHighlight()
@@ -60,15 +89,55 @@ export class TransportController {
   playAlbumTrack(album: Album, track: Track): void {
     const index = album.tracks.findIndex((item) => item.id === track.id)
     if (index < 0) return
-    this.playQueue(album.tracks, index)
+    this.playQueue(album.tracks, index, albumContext(album))
+  }
+
+  playAlbum(album: Album): void {
+    this.playQueue(album.tracks, 0, albumContext(album))
+  }
+
+  shuffleAlbum(album: Album): void {
+    if (album.tracks.length === 0) return
+    this.deps.queue.setShuffle(true)
+    this.playQueue(album.tracks, randomStartIndex(album.tracks.length), albumContext(album))
+  }
+
+  playArtist(artist: ArtistItem): void {
+    this.playQueue(getArtistTracks(artist), 0, artistContext(artist))
+  }
+
+  shuffleArtist(artist: ArtistItem): void {
+    const tracks = getArtistTracks(artist)
+    if (tracks.length === 0) return
+    this.deps.queue.setShuffle(true)
+    this.playQueue(tracks, randomStartIndex(tracks.length), artistContext(artist))
   }
 
   playVisibleTrack(index: number): void {
-    this.playQueue(this.deps.getVisibleTracks(), index)
+    const search = this.deps.getSearchText()
+    const context: QueueContext =
+      search.trim() === ''
+        ? { kind: 'tracks', label: 'Tracks' }
+        : { kind: 'search', label: search }
+    this.playQueue(this.deps.getVisibleTracks(), index, context)
+  }
+
+  toggleShuffle(): void {
+    const snapshot = this.deps.queue.getSnapshot()
+    const shuffle = !snapshot.shuffle
+    this.deps.queue.setShuffle(shuffle)
+    this.deps.savePlaybackSettings({ shuffle, repeat: snapshot.repeat })
+  }
+
+  cycleRepeat(): void {
+    const snapshot = this.deps.queue.getSnapshot()
+    const repeat = nextRepeatMode(snapshot.repeat)
+    this.deps.queue.setRepeat(repeat)
+    this.deps.savePlaybackSettings({ shuffle: snapshot.shuffle, repeat })
   }
 
   startCurrentTrack(autoplay: boolean): void {
-    const track = this.deps.queue.current()
+    const track = this.deps.queue.getSnapshot().current?.track ?? null
     if (!track) {
       this.resetPlayback()
       return
@@ -93,7 +162,8 @@ export class TransportController {
 
   resetPlayback(): void {
     this.activeAttempt = null
-    this.deps.queue.setQueue([])
+    this.consecutiveFailures = 0
+    this.deps.queue.clear()
     this.deps.engine.pause()
     this.deps.setLyricsTrack(null)
     this.resetTimeUi()
@@ -103,22 +173,11 @@ export class TransportController {
   }
 
   reconcileQueue(): void {
-    const current = this.deps.queue.current()
+    const current = this.deps.queue.getSnapshot().current
     if (!current) return
 
-    const refreshed: Track[] = []
-    for (const track of this.deps.queue.getTracks()) {
-      const found = this.findTrackById(track.id)
-      if (found) refreshed.push(found)
-    }
-
-    const index = refreshed.findIndex((track) => track.id === current.id)
-    if (index < 0) {
-      this.resetPlayback()
-      return
-    }
-
-    this.deps.queue.setQueue(refreshed, index)
+    const reconciled = this.deps.queue.reconcile((trackId) => this.findTrackById(trackId))
+    if (!reconciled) this.resetPlayback()
   }
 
   /** Subscribes to engine events and returns a single disposer for all of them. */
@@ -132,7 +191,10 @@ export class TransportController {
   private subscribeEngine(): Array<() => void> {
     const { engine } = this.deps
     return [
-      engine.on('play', () => this.deps.updateControls()),
+      engine.on('play', () => {
+        this.consecutiveFailures = 0
+        this.deps.updateControls()
+      }),
       engine.on('pause', () => this.deps.updateControls()),
       engine.on('ended', () => this.handleEnded()),
       engine.on('loadedmetadata', (duration) => this.deps.updateDuration(duration)),
@@ -190,45 +252,52 @@ export class TransportController {
 
   private previous(): void {
     const { engine, queue } = this.deps
-    if (!queue.current()) return
+    if (!queue.getSnapshot().current) return
 
-    if (engine.getPosition() > 3) {
-      engine.seek(0)
-      this.deps.syncTime(0)
+    const position = engine.getPosition()
+    if (Number.isFinite(position) && position > 3) {
+      this.seekCurrentToStart()
       return
     }
 
-    if (queue.hasPrevious()) {
-      queue.previous()
+    const previous = queue.previous()
+    const action = decidePreviousAction(position, previous)
+    if (action.type === 'play') {
+      this.consecutiveFailures = 0
       this.startCurrentTrack(true)
       return
     }
 
-    engine.seek(0)
+    this.seekCurrentToStart()
+  }
+
+  private seekCurrentToStart(): void {
+    this.deps.engine.seek(0)
     this.deps.syncTime(0)
   }
 
   private togglePlayPause(): void {
     const { engine, queue } = this.deps
-    if (!queue.current()) return
+    if (!queue.getSnapshot().current) return
 
     if (engine.isPlaying()) {
       engine.pause()
       return
     }
 
+    this.consecutiveFailures = 0
     this.resumeCurrentTrack()
   }
 
   private next(): void {
-    if (!this.deps.queue.hasNext()) return
-    this.deps.queue.next()
-    this.startCurrentTrack(true)
+    this.consecutiveFailures = 0
+    const entry = this.deps.queue.advance('skip')
+    if (entry) this.startCurrentTrack(true)
   }
 
   private resumeCurrentTrack(): void {
     const { engine, queue } = this.deps
-    const track = queue.current()
+    const track = queue.getSnapshot().current?.track ?? null
     if (!track) return
 
     const duration = engine.getDuration()
@@ -242,6 +311,16 @@ export class TransportController {
     void engine.play().catch((error) => this.handlePlaybackFailure(attempt, error))
   }
 
+  private restartCurrentForRepeat(): void {
+    const attempt: PlaybackAttempt = { failed: false }
+    this.activeAttempt = attempt
+    this.deps.engine.seek(0)
+    this.deps.syncTime(0)
+    void this.deps.engine
+      .play()
+      .catch((error) => this.handlePlaybackFailure(attempt, error))
+  }
+
   private handlePlaybackFailure(attempt: PlaybackAttempt, error: unknown): void {
     if (this.activeAttempt !== attempt || attempt.failed) return
 
@@ -250,14 +329,23 @@ export class TransportController {
 
     attempt.failed = true
 
-    const track = this.deps.queue.current()
+    const snapshot = this.deps.queue.getSnapshot()
+    const track = snapshot.current?.track ?? null
     console.error(`[renderer] Could not play ${track?.title ?? 'track'}`, error)
     this.deps.setStatus(track ? `Could not play ${track.title}.` : 'Could not play this file.')
 
-    if (this.deps.queue.hasNext()) {
-      this.deps.queue.next()
-      this.startCurrentTrack(true)
-      return
+    const decision = decideFailureAction(
+      snapshot.entries.length,
+      this.consecutiveFailures
+    )
+    this.consecutiveFailures = decision.failures
+
+    if (decision.action === 'skip') {
+      const entry = this.deps.queue.advance('skip')
+      if (entry) {
+        this.startCurrentTrack(true)
+        return
+      }
     }
 
     this.deps.engine.pause()
@@ -265,9 +353,17 @@ export class TransportController {
   }
 
   private handleEnded(): void {
-    if (this.deps.queue.hasNext()) {
-      this.deps.queue.next()
+    const snapshot = this.deps.queue.getSnapshot()
+    const next = this.deps.queue.advance('ended')
+    const action = decideEndedAction(snapshot.current, next)
+
+    if (action.type === 'play') {
       this.startCurrentTrack(true)
+      return
+    }
+
+    if (action.type === 'restart') {
+      this.restartCurrentForRepeat()
       return
     }
 

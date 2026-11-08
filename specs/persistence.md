@@ -18,7 +18,7 @@ All paths are under Electron `userData`.
 
 | Path | Contents | Write strategy |
 | --- | --- | --- |
-| `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`, `lyricPreference`, `translationEnabled`, `translationLanguage`. | Normalized, atomic. |
+| `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`, `lyricPreference`, `translationEnabled`, `translationLanguage`, `shuffle`, `repeat`. | Normalized, atomic. |
 | `library-cache.json` | Version, folder, per-path tag entries with `mtimeMs`/`size`. | Validated, atomic. |
 | `lyric-choices.json` | Version 1 plus `tracks` and optional `translations`: `Record<trackId, sourceId>`. | Validated, atomic, capped at 5000 entries per map. |
 | `covers/<albumId>.jpg` | Full cover JPEG. Dimensions and quality are owned by [main/covers-and-media.md](main/covers-and-media.md). | Atomic. |
@@ -51,6 +51,8 @@ Defaults:
 - `lyricPreference: 'sidecar'`
 - `translationEnabled: false`
 - `translationLanguage: null`
+- `shuffle: false`
+- `repeat: 'off'`
 
 Normalization rules:
 
@@ -58,8 +60,10 @@ Normalization rules:
 - `normalizeUiState` keeps only string view names and non-empty string sort values.
 - `normalizeTranslationLanguage` accepts only `/^[A-Za-z0-9_-]{1,32}$/`; anything else becomes `null`.
 - `translationEnabled` is true only for the boolean `true`.
+- `normalizeShuffle` returns true only for the boolean `true`.
+- `normalizeRepeat` accepts only `"all"` or `"one"`; anything else becomes `"off"`.
 - `normalize` validates the folder string, clamps volume, merges normalized UI state, validates the
-  lyric preference, and normalizes both translation fields.
+  lyric preference, normalizes both translation fields, and normalizes shuffle/repeat.
 - Reads use `readJsonFile`; writes use `writeJsonAtomic` with normalization.
 
 Unknown view and sort keys currently pass through main-side normalization and are validated by the

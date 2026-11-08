@@ -62,6 +62,12 @@
             <h1 id="detail-title"></h1>
             <p id="detail-artist" class="muted"></p>
             <p id="detail-year" class="muted"></p>
+            <div class="detail-actions">
+              <button id="album-play" class="action-primary" type="button" aria-label="Play album">
+                Play
+              </button>
+              <button id="album-shuffle" type="button" aria-label="Shuffle album">Shuffle</button>
+            </div>
           </div>
         </div>
 
@@ -74,6 +80,12 @@
         <div class="artist-header">
           <h1 id="artist-name"></h1>
           <p id="artist-meta" class="muted"></p>
+          <div class="artist-actions">
+            <button id="artist-play" class="action-primary" type="button" aria-label="Play artist">
+              Play
+            </button>
+            <button id="artist-shuffle" type="button" aria-label="Shuffle artist">Shuffle</button>
+          </div>
         </div>
 
         <div id="artist-album-grid" class="album-grid artist-album-grid"></div>
@@ -131,6 +143,20 @@
 
       <div class="controls">
         <button
+          id="shuffle"
+          class="control-button"
+          type="button"
+          aria-pressed="false"
+          aria-label="Shuffle: off"
+          title="Shuffle: off"
+        >
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"
+            />
+          </svg>
+        </button>
+        <button
           id="previous"
           class="control-button"
           type="button"
@@ -168,6 +194,20 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
           </svg>
+        </button>
+        <button
+          id="repeat"
+          class="control-button repeat-button"
+          type="button"
+          data-repeat="off"
+          aria-pressed="false"
+          aria-label="Repeat: off"
+          title="Repeat: off"
+        >
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+          </svg>
+          <span class="repeat-one-badge" aria-hidden="true">1</span>
         </button>
         <span id="current-time" class="time">0:00</span>
         <input

@@ -26,12 +26,16 @@ function buttonStateScript() {
       const icons = [...button.querySelectorAll('svg.icon')]
       const visible = icons.filter((icon) => getComputedStyle(icon).display !== 'none')
       const style = getComputedStyle(button)
+      const badge = button.querySelector('.repeat-one-badge')
       return {
         text: (button.textContent ?? '').trim(),
         disabled: button.disabled,
         label: button.getAttribute('aria-label'),
         title: button.getAttribute('title'),
         playing: button.dataset.playing ?? '',
+        pressed: button.getAttribute('aria-pressed') ?? '',
+        repeat: button.dataset.repeat ?? '',
+        badgeVisible: badge ? getComputedStyle(badge).display !== 'none' : false,
         iconCount: icons.length,
         visibleIconCount: visible.length,
         width: Math.round(rect.width),
@@ -41,9 +45,11 @@ function buttonStateScript() {
       }
     }
     return {
+      shuffle: read('shuffle'),
       previous: read('previous'),
       playPause: read('play-pause'),
-      next: read('next')
+      next: read('next'),
+      repeat: read('repeat')
     }
   })()`
 }
@@ -232,6 +238,20 @@ async function playerButtons(runner, tempRoot) {
     )
     runner.check('play button uses accent background', idle.playPause.background === 'rgb(110, 168, 254)', idle.playPause.background)
     runner.check('previous/next disabled with no current track', idle.previous.disabled && idle.next.disabled)
+    runner.check(
+      'shuffle and repeat start off with no badge',
+      idle.shuffle.pressed === 'false' &&
+        idle.shuffle.label === 'Shuffle: off' &&
+        idle.shuffle.visibleIconCount === 1 &&
+        idle.shuffle.width === 36 &&
+        idle.repeat.pressed === 'false' &&
+        idle.repeat.repeat === 'off' &&
+        idle.repeat.label === 'Repeat: off' &&
+        idle.repeat.visibleIconCount === 1 &&
+        idle.repeat.width === 36 &&
+        !idle.repeat.badgeVisible,
+      JSON.stringify({ shuffle: idle.shuffle, repeat: idle.repeat })
+    )
 
     // Filter to the 8 s word track so playback cannot end mid-assertion.
     await setSearch(cdp, 'Word Test')
@@ -249,6 +269,31 @@ async function playerButtons(runner, tempRoot) {
       return { x: box.x, y: box.y, width: box.width, height: box.height }
     })()`)
     await cdp.screenshot(join(tempRoot, 'player-bar.png'), { clip: rect })
+
+    // Toggle shuffle on and cycle repeat to "one" to capture the active accent state.
+    await clickSelector(cdp, '#shuffle')
+    await cdp.waitFor('shuffle pressed', `document.querySelector('#shuffle')?.getAttribute('aria-pressed') === 'true'`)
+    await clickSelector(cdp, '#repeat')
+    await cdp.waitFor('repeat all', `document.querySelector('#repeat')?.dataset.repeat === 'all'`)
+    await clickSelector(cdp, '#repeat')
+    await cdp.waitFor('repeat one', `document.querySelector('#repeat')?.dataset.repeat === 'one'`)
+
+    const activeControls = await cdp.evaluate(buttonStateScript())
+    runner.check(
+      'shuffle active state uses accent color',
+      activeControls.shuffle.pressed === 'true' &&
+        activeControls.shuffle.label === 'Shuffle: on' &&
+        activeControls.shuffle.color === 'rgb(110, 168, 254)',
+      JSON.stringify(activeControls.shuffle)
+    )
+    runner.check(
+      'repeat one shows badge and accent color',
+      activeControls.repeat.pressed === 'true' &&
+        activeControls.repeat.label === 'Repeat: one' &&
+        activeControls.repeat.badgeVisible &&
+        activeControls.repeat.color === 'rgb(110, 168, 254)',
+      JSON.stringify(activeControls.repeat)
+    )
 
     runner.check('no renderer exceptions', cdp.exceptions.length === 0, cdp.exceptions.join(' | '))
     runner.check('no console errors', cdp.consoleErrors.length === 0, cdp.consoleErrors.join(' | '))

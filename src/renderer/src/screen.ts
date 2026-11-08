@@ -1,6 +1,6 @@
 import type { Album, Track } from '../../shared/types'
 import { queryLibrary } from '../library/query'
-import type { LibraryIndex, LibraryView } from '../library/query'
+import type { ArtistItem, LibraryIndex, LibraryView } from '../library/query'
 import type { AppElements } from './dom'
 import type { DetailRoute } from './routeStack'
 import { renderAlbumDetail } from './views/albumDetail'
@@ -33,6 +33,10 @@ export interface ScreenDeps {
   onOpenArtist(artistName: string): void
   onPlayTrack(index: number): void
   onPlayAlbumTrack(album: Album, track: Track): void
+  onPlayAlbum(album: Album): void
+  onShuffleAlbum(album: Album): void
+  onPlayArtist(artist: ArtistItem): void
+  onShuffleArtist(artist: ArtistItem): void
   syncViewControls(): void
 }
 
@@ -138,10 +142,14 @@ export class ScreenController {
         title: this.deps.elements.detailTitle,
         artist: this.deps.elements.detailArtist,
         year: this.deps.elements.detailYear,
+        playButton: this.deps.elements.albumPlayButton,
+        shuffleButton: this.deps.elements.albumShuffleButton,
         trackList: this.deps.elements.trackList,
         backLabel: () => this.deps.navigation.backLabel(),
         getCurrentTrackId: () => this.deps.getCurrentTrackId(),
-        onPlayTrack: (albumItem, track) => this.deps.onPlayAlbumTrack(albumItem, track)
+        onPlayTrack: (albumItem, track) => this.deps.onPlayAlbumTrack(albumItem, track),
+        onPlayAlbum: (albumItem) => this.deps.onPlayAlbum(albumItem),
+        onShuffleAlbum: (albumItem) => this.deps.onShuffleAlbum(albumItem)
       },
       album
     )
@@ -162,8 +170,12 @@ export class ScreenController {
         backButton: this.deps.elements.artistBackButton,
         name: this.deps.elements.artistNameLabel,
         meta: this.deps.elements.artistMetaLabel,
+        playButton: this.deps.elements.artistPlayButton,
+        shuffleButton: this.deps.elements.artistShuffleButton,
         albumGrid: this.deps.elements.artistAlbumGrid,
-        onOpenAlbum: (albumId) => this.deps.onOpenAlbum(albumId)
+        onOpenAlbum: (albumId) => this.deps.onOpenAlbum(albumId),
+        onPlayArtist: (artistItem) => this.deps.onPlayArtist(artistItem),
+        onShuffleArtist: (artistItem) => this.deps.onShuffleArtist(artistItem)
       },
       artist
     )

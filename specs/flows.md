@@ -17,7 +17,8 @@ that owns the detailed contract.
 2. Main loads settings and the library cache, then restores the cached snapshot for the last folder.
 3. Main installs the media handler, IPC, and creates the window.
 4. Preload exposes `window.library`.
-5. Renderer subscribes to library events, loads settings, applies view/sort, then calls `getState`.
+5. Renderer subscribes to library events, loads settings, applies view/sort plus persisted
+   shuffle/repeat, then calls `getState`.
 6. `getState` triggers a one-time background refresh; the cached library is already visible.
 7. When the refresh finishes, `library:updated` replaces the snapshot and the UI re-renders.
 
@@ -41,11 +42,15 @@ Details: [main/library-scanning.md](main/library-scanning.md),
 
 ## Track start and playback
 
-1. Clicking a track queues either the album or the visible track list and sets the index.
+1. Clicking a track queues either the album or the visible track list and sets the index; the queue
+   records an album, artist, tracks, or search context. Album/artist headers can also Play or Shuffle
+   the whole collection.
 2. `startCurrentTrack` loads the URL, calls `lyricsController.setTrack(track.id)`, resets time UI,
    updates Now Playing/highlight, and starts playback.
-3. Engine events update controls, time labels, duration, and advance on `ended`.
-4. A failed `play()` or media error skips to the next track; `AbortError` is ignored.
+3. Engine events update controls, time labels, and duration. On `ended`, repeat-one restarts the
+   current track, repeat-all wraps, and otherwise playback advances or stops.
+4. A failed `play()` or media error skips to the next track until one failure per queue entry has
+   been reached; `AbortError` is ignored.
 5. If the library refresh removes the current track, `reconcileQueue` resets playback.
 
 Details: [renderer/playback.md](renderer/playback.md).

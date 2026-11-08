@@ -19,7 +19,9 @@ export function createAppStore(): AppStore {
       sortByView: {},
       lyricPreference: 'sidecar',
       translationEnabled: false,
-      translationLanguage: null
+      translationLanguage: null,
+      shuffle: false,
+      repeat: 'off'
     },
     cache: emptyLibraryCache(),
     settingsFile: '',

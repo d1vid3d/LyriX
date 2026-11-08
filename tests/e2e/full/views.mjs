@@ -101,6 +101,24 @@ export async function run(ctx) {
   runner.equal('artist detail name', ui.artistName, 'Album Artist A')
   runner.equal('artist detail counts', ui.artistMeta, '1 album · 2 tracks')
   runner.equal('artist detail albums', ui.artistAlbums, ['Shared Album'])
+  const artistActions = await cdp.evaluate(`(() => {
+    const play = document.querySelector('#artist-play')
+    const shuffle = document.querySelector('#artist-shuffle')
+    return {
+      playText: play?.textContent.trim() ?? '',
+      playLabel: play?.getAttribute('aria-label') ?? '',
+      shuffleText: shuffle?.textContent.trim() ?? '',
+      shuffleLabel: shuffle?.getAttribute('aria-label') ?? ''
+    }
+  })()`)
+  runner.check(
+    'artist header exposes Play and Shuffle',
+    artistActions.playText === 'Play' &&
+      artistActions.playLabel === 'Play artist' &&
+      artistActions.shuffleText === 'Shuffle' &&
+      artistActions.shuffleLabel === 'Shuffle artist',
+    JSON.stringify(artistActions)
+  )
 
   runner.check('artist detail album clicked', await clickArtistAlbum(cdp, 'Shared Album'))
   await cdp.waitFor('album detail from artist', `document.querySelector('#detail-view').hidden === false`)

@@ -2,8 +2,14 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clampVolume, loadSettings, saveSettings } from '../src/main/settings'
-import type { Settings } from '../src/shared/types'
+import {
+  clampVolume,
+  loadSettings,
+  normalizeRepeat,
+  normalizeShuffle,
+  saveSettings
+} from '../src/main/settings'
+import type { RepeatMode, Settings } from '../src/shared/types'
 
 const DEFAULTS: Settings = {
   lastFolder: null,
@@ -12,7 +18,9 @@ const DEFAULTS: Settings = {
   sortByView: {},
   lyricPreference: 'sidecar',
   translationEnabled: false,
-  translationLanguage: null
+  translationLanguage: null,
+  shuffle: false,
+  repeat: 'off'
 }
 
 let directory = ''
@@ -77,8 +85,35 @@ describe('loadSettings', () => {
       sortByView: { tracks: 'title' },
       lyricPreference: 'sidecar',
       translationEnabled: false,
-      translationLanguage: null
+      translationLanguage: null,
+      shuffle: false,
+      repeat: 'off'
     })
+  })
+
+  it.each([
+    [true, true],
+    [false, false],
+    ['true', false],
+    [1, false],
+    [null, false]
+  ] as Array<[unknown, boolean]>)('normalizes shuffle %j to %j', async (shuffle, expected) => {
+    await writeJson({ shuffle })
+
+    expect((await loadSettings(settingsPath())).shuffle).toBe(expected)
+  })
+
+  it.each([
+    ['off', 'off'],
+    ['all', 'all'],
+    ['one', 'one'],
+    ['bogus', 'off'],
+    [null, 'off'],
+    [2, 'off']
+  ] as Array<[unknown, RepeatMode]>)('normalizes repeat %j to %j', async (repeat, expected) => {
+    await writeJson({ repeat })
+
+    expect((await loadSettings(settingsPath())).repeat).toBe(expected)
   })
 
   it.each([
@@ -195,8 +230,26 @@ describe('saveSettings', () => {
       sortByView: { artists: 'name' },
       lyricPreference: 'sidecar',
       translationEnabled: false,
-      translationLanguage: null
+      translationLanguage: null,
+      shuffle: false,
+      repeat: 'off'
     })
+  })
+
+  it('persists valid playback settings', async () => {
+    await saveSettings(settingsPath(), { ...DEFAULTS, shuffle: true, repeat: 'one' })
+
+    const raw = JSON.parse(await readFile(settingsPath(), 'utf8'))
+    expect(raw.shuffle).toBe(true)
+    expect(raw.repeat).toBe('one')
+  })
+
+  it('normalizes playback setting helpers', () => {
+    expect(normalizeShuffle(true)).toBe(true)
+    expect(normalizeShuffle('true')).toBe(false)
+    expect(normalizeRepeat('all')).toBe('all')
+    expect(normalizeRepeat('one')).toBe('one')
+    expect(normalizeRepeat('bogus')).toBe('off')
   })
 
   it('persists a valid lyric preference', async () => {

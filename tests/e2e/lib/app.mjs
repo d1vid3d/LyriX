@@ -35,6 +35,8 @@ export async function seedSettings(userDataDir, settings = {}) {
     lyricPreference: 'sidecar',
     translationEnabled: false,
     translationLanguage: null,
+    shuffle: false,
+    repeat: 'off',
     ...settings
   }
   await fs.writeFile(join(userDataDir, 'settings.json'), JSON.stringify(full, null, 2), 'utf8')

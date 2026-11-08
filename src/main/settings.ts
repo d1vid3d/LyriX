@@ -1,4 +1,4 @@
-import type { Settings, UiState } from '../shared/types'
+import type { RepeatMode, Settings, UiState } from '../shared/types'
 import type { LyricPreference } from '../shared/lyrics/sources'
 import { readJsonFile, writeJsonAtomic } from './json-file'
 
@@ -9,7 +9,9 @@ const DEFAULT_SETTINGS: Settings = {
   sortByView: {},
   lyricPreference: 'sidecar',
   translationEnabled: false,
-  translationLanguage: null
+  translationLanguage: null,
+  shuffle: false,
+  repeat: 'off'
 }
 
 const TRANSLATION_LANGUAGE_PATTERN = /^[A-Za-z0-9_-]{1,32}$/
@@ -21,6 +23,14 @@ export function normalizeLyricPreference(value: unknown): LyricPreference {
 /** Only short ASCII language tags such as "en", "en-US", or "zh_Hans" are accepted. */
 export function normalizeTranslationLanguage(value: unknown): string | null {
   return typeof value === 'string' && TRANSLATION_LANGUAGE_PATTERN.test(value) ? value : null
+}
+
+export function normalizeShuffle(value: unknown): boolean {
+  return value === true
+}
+
+export function normalizeRepeat(value: unknown): RepeatMode {
+  return value === 'all' || value === 'one' ? value : 'off'
 }
 
 export function clampVolume(volume: number): number {
@@ -62,7 +72,9 @@ function normalize(value: Partial<Settings> | null): Settings {
     ...normalizeUiState(value),
     lyricPreference: normalizeLyricPreference(value?.lyricPreference),
     translationEnabled: value?.translationEnabled === true,
-    translationLanguage: normalizeTranslationLanguage(value?.translationLanguage)
+    translationLanguage: normalizeTranslationLanguage(value?.translationLanguage),
+    shuffle: normalizeShuffle(value?.shuffle),
+    repeat: normalizeRepeat(value?.repeat)
   }
 }
 

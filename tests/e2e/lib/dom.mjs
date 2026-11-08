@@ -35,6 +35,13 @@ export const LIBRARY_STATE_EXPRESSION = `(() => {
     playing: button?.dataset.playing ?? '',
     previousDisabled: document.querySelector('#previous')?.disabled ?? true,
     nextDisabled: document.querySelector('#next')?.disabled ?? true,
+    shufflePressed: document.querySelector('#shuffle')?.getAttribute('aria-pressed') ?? '',
+    shuffleLabel: document.querySelector('#shuffle')?.getAttribute('aria-label') ?? '',
+    repeatPressed: document.querySelector('#repeat')?.getAttribute('aria-pressed') ?? '',
+    repeatLabel: document.querySelector('#repeat')?.getAttribute('aria-label') ?? '',
+    repeatMode: document.querySelector('#repeat')?.dataset.repeat ?? '',
+    repeatBadgeVisible:
+      getComputedStyle(document.querySelector('.repeat-one-badge')).display !== 'none',
     volume: Number(document.querySelector('#volume')?.value),
     audioVolume: document.querySelector('#audio')?.volume,
     audioPaused: document.querySelector('#audio')?.paused,

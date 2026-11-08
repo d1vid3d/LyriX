@@ -7,16 +7,22 @@ export interface AlbumDetailOptions {
   title: HTMLElement
   artist: HTMLElement
   year: HTMLElement
+  playButton: HTMLButtonElement
+  shuffleButton: HTMLButtonElement
   trackList: HTMLElement
   backLabel(): string
   getCurrentTrackId(): string | null
   onPlayTrack(album: Album, track: Track): void
+  onPlayAlbum(album: Album): void
+  onShuffleAlbum(album: Album): void
 }
 
 export function renderAlbumDetail(options: AlbumDetailOptions, album: Album): void {
   options.backButton.textContent = options.backLabel()
   options.title.textContent = album.title
   options.artist.textContent = album.artist
+  options.playButton.onclick = () => options.onPlayAlbum(album)
+  options.shuffleButton.onclick = () => options.onShuffleAlbum(album)
 
   if (album.year === null) {
     options.year.hidden = true

@@ -27,12 +27,14 @@ of every module. Exact imports and call graphs belong to graphify, not to this f
 - Extract embedded or folder cover art, resize it, and cache JPEGs.
 - Browse **Albums**, **Artists**, and **Tracks** views with search and per-view sorting.
 - Play tracks through a `media://` protocol with byte-range seeking.
-- Queue an album (album detail) or the visible filtered list (tracks view).
+- Queue an album, an artist, or the visible filtered list (tracks view) with a queue context.
+- Control playback with shuffle and off/all/one repeat, including an editable queue model
+  (play-next, add, remove, move, jump, clear) without a queue UI.
 - Load embedded lyrics on demand and display them in a **Now Playing** view.
 - Render line-timed LRC, word-timed enhanced LRC, and plain untimed lyrics.
 - Render an aligned translation under each lyric line, with a menu picker and quick toggle.
 - Synchronize lyrics from `requestAnimationFrame` using only the playback engine position.
-- Persist the last folder, volume, active view, and per-view sort between launches.
+- Persist the last folder, volume, active view, per-view sort, shuffle, and repeat between launches.
 
 Architecture in one line: **the main process owns the filesystem, tags, covers, persistence, and the
 `media://` protocol; the preload exposes a small typed bridge; the renderer owns all UI, playback
@@ -64,10 +66,11 @@ state, and lyric presentation.**
 ┌───────────────────────────────┴──────────────────────────────────────┐
 │ Preload (contextIsolation, sandbox)                                  │
 │  window.library: getState, openFolder, rescan, getSettings,          │
-│                  saveVolume, saveUiState, getLyricSources,           │
-│                  saveLyricChoice, saveLyricPreference,               │
-│                  saveTranslationChoice, saveTranslationSettings,     │
-│                  onScanProgress, onLibraryUpdated                    │
+│                  saveVolume, saveUiState, savePlaybackSettings,      │
+│                  getLyricSources, saveLyricChoice,                   │
+│                  saveLyricPreference, saveTranslationChoice,         │
+│                  saveTranslationSettings, onScanProgress,            │
+│                  onLibraryUpdated                                    │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ no Node APIs in renderer
 ┌───────────────────────────────┴──────────────────────────────────────┐
@@ -83,7 +86,9 @@ state, and lyric presentation.**
 │    ├─ screen.ts + views/* ── section choice + rendering              │
 │    ├─ library/query.ts ── pure index + view/sort registry + search   │
 │    ├─ player/engine.ts ── PlaybackEngine + HtmlAudioEngine           │
-│    ├─ player/queue.ts ── pure current-index queue                    │
+│    ├─ player/transportDecisions.ts ── pure ended/prev/failure rules  │
+│    ├─ player/queue/ ── editable queue + shuffle + repeat             │
+│    ├─ library/artistTracks.ts ── pure artist playback ordering       │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
 │    ├─ lyrics/lyricsController.ts ── fetch/parse/select/state/cache   │
 │    ├─ lyrics/translationState.ts ── pure translation-layer state     │
@@ -179,8 +184,10 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `styles/lyrics.css` | Lyric + Now Playing styling. |
 | `styles/lyricSourceMenu.css` | Source chip/popover + translation toggle styling. |
 | `library/query.ts` | Pure view/sort/search registry. |
+| `library/artistTracks.ts` | Pure artist playback ordering. |
 | `player/engine.ts` | Playback abstraction. |
-| `player/queue.ts` | Pure queue. |
+| `player/transportDecisions.ts` | Pure ended/previous/failure/repeat decisions. |
+| `player/queue/` | Editable queue, shuffle helpers, and queue types. |
 | `lyrics/lyricsController.ts` | Source fetch/parse/select/state/cache. |
 | `lyrics/translationState.ts` | Pure translation layer + document attachment. |
 | `lyrics/translationMenuModel.ts` | Pure translation section + quick-toggle model. |

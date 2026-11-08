@@ -18,12 +18,12 @@ and components named below.
 - **Albums view** — album grid + empty state.
 - **Artists view** — artist list + empty state.
 - **Tracks view** — virtualized track list + empty state.
-- **Album detail** — back button, cover, title/artist/year, ordered track list.
-- **Artist detail** — back button, artist name/counts, album grid.
+- **Album detail** — back button, cover, title/artist/year, Play and Shuffle, ordered track list.
+- **Artist detail** — back button, artist name/counts, Play and Shuffle, album grid.
 - **Now Playing** — close button, large cover, title/artist/album, translation quick toggle, lyric
   source chip + popover (including the Translation section), lyric status/scroller.
-- **Player bar** — clickable current-track target, Previous/Play/Pause/Next, time, seek, duration,
-  volume.
+- **Player bar** — clickable current-track target, Shuffle/Previous/Play/Pause/Next/Repeat, time, seek,
+  duration, volume.
 - **Audio element** — hidden `<audio id="audio">`.
 
 Element ids are looked up once by `getAppElements()`; see
@@ -48,6 +48,8 @@ Element ids are looked up once by `getAppElements()`; see
 ## Accessibility details
 
 - View buttons use `aria-pressed`.
+- Shuffle and Repeat use `aria-pressed` with state-driven `aria-label`/`title`; Repeat also exposes
+  `data-repeat` and a decorative "1" badge for repeat-one.
 - Playing tracks use `aria-current="true"`.
 - Lyric lines are focusable buttons only when timed.
 - The source chip uses `aria-haspopup="menu"` and a synchronized `aria-expanded`.
