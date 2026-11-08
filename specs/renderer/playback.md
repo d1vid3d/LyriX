@@ -38,11 +38,18 @@ Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, `activeAttempt`
 - `reconcileQueue` rebuilds the queue from current track ids and resets playback when the current
   track disappeared.
 - `resetPlayback` clears the queue, pauses the engine, clears lyrics, and resets the UI.
-- Seek bar, volume, and engine event wiring live here. `start()` subscribes to engine events and
-  returns one disposer.
+- `restoreSession(state, position)` imports the queue by track id, loads the current track, applies
+  the saved position once metadata arrives, and never autoplays.
+- Public shortcut/media entry points: `playPause`, `play`, `pause`, `nextTrack`, `previousTrack`,
+  `seekBy`, `seekTo`, and `adjustVolume` (which saves exactly like the volume slider).
+- Seek bar, volume, and engine event wiring live here. Finishing a seek calls the injected
+  `onSeekEnd` hook so the session and Media Session position can be saved immediately. `start()`
+  subscribes to engine events and returns one disposer.
 
 The visible track list comes from the tracks view ([renderer/shell-and-navigation.md](shell-and-navigation.md));
-lyric loading is started through [renderer/lyrics-controller.md](lyrics-controller.md).
+lyric loading is started through [renderer/lyrics-controller.md](lyrics-controller.md). The session
+timing/restore flow is owned by [main/window-and-session.md](../main/window-and-session.md) and
+[renderer/shortcuts.md](shortcuts.md).
 
 ## Pure transport decisions (`src/renderer/player/transportDecisions.ts`)
 
@@ -146,6 +153,10 @@ the shuffle helpers.
 - `setRepeat(mode)` normalizes unknown values to `off`.
 - `reconcile(trackLookup)` drops entries whose ids no longer resolve, returns the current entry when
   it survived, and clears the queue when it did not.
+- `exportState()` returns a plain-JSON, id-only `SessionQueueState` (play order, natural order,
+  current entry id, context). `importState(state, trackLookup)` validates defensively, drops entries
+  whose tracks are gone, restarts at the first survivor when the current entry vanished, rebuilds the
+  natural order and entry counter, and never reshuffles.
 - The constructor accepts an injectable RNG (`QueueRandom`) for deterministic shuffle tests; it
   defaults to `Math.random`.
 

@@ -15,10 +15,10 @@ This is the **only** file where volatile verification numbers (test counts, file
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 489 tests pass across 28 files. |
+| `npm test` | 554 tests pass across 39 files. |
 | `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
-| `npm run test:e2e` | Passes; 93 checks (Tier 1 smoke). |
-| `npm run test:e2e:full` | Passes; 150 checks (Tier 2 regression). |
+| `npm run test:e2e` | Passes; 101 checks (Tier 1 smoke). |
+| `npm run test:e2e:full` | Passes; 158 checks (Tier 2 regression). |
 | `npm run test:e2e:visual` | Passes; 29 checks (Tier 3 visual). |
 | `npm run dev` | Starts electron-vite and Electron. |
 
@@ -57,6 +57,17 @@ filesystem scanning, audio playback, and DOM behavior. The E2E tiers are not par
 | `tests/contextActions.test.ts` | Play vs queue dispatch, empty-queue play-next/add fallback, album/artist play/shuffle, album/track go-to-artist navigation, album reveal via the first track, missing navigation targets, reveal failure toast, queue-row jump/move/remove, and disabled-item no-ops. |
 | `tests/toastMessages.test.ts` | Exact toast strings, single/multiple track messages, empty input, and title truncation. |
 | `tests/revealPath.test.ts` | Strict path containment, sibling-prefix/traversal rejection, FLAC-extension requirement, and null root/file guards. |
+| `tests/queueSession.test.ts` | Queue export/import round-trips, shuffled natural-order restore, vanished tracks/current, empty/malformed input, duplicate ids, and no reshuffle. |
+| `tests/windowBounds.test.ts` | Default fallback, invalid saves, min-size clamp, sufficient/insufficient overlap, unplugged monitor recentering, and maximized pass-through. |
+| `tests/sessionValidation.test.ts` | Queue/position validation, entry caps, id/label bounds, origins, current-entry membership, and position/entry matching. |
+| `tests/sessionWritePolicy.test.ts` | First write, unchanged no-op, queue changes, position throttling, and immediate track-change writes. |
+| `tests/sessionStore.test.ts` | Folder-mismatch discard, corrupt/wrong-version reads, independent queue/position payloads, invalid updates, and flush. |
+| `tests/sessionTiming.test.ts` | Time-update interval and immediate pause/seek/track-change/flush reasons. |
+| `tests/sessionController.test.ts` | No writeback before start, queue debounce, position throttling, track-change zero, flush, and the seek hook. |
+| `tests/shortcutRegistry.test.ts` | Exact modifier matching, mod mapping, when/scopes, conflict detection, labels, and the typing/native-activation guard. |
+| `tests/layerStack.test.ts` | Priority ordering, exactly-one close, closed-layer skipping, ties, and unregister. |
+| `tests/overlayModel.test.ts` | Category grouping and platform-aware chord labels. |
+| `tests/mediaSessionModel.test.ts` | Metadata/artwork URLs and Media Session action mapping including default seeks. |
 | `tests/transportDecisions.test.ts` | Ended (stop/play/restart), previous (>3 s restart), failure cap, and repeat-mode cycling. |
 | `tests/artistTracks.test.ts` | Artist playback order: album year then title (unknown last), disc then track then title, missing disc as one, input not reordered. |
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
@@ -95,7 +106,7 @@ Three tiers drive the built app through raw Chrome DevTools Protocol (CDP). They
 
 | Tier | Command | Scope | When to run |
 | --- | --- | --- | --- |
-| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel open/close and context menu + Escape priority, fluid queue drag (ghost follows pointer, neighbouring row shifts, drop commits), album-card menu Go to artist navigation, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
+| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel/drag/context menus + Escape priority, album-card menu Go to artist, shortcut toggles, shortcuts overlay + Escape layering, Media Session metadata/state, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
 | 2 — full | `npm run test:e2e:full` | Startup and cached settings, library metadata, transport wiring, volume persistence, rescan, relaunch, views/search/sort, virtualization with 600 tracks, renderer health. | Opt-in for risky refactors and broad regression coverage. |
 | 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting plus player-bar button colors, sizes, icons, shuffle/repeat active states, and active/upcoming lyric states. | Optional after CSS/UI changes. |
 
@@ -176,6 +187,14 @@ Expected:
   run for a styling change.
 - `npm run dev` opens the app with no console errors.
 - Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.
+- `npm run test:e2e:full` includes a real process restart: the queue/context/current track and paused
+  position are restored and never autoplay.
+- Media keys and the Windows media overlay cannot be driven by the CDP suites. Check by hand with dev
+  or a packaged build: play a track, then use the keyboard media keys and the Windows media flyout
+  while LyriX is unfocused. If either does not respond, flip `MEDIA_KEY_MODE` in
+  `src/shared/mediaKeys.ts` to `global-shortcuts` and repeat (only one route is active at a time).
+- Window state resumes bounds/maximized state between launches; a second launch focuses the existing
+  window instead of starting another process.
 - Shuffle and repeat toggle their labels/active states and survive a relaunch.
 - The Queue button and `Q` toggle the panel; opening a context menu then pressing Escape closes the
   menu before the queue panel.

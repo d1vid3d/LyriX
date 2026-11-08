@@ -21,6 +21,13 @@ albums.
 | `UiState` | `lastView`, `sortByView`. |
 | `Settings` | `UiState` + `lastFolder`, `volume`, `lyricPreference`, `translationEnabled`, `translationLanguage`, `shuffle`, `repeat`. |
 | `RepeatMode` | `"off"`, `"all"`, or `"one"` (shared by settings and the renderer queue). |
+| `QueueContext` | `kind` (`album`/`artist`/`tracks`/`search`/`other`) and `label`; shared because the session serializes it. |
+| `QueueOrigin` | `"context"`, `"playNext"`, or `"added"`. |
+| `SessionQueueEntry` | `entryId`, `trackId`, `origin` (plain JSON; no paths). |
+| `SessionQueueState` | `version: 1`, `entries`, `originalOrder`, `currentEntryId`, `context`. |
+| `SessionPositionState` | `entryId`, `trackId`, `position` (finite, non-negative). |
+| `RestoredSession` | `queue` plus `position | null` after main's folder/validation checks. |
+| `MediaKeyAction` | `"playpause"`, `"next"`, `"previous"`, or `"stop"` for the shortcut fallback. |
 | `PlaybackSettingsInput` | `shuffle: boolean`, `repeat: RepeatMode` for the playback-settings IPC. |
 | `TranslationSettingsInput` | `enabled: boolean`, `language: string \| null` for the translation IPC. |
 | `ScanProgress` | `scanned`, `total`. |
@@ -31,11 +38,12 @@ albums.
 | `LyricSources` | `trackId`, ordered `options`, `savedChoice`, `savedTranslationChoice`, `preference`, `expectedSidecarName` (file name only). |
 | `LibraryApi` | Typed preload surface (see [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md)). |
 
-Queue-only types (`QueueEntry`, `QueueContext`, `QueueSnapshot`, `QueueOrigin`) live in
-`src/renderer/player/queue/types.ts`; they are renderer-local and do not cross the process boundary.
-The visible queue-panel row model and the context-menu item/action types are also renderer-local
-(`src/renderer/queue/queuePanelModel.ts`, `src/renderer/menus/contextMenuModels.ts`). The only reveal
-shape that crosses IPC is `trackId: string` in and `boolean` out (`LibraryApi.revealTrack`).
+Queue implementation types (`QueueEntry`, `QueueSnapshot`) live in
+`src/renderer/player/queue/types.ts`, which re-exports `QueueContext`, `QueueOrigin`, and
+`RepeatMode` from `src/shared/types.ts`. The visible queue-panel row model and the context-menu
+item/action types are renderer-local (`src/renderer/queue/queuePanelModel.ts`,
+`src/renderer/menus/contextMenuModels.ts`). The reveal shape that crosses IPC is `trackId: string` in
+and `boolean` out (`LibraryApi.revealTrack`); session IPC carries only id-based queue/position shapes.
 
 The lyric document types (`LyricFormat`, `LyricDocument`, `LyricLine`, `LyricSegment`, and parse
 options) live in [shared-lyric-core.md](shared-lyric-core.md); they are not duplicated here.

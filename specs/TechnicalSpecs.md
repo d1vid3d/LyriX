@@ -50,6 +50,9 @@ them.
 10. **UI updates are minimal.** Virtual rows and lyric lines update only when their state changes.
 11. **Sidecar reads stay inside the track's directory.** Only regular files are read; symlinks,
     directories, and files over 1 MiB are skipped.
+12. **Shell state is machine-local and renderer-safe.** Window state and the resume session live
+    under `userData`; the session references tracks by id only, is validated in main, and is
+    discarded when its library folder no longer matches. Exactly one media-key mechanism is active.
 
 ## Routing: if you are changing X, read Y
 
@@ -60,6 +63,7 @@ them.
 | Cross-process types, track/album ids, `LibraryApi` surface | [data-model.md](data-model.md) |
 | Settings, library cache, lyric choices, atomic JSON writes | [persistence.md](persistence.md) |
 | App startup, window, `AppStore`, IPC handlers, preload bridge | [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md) |
+| Window bounds, single instance, resume session files/flow, media-key route | [main/window-and-session.md](main/window-and-session.md) |
 | Folder walking, tag reads, album grouping, scan generation/progress | [main/library-scanning.md](main/library-scanning.md) |
 | Cover extraction/resizing/cache, `media://` and byte ranges | [main/covers-and-media.md](main/covers-and-media.md) |
 | Embedded lyric tags, sidecar discovery/decoding, provider order | [main/lyric-sources.md](main/lyric-sources.md) |
@@ -72,6 +76,7 @@ them.
 | Lyric DOM, rAF sync, scrolling, seek, translation children | [renderer/lyric-view.md](renderer/lyric-view.md) |
 | Source-menu models, popover DOM, keyboard/ARIA, quick toggle | [renderer/lyric-source-menu.md](renderer/lyric-source-menu.md) |
 | Lyric, Now Playing, and source-menu styling | [renderer/styles.md](renderer/styles.md) |
+| Keyboard shortcut registry, Escape layers, help overlay, Media Session | [renderer/shortcuts.md](renderer/shortcuts.md) |
 | Markup, keyboard map, element ids, accessibility | [renderer/ui-map.md](renderer/ui-map.md) |
 | Lyric parsing, timestamps, alignment, sync helpers | [shared-lyric-core.md](shared-lyric-core.md) |
 | Startup, scan, playback, lyric-load, Now Playing flows | [flows.md](flows.md) |
@@ -109,6 +114,7 @@ contracts that the graph cannot.
 | [data-model.md](data-model.md) | Shared types, settings/snapshot shapes, SHA-1 id contract. |
 | [persistence.md](persistence.md) | On-disk layout, settings normalization, library cache, lyric-choice store, atomic JSON helpers. |
 | [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md) | App startup, window, shared store, IPC channels, preload `window.library`. |
+| [main/window-and-session.md](main/window-and-session.md) | Window bounds/state, single instance, resume session files and flow, media-key route. |
 | [main/library-scanning.md](main/library-scanning.md) | Folder walk, tag fallbacks, album grouping, scan coordinator. |
 | [main/covers-and-media.md](main/covers-and-media.md) | Cover extraction/resizing/cache, `media://` track/cover serving, ranges. |
 | [main/lyric-sources.md](main/lyric-sources.md) | Embedded tags, sidecar discovery/decoding, canonical provider list. |
@@ -121,6 +127,7 @@ contracts that the graph cannot.
 | [renderer/lyric-view.md](renderer/lyric-view.md) | Lyric DOM construction, rAF synchronization, auto-scroll, line seek. |
 | [renderer/lyric-source-menu.md](renderer/lyric-source-menu.md) | Source/translation menu models, popover, keyboard/ARIA, quick toggle. |
 | [renderer/styles.md](renderer/styles.md) | Theme, lyric, and source-menu CSS variables and visual rules. |
+| [renderer/shortcuts.md](renderer/shortcuts.md) | Shortcut registry/table, typing guard, Escape layers, help overlay, Media Session. |
 | [renderer/ui-map.md](renderer/ui-map.md) | Markup sections, keyboard map, accessibility details. |
 | [shared-lyric-core.md](shared-lyric-core.md) | Pure lyric types, parsers, timing, translation alignment, sync helpers. |
 | [flows.md](flows.md) | End-to-end startup, scan, playback, lyric-load, and Now Playing flows. |

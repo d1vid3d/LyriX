@@ -5,14 +5,16 @@ source menu, and translation controls.
 
 **Owning source paths:** `src/renderer/src/style.css`, `src/renderer/styles/lyrics.css`,
 `src/renderer/styles/lyricSourceMenu.css`, `src/renderer/styles/contextMenu.css`,
-`src/renderer/styles/queuePanel.css`, `src/renderer/styles/toast.css`.
+`src/renderer/styles/queuePanel.css`, `src/renderer/styles/toast.css`,
+`src/renderer/styles/shortcutOverlay.css`.
 
 **Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md),
 [renderer/lyric-view.md](lyric-view.md), [renderer/lyric-source-menu.md](lyric-source-menu.md),
 [renderer/queue-panel.md](queue-panel.md),
-[renderer/context-menu-and-toasts.md](context-menu-and-toasts.md), [renderer/ui-map.md](ui-map.md).
+[renderer/context-menu-and-toasts.md](context-menu-and-toasts.md),
+[renderer/shortcuts.md](shortcuts.md), [renderer/ui-map.md](ui-map.md).
 
 ## App shell and layout (`src/renderer/src/style.css`)
 
@@ -86,11 +88,10 @@ Slide-over presentation. Variables at the top: `--queue-panel-width`, `--queue-p
 `--queue-panel-header-padding`, `--queue-panel-row-height`, `--queue-panel-row-padding`,
 `--queue-panel-row-gap`, `--queue-panel-cover-size`, `--queue-panel-muted`,
 `--queue-panel-current-background`, `--queue-panel-hover`, `--queue-panel-insert-color`,
-`--queue-panel-insert-height`, `--queue-panel-insert-top`, `--queue-panel-row-shift`,
+`--queue-panel-insert-height`, and `--queue-panel-insert-top`, `--queue-panel-row-shift`,
 `--queue-panel-drag-x`, `--queue-panel-drag-y`, `--queue-panel-drag-width`,
 `--queue-panel-drag-transition`, `--queue-panel-ghost-background`, and
 `--queue-panel-ghost-z-index`.
-
 The panel is absolutely positioned on the right edge of the content area, above the views and Now
 Playing but below the player bar and the lyric source menu. The header is fixed; the row area scrolls.
 Entry rows use a grid of drag handle / small cover / title+artist / duration / remove. The current row
@@ -111,6 +112,19 @@ Variables: `--toast-bottom`, `--toast-z-index`, `--toast-padding`, `--toast-radi
 bottom-center above the player bar, centered with a transform, and non-interactive. The single toast
 is a small dark pill with a border/shadow, truncates long text, and fades/slides in when shown. There
 is no toast stack.
+
+## Shortcuts overlay (`src/renderer/styles/shortcutOverlay.css`)
+
+Variables at the top: `--shortcut-overlay-z-index`, `--shortcut-overlay-backdrop`,
+`--shortcut-overlay-width`, `--shortcut-overlay-max-height`, `--shortcut-overlay-padding`,
+`--shortcut-overlay-radius`, `--shortcut-overlay-background`, `--shortcut-overlay-border`,
+`--shortcut-overlay-shadow`, `--shortcut-overlay-muted`, `--shortcut-overlay-key-background`,
+`--shortcut-overlay-key-border`, `--shortcut-overlay-key-radius`, and
+`--shortcut-overlay-key-padding`.
+
+The root is a fixed full-viewport layer with a dim backdrop and a centered dialog. The body scrolls
+inside the dialog; category headings are uppercase muted labels; each row is a two-column
+label/chords grid with `kbd` chips for the generated chord labels.
 
 ## Lyric visual rules
 

@@ -18,16 +18,23 @@ typed preload bridge.
 Startup wiring only:
 
 1. `registerMediaScheme()` runs before `app.whenReady()` (required by Electron).
-2. On ready: set the app user model id, resolve `userData/settings.json` and
-   `userData/library-cache.json`, and load settings/cache into the shared `AppStore`.
-3. `realpath` the last folder when possible, then `restoreLibrary(root, cache)` to show cached data
+2. `app.requestSingleInstanceLock()` runs before ready; a second process quits, while the primary
+   focuses/restores the existing window on `second-instance`.
+3. In media-session mode, the Chromium media-key features are enabled before ready.
+4. On ready: set the app user model id, resolve `userData` settings/cache/lyric-choice/session/window
+   files, and load settings and cache into the shared `AppStore`.
+5. `realpath` the last folder when possible, then `restoreLibrary(root, cache)` to show cached data
    immediately without reading audio files.
-4. Create `CoverService(userData/covers)` and install the `media://` handler.
-5. Create the `ScanCoordinator`, register IPC, create the window, and handle macOS re-activation.
-6. On non-macOS, quit when all windows close.
+6. Load `userData/window-state.json`, load the session against the current library root, create the
+   `CoverService` and install the `media://` handler.
+7. Create the `ScanCoordinator`, register IPC (including the session store), create the window with
+   restored bounds, and handle macOS re-activation.
+8. On quit, flush the session; on non-macOS, quit when all windows close.
 
 The scan generation counter, IPC handlers, and window creation are described below and in
-[main/library-scanning.md](library-scanning.md).
+[main/library-scanning.md](library-scanning.md). Window bounds, the single-instance lock, the session
+files/flow, and the media-key route are owned by
+[main/window-and-session.md](window-and-session.md).
 
 UNVERIFIED/POSSIBLY STALE: the current startup also constructs and `load()`s the
 `LyricChoiceStore` before restoring the library; the original §7.1 step list did not include that
@@ -37,14 +44,17 @@ step.
 
 `WindowManager` owns the single `BrowserWindow`:
 
-- `createWindow()` builds it with the existing security settings (`contextIsolation`, no Node
-  integration, sandbox), shows it on `ready-to-show`, clears the reference on `closed`, and loads
-  either `ELECTRON_RENDERER_URL` or the built `index.html`.
+- `createWindow(saved)` resolves bounds through `windowBounds.ts`, restores/maximizes before showing,
+  builds it with the existing security settings (`contextIsolation`, no Node integration, sandbox),
+  shows it on `ready-to-show`, and clears the reference on `closed`.
+- Resize/move/maximize changes are saved to `window-state.json` with a 500 ms debounce, and on close.
+- `focusOrCreate()` focuses the existing window (restoring if minimized) for a second launch.
 - `getWindow()` exposes the current window for dialogs.
 - `send(channel, payload)` no-ops when the window or its web contents are destroyed.
 
 The security flags and CSP are summarized in [security-and-robustness.md](../security-and-robustness.md)
-and their build-time view in [build-and-config.md](../build-and-config.md).
+and their build-time view in [build-and-config.md](../build-and-config.md). Window-state details are
+in [window-and-session.md](window-and-session.md).
 
 ## Shared state (`src/main/store.ts`)
 
@@ -67,6 +77,9 @@ subscribe.
 | `library:open-folder` | — | `LibrarySnapshot \| null` (null on cancel/empty) |
 | `library:rescan` | — | `LibrarySnapshot \| null` (null when no root) |
 | `library:reveal-track` | `trackId: unknown` | `boolean` (false on any invalid/missing/failed path) |
+| `session:get` | — | `RestoredSession \| null` (null on folder mismatch/corrupt data) |
+| `session:save-queue` | `SessionQueueState` candidate | `void` (validated, capped, folder-stamped) |
+| `session:save-position` | `SessionPositionState` candidate | `void` (validated, throttled write) |
 | `lyrics:get-sources` | `trackId: unknown` | `LyricSources \| null` |
 | `lyrics:set-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
 | `lyrics:set-translation-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
@@ -77,8 +90,8 @@ subscribe.
 | `settings:set-lyric-preference` | `preference: unknown` | `void` (validated) |
 | `settings:set-translation` | `{ enabled: unknown, language: unknown }` | `void` (validated) |
 
-Events to renderer: `library:scan-progress` (throttled) and `library:updated` (after a successful
-background refresh).
+Events to renderer: `library:scan-progress` (throttled), `library:updated` (after a successful
+background refresh), and `media:key` (only in the global-shortcut fallback mode).
 
 `lyrics:get-sources` rejects non-string/empty ids with `null`, resolves the path through
 `resolveTrackFile(trackId)`, and catches every error. `lyrics:set-choice` and
@@ -110,6 +123,9 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `openFolder()` | `library:open-folder` | `null` when the dialog is cancelled. |
 | `rescan()` | `library:rescan` | `null` when no folder is open. |
 | `revealTrack(trackId)` | `library:reveal-track` | Resolves `true` only when main revealed a validated file. |
+| `getSession()` | `session:get` | Returns the validated session for the current folder, or `null`. |
+| `saveSessionQueue(state)` | `session:save-queue` | Main validates/caps the payload and folder-stamps it. |
+| `saveSessionPosition(state)` | `session:save-position` | Main validates the entry/track/position and throttles writes. |
 | `getSettings()` | `settings:get` | Returns normalized settings. |
 | `saveVolume(volume)` | `settings:set-volume` | Main clamps the value. |
 | `saveUiState(state)` | `settings:set-ui` | Main normalizes the value. |
@@ -121,6 +137,7 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `saveTranslationSettings({ enabled, language })` | `settings:set-translation` | Main validates both fields and writes atomically. |
 | `onScanProgress(listener)` | `library:scan-progress` | Returns an unsubscribe function. |
 | `onLibraryUpdated(listener)` | `library:updated` | Returns an unsubscribe function. |
+| `onMediaKey(listener)` | `media:key` | Fallback mode only; returns an unsubscribe function. |
 
 `subscribe()` wraps the IPC listener so the renderer callback never receives the Electron event
 object, and returns a function that removes exactly that listener.

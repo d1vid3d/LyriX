@@ -8,6 +8,7 @@ export interface AppElements {
   viewButtons: HTMLButtonElement[]
   sortSelect: HTMLSelectElement
   searchInput: HTMLInputElement
+  shortcutsHelpButton: HTMLButtonElement
 
   gridView: HTMLElement
   detailView: HTMLElement
@@ -94,6 +95,7 @@ export function getAppElements(): AppElements {
     ],
     sortSelect: getElement<HTMLSelectElement>('sort-select'),
     searchInput: getElement<HTMLInputElement>('search'),
+    shortcutsHelpButton: getElement<HTMLButtonElement>('shortcuts-help'),
 
     gridView: getElement<HTMLElement>('grid-view'),
     detailView: getElement<HTMLElement>('detail-view'),

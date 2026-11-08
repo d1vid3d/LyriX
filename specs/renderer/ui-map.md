@@ -14,7 +14,8 @@ and components named below.
 
 ## Markup regions (`src/renderer/index.html`)
 
-- **Toolbar** — Open Folder, Rescan, status, scan progress, view switcher, sort select, search.
+- **Toolbar** — Open Folder, Rescan, status, scan progress, view switcher, sort select, search, and a
+  `?` keyboard-shortcuts button.
 - **Albums view** — album grid + empty state.
 - **Artists view** — artist list + empty state.
 - **Tracks view** — virtualized track list + empty state.
@@ -27,6 +28,8 @@ and components named below.
 - **Player bar** — clickable current-track target, Shuffle/Previous/Play/Pause/Next/Repeat/Queue,
   time, seek, duration, volume.
 - **Toast region** — bottom-center live region above the player bar, outside the content area.
+- **Shortcuts overlay** — modal `role="dialog"` generated from the shortcut registry, appended to
+  `<body>` with a backdrop, category groups, focus trap, and a close button.
 - **Audio element** — hidden `<audio id="audio">`.
 
 Element ids are looked up once by `getAppElements()`; see
@@ -34,12 +37,27 @@ Element ids are looked up once by `getAppElements()`; see
 
 ## Keyboard
 
+Global shortcuts are declared in `renderer/shortcuts/defaultShortcuts.ts` and dispatched by one
+listener; component-local keys are listed separately. The full table and matching rules are owned by
+[renderer/shortcuts.md](shortcuts.md).
+
 | Key | Action |
 | --- | --- |
-| `Ctrl/Cmd+F` | Focus and select search. |
-| `/` | Focus search when not in a text input. |
+| `Space` | Play / pause (native button activation wins when a button is focused). |
+| `N` / `Ctrl/Cmd+→` | Next track. |
+| `P` / `Ctrl/Cmd+←` | Previous track (restarts when more than 3 s in). |
+| `J` / `L` | Seek -10 s / +10 s. |
+| `Ctrl/Cmd+↑` / `Ctrl/Cmd+↓` | Volume +5% / -5%. |
+| `S` | Toggle shuffle. |
+| `R` | Cycle repeat. |
 | `Q` | Toggle the queue panel when no text input has focus and no floating menu is open. |
-| `Escape` | Close the context menu if open (consumed); otherwise close the lyric source menu; otherwise close the queue panel; otherwise close Now Playing; otherwise clear search if focused/non-empty. |
+| `Ctrl/Cmd+F` | Focus and select search. |
+| `/` | Focus search when focus is not in a text-entry/range target. |
+| `Ctrl/Cmd+L` | Toggle Now Playing. |
+| `T` | Toggle translation when Now Playing is open and the toggle is available. |
+| `?` (Shift+/) | Open the keyboard-shortcuts overlay. |
+| `Escape` | Close the highest-priority open layer: context menu, shortcuts overlay, lyric source menu, queue panel, Now Playing, then clear search if focused/non-empty. |
+| `Tab` in the shortcuts overlay | Cycle focus inside the dialog; Escape or the backdrop closes it. |
 | `Shift+F10` / Menu key | Open the context menu for the focused track row, album card, artist row, queue row, or current-track target. |
 | `Enter`/`Space` | Activate the bottom-bar target or a focused lyric line. |
 | `Enter`/`Space`/`ArrowDown` on the source chip | Open the source menu and focus its first enabled item. |
@@ -64,7 +82,11 @@ Element ids are looked up once by `getAppElements()`; see
 - View buttons use `aria-pressed`.
 - Shuffle and Repeat use `aria-pressed` with state-driven `aria-label`/`title`; Repeat also exposes
   `data-repeat` and a decorative "1" badge for repeat-one.
-- The queue toggle uses `aria-pressed` and `aria-expanded`, synchronized with the panel.
+- The queue toggle uses `aria-pressed` and `aria-expanded`, synchronized with the panel, and exposes
+  `aria-keyshortcuts="Q"`.
+- The shortcuts help button exposes `aria-keyshortcuts="?"`; the overlay uses `role="dialog"`,
+  `aria-modal="true"`, a labelled title, `kbd` chord labels, a Tab focus trap, and returns focus to
+  its opener.
 - The queue panel is a `role="list"`; entry rows are list items, `aria-current="true"` marks the
   playing entry, the History header is a disclosure button with `aria-expanded`, and the insertion
   indicator is decorative.

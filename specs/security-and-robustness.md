@@ -4,8 +4,9 @@
 player predictable when inputs are malformed or files disappear.
 
 **Owning source paths:** `src/main/media-protocol.ts`, `src/main/ipc.ts`, `src/main/reveal.ts`,
-`src/main/pathContainment.ts`, `src/main/lyrics/`, `src/main/settings.ts`, `src/main/cache.ts`,
-`src/main/json-file.ts`, `src/preload/index.ts`, `src/renderer/index.html`.
+`src/main/pathContainment.ts`, `src/main/sessionValidation.ts`, `src/main/sessionStore.ts`,
+`src/main/lyrics/`, `src/main/settings.ts`, `src/main/cache.ts`, `src/main/json-file.ts`,
+`src/preload/index.ts`, `src/renderer/index.html`.
 
 **Last verified:** 2026-11-08 against LyriX 0.1.0.
 
@@ -17,6 +18,10 @@ player predictable when inputs are malformed or files disappear.
 - **CSP** restricts scripts to self, styles to self/inline, images to self/data/media, and media to
   self/media.
 - **No renderer paths**: ids only; main resolves and validates.
+- **Session payloads are id-only and validated**: `session:save-queue` accepts only versioned,
+  capped queue state with 40-hex track ids and bounded strings; `session:save-position` requires a
+  finite non-negative position and a matching queue entry; the session is discarded when its folder
+  no longer matches. Window state is machine-local and independent of the library.
 - **Path containment** in `media://` uses `realpath` on both the file and the root, then
   `isPathInside`.
 - **Reveal never trusts a renderer path**: `library:reveal-track` takes only a track id, resolves the

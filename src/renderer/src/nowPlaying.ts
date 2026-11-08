@@ -4,6 +4,7 @@ import type { Album, Track } from '../../shared/types'
 import type { LyricsState } from '../lyrics/lyricsController'
 import { buildSourceMenuModel } from '../lyrics/sourceMenuModel'
 import type { SourceMenuModel } from '../lyrics/sourceMenuModel'
+import type { TranslationToggleModel } from '../lyrics/translationMenuModel'
 import { LyricSourceMenu } from '../ui/lyricSourceMenu'
 import { TranslationToggle } from '../ui/translationToggle'
 import type { AppElements } from './dom'
@@ -46,6 +47,7 @@ export class NowPlayingController {
   private readonly translationToggle: TranslationToggle
   private open = false
   private dirty = false
+  private translationToggleModel: TranslationToggleModel | null = null
 
   constructor(deps: NowPlayingDeps) {
     this.deps = deps
@@ -81,6 +83,27 @@ export class NowPlayingController {
 
   closeSourceMenu(): void {
     this.menu.close()
+  }
+
+  /** Escape path: close the source menu and return focus to its chip. */
+  closeSourceMenuAndFocus(): void {
+    this.menu.closeAndFocusTrigger()
+  }
+
+  toggle(): void {
+    if (this.open) this.closeNowPlaying()
+    else this.openNowPlaying()
+  }
+
+  /** True when Now Playing is open and the translation toggle is enabled for the lyrics. */
+  isTranslationAvailable(): boolean {
+    return this.open && this.translationToggleModel !== null && !this.translationToggleModel.disabled
+  }
+
+  toggleTranslation(): void {
+    const model = this.translationToggleModel
+    if (!this.open || !model || model.disabled) return
+    this.deps.setTranslationEnabled(!model.pressed)
   }
 
   markDirty(): void {
@@ -162,6 +185,7 @@ export class NowPlayingController {
 
   private applyLyricsState(state: LyricsState): void {
     const model = buildSourceMenuModel(state)
+    this.translationToggleModel = model.translationToggle
     this.menu.update(model)
     this.translationToggle.update(model.translationToggle)
 

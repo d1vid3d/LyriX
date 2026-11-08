@@ -599,6 +599,110 @@ async function main(runner, ctx) {
     `before=${scrollBefore} after=${now.trackScrollTop}`
   )
 
+  runner.step('keyboard shortcut registry, overlay, and Escape layers')
+  const shuffleBefore = await cdp.evaluate(
+    `document.querySelector('#shuffle').getAttribute('aria-pressed')`
+  )
+  await pressKey(cdp, 's')
+  await cdp.waitFor(
+    'S toggles shuffle',
+    `document.querySelector('#shuffle').getAttribute('aria-pressed') !== ${JSON.stringify(shuffleBefore)}`
+  )
+  await pressKey(cdp, 's')
+  await cdp.waitFor(
+    'S toggles shuffle back',
+    `document.querySelector('#shuffle').getAttribute('aria-pressed') === ${JSON.stringify(shuffleBefore)}`
+  )
+
+  const playingBefore = await cdp.evaluate(
+    `document.querySelector('#play-pause').dataset.playing`
+  )
+  await pressKey(cdp, ' ')
+  await cdp.waitFor(
+    'Space toggles play/pause',
+    `document.querySelector('#play-pause').dataset.playing !== ${JSON.stringify(playingBefore)}`
+  )
+  await pressKey(cdp, ' ')
+  await cdp.waitFor(
+    'Space restores the play state',
+    `document.querySelector('#play-pause').dataset.playing === ${JSON.stringify(playingBefore)}`
+  )
+
+  await pressKey(cdp, 'q')
+  await cdp.waitFor(
+    'Q opens the queue before the overlay',
+    `document.querySelector('#queue-panel').hidden === false`
+  )
+
+  await pressKey(cdp, '?', { shiftKey: true })
+  await cdp.waitFor(
+    'Shift+/ opens the shortcuts overlay',
+    `document.querySelector('#shortcut-overlay').hidden === false`
+  )
+  const overlay = await cdp.evaluate(`(() => {
+    const root = document.querySelector('#shortcut-overlay')
+    const dialog = root.querySelector('[role="dialog"]')
+    return {
+      modal: dialog?.getAttribute('aria-modal') ?? '',
+      groups: root.querySelectorAll('.shortcut-overlay__group').length,
+      labels: [...root.querySelectorAll('.shortcut-overlay__list dt')].map(
+        (item) => item.textContent ?? ''
+      ),
+      focusedInside: dialog ? dialog.contains(document.activeElement) : false
+    }
+  })()`)
+  runner.equal('shortcuts overlay is a modal dialog', overlay.modal, 'true')
+  runner.check('overlay groups shortcuts by category', overlay.groups >= 5, String(overlay.groups))
+  runner.check(
+    'overlay lists playback and help shortcuts',
+    overlay.labels.includes('Play / pause') &&
+      overlay.labels.includes('Show keyboard shortcuts'),
+    overlay.labels.join('|')
+  )
+  runner.check('overlay takes focus', overlay.focusedInside)
+
+  await pressKey(cdp, 'Escape')
+  await cdp.waitFor(
+    'Escape closes the overlay before the queue',
+    `document.querySelector('#shortcut-overlay').hidden === true &&
+      document.querySelector('#queue-panel').hidden === false`
+  )
+  await pressKey(cdp, 'Escape')
+  await cdp.waitFor(
+    'Escape then closes the queue panel',
+    `document.querySelector('#queue-panel').hidden === true`
+  )
+
+  const helpOpened = await clickSelector(cdp, '#shortcuts-help')
+  runner.check('toolbar help button opens the overlay', helpOpened)
+  await cdp.waitFor(
+    'help button overlay visible',
+    `document.querySelector('#shortcut-overlay').hidden === false`
+  )
+  await pressKey(cdp, 'Escape')
+  await cdp.waitFor(
+    'help button overlay closes',
+    `document.querySelector('#shortcut-overlay').hidden === true`
+  )
+
+  const mediaSession = await cdp.evaluate(`(() => ({
+    supported: 'mediaSession' in navigator,
+    title: navigator.mediaSession?.metadata?.title ?? '',
+    state: navigator.mediaSession?.playbackState ?? '',
+    nowTitle: document.querySelector('#now-title').textContent
+  }))()`)
+  runner.check('Media Session API is available', mediaSession.supported)
+  runner.equal(
+    'Media Session metadata matches the playing track',
+    mediaSession.title,
+    mediaSession.nowTitle
+  )
+  runner.check(
+    'Media Session playback state is published',
+    mediaSession.state === 'playing' || mediaSession.state === 'paused',
+    mediaSession.state
+  )
+
   runner.step('renderer stayed clean')
   runner.check('no renderer exceptions', cdp.exceptions.length === 0, cdp.exceptions.join(' | '))
   runner.check('no console errors', cdp.consoleErrors.length === 0, cdp.consoleErrors.join(' | '))

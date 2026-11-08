@@ -5,6 +5,7 @@ import type { LyricChoiceStore } from './lyrics/choices'
 import { getLyricSources } from './lyrics/sources'
 import { revealTrackFile } from './reveal'
 import type { ScanCoordinator } from './scanCoordinator'
+import type { SessionStore } from './sessionStore'
 import type { TranslationSettingsInput } from '../shared/types'
 import {
   clampVolume,
@@ -20,7 +21,8 @@ import type { AppStore } from './store'
 export function registerIpc(
   store: AppStore,
   scan: ScanCoordinator,
-  choices: LyricChoiceStore
+  choices: LyricChoiceStore,
+  session: SessionStore
 ): void {
   let startupRefreshStarted = false
 
@@ -42,6 +44,17 @@ export function registerIpc(
   ipcMain.handle('library:reveal-track', async (_event, trackId: unknown) => {
     // The renderer sends an id only; reveal.ts resolves and validates the path.
     return revealTrackFile(trackId)
+  })
+
+  ipcMain.handle('session:get', () => session.getSession())
+
+  ipcMain.handle('session:save-queue', (_event, value: unknown) => {
+    // sessionStore validates ids, caps, origins, and the context; no paths are accepted.
+    session.updateQueue(value)
+  })
+
+  ipcMain.handle('session:save-position', (_event, value: unknown) => {
+    session.updatePosition(value)
   })
 
   ipcMain.handle('lyrics:get-sources', async (_event, trackId: unknown) => {

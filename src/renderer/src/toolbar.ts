@@ -16,17 +16,9 @@ export interface ToolbarDeps {
   switchView(view: LibraryView): void
   isNowPlayingOpen(): boolean
   leaveNowPlaying(): void
-  closeNowPlaying(): void
   showCurrentSection(): void
   renderLibraryView(view: LibraryView): void
   saveUiState(): void
-  isContextMenuOpen(): boolean
-  closeContextMenu(): void
-  isSourceMenuOpen(): boolean
-  closeSourceMenu(): void
-  isQueuePanelOpen(): boolean
-  closeQueuePanel(): void
-  toggleQueuePanel(): void
 }
 
 /** Search box, sort dropdown, view switcher, and keyboard shortcuts. */
@@ -39,7 +31,6 @@ export class ToolbarController {
   }
   private appliedSearch = ''
   private searchTimer: ReturnType<typeof setTimeout> | null = null
-  private readonly handleKeydown = (event: KeyboardEvent): void => this.onKeydown(event)
 
   constructor(deps: ToolbarDeps) {
     this.deps = deps
@@ -68,8 +59,6 @@ export class ToolbarController {
         this.applySearch(deps.elements.searchInput.value)
       }, 150)
     })
-
-    window.addEventListener('keydown', this.handleKeydown)
   }
 
   getAppliedSearch(): string {
@@ -138,6 +127,13 @@ export class ToolbarController {
     if (wasNowPlaying) this.deps.showCurrentSection()
   }
 
+  /** Shortcut handler entry point; behavior matches the old Ctrl+F / `/` handler. */
+  focusSearch(): void {
+    const input = this.deps.elements.searchInput
+    input.focus()
+    input.select()
+  }
+
   clearSearch(): void {
     this.clearPendingSearch()
     this.deps.elements.searchInput.value = ''
@@ -147,87 +143,5 @@ export class ToolbarController {
 
   dispose(): void {
     this.clearPendingSearch()
-    window.removeEventListener('keydown', this.handleKeydown)
   }
-
-  private onKeydown(event: KeyboardEvent): void {
-    const { elements } = this.deps
-
-    if (event.key === 'Escape' && this.deps.isContextMenuOpen()) {
-      event.preventDefault()
-      this.deps.closeContextMenu()
-      return
-    }
-
-    if (event.key === 'Escape' && this.deps.isSourceMenuOpen()) {
-      event.preventDefault()
-      this.deps.closeSourceMenu()
-      return
-    }
-
-    if (event.key === 'Escape' && this.deps.isQueuePanelOpen()) {
-      event.preventDefault()
-      this.deps.closeQueuePanel()
-      return
-    }
-
-    if (event.key === 'Escape' && this.deps.isNowPlayingOpen()) {
-      event.preventDefault()
-      this.deps.closeNowPlaying()
-      return
-    }
-
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
-      event.preventDefault()
-      elements.searchInput.focus()
-      elements.searchInput.select()
-      return
-    }
-
-    if (
-      event.key === 'Escape' &&
-      (document.activeElement === elements.searchInput || elements.searchInput.value)
-    ) {
-      event.preventDefault()
-      this.clearSearch()
-      return
-    }
-
-    if (
-      event.key === '/' &&
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.altKey &&
-      !isTextInput(event.target)
-    ) {
-      event.preventDefault()
-      elements.searchInput.focus()
-      elements.searchInput.select()
-      return
-    }
-
-    if (
-      event.key.toLowerCase() === 'q' &&
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.altKey &&
-      !event.shiftKey &&
-      !isTextInput(event.target) &&
-      !this.deps.isContextMenuOpen() &&
-      !this.deps.isSourceMenuOpen()
-    ) {
-      event.preventDefault()
-      this.deps.toggleQueuePanel()
-    }
-  }
-}
-
-function isTextInput(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.tagName === 'SELECT' ||
-      target.isContentEditable)
-  )
 }

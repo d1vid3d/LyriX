@@ -37,6 +37,13 @@ intent without duplicating volatile values.
   queue keeps a bounded DOM. Snapshot updates preserve the scroll offset; only opening the panel
   scrolls the current entry into view. Drag auto-scroll adjusts `scrollTop` once per animation frame.
   See [renderer/queue-panel.md](renderer/queue-panel.md).
+- **Session writes:** the renderer debounces queue payloads by ~1 s and sends position at most every
+  ~5 s while playing; main writes the queue only when it changes and throttles position writes to
+  1 s, so a large queue is never rewritten for position updates. See
+  [main/window-and-session.md](main/window-and-session.md).
+- **Shortcuts and Media Session:** matching is a small table scan per keydown; the overlay is built
+  once. Media Session position updates happen on events (track change, metadata, play/pause, seek),
+  not every frame. See [renderer/shortcuts.md](renderer/shortcuts.md).
 - **Lyric DOM:** built once per document; each frame reads the position once, runs the binary
   searches, and does one O(lines) flag pass whose DOM writes happen only for changed state. See
   [renderer/lyric-view.md](renderer/lyric-view.md).

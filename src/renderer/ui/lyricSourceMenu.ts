@@ -93,6 +93,12 @@ export class LyricSourceMenu {
     this.trigger.setAttribute('aria-expanded', 'false')
   }
 
+  /** Escape closes the source menu and returns focus to its chip. */
+  closeAndFocusTrigger(): void {
+    this.close()
+    this.trigger.focus({ preventScroll: true })
+  }
+
   isOpen(): boolean {
     return this.openState
   }
@@ -188,12 +194,6 @@ export class LyricSourceMenu {
   private readonly handleKeydown = (event: KeyboardEvent): void => {
     if (this.openState) {
       switch (event.key) {
-        case 'Escape':
-          event.preventDefault()
-          event.stopPropagation()
-          this.close()
-          this.trigger.focus()
-          return
         case 'Tab':
           this.close()
           return

@@ -11,7 +11,8 @@ the index routes by concern. Use `graphify query` for the current file/import ma
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/lyric-sources.md](main/lyric-sources.md),
 [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md),
 [renderer/playback.md](renderer/playback.md), [renderer/queue-panel.md](renderer/queue-panel.md),
-[renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md), [persistence.md](persistence.md).
+[renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md),
+[renderer/shortcuts.md](renderer/shortcuts.md), [persistence.md](persistence.md).
 
 ## Add a lyric source
 
@@ -101,6 +102,16 @@ Queue semantics themselves are owned by [renderer/playback.md](renderer/playback
 them in the panel. The full interaction contract is in
 [renderer/queue-panel.md](renderer/queue-panel.md).
 
+## Add a global shortcut
+
+1. Add a `ShortcutDefinition` to `src/renderer/shortcuts/defaultShortcuts.ts` with a unique id,
+   label, category, and chord(s). Use `mod: true` for Ctrl/Cmd; matching is exact on modifiers.
+2. Add the command id and handler mapping in `src/renderer/shortcuts/shortcutCommands.ts`, injecting
+   the real handler through `src/renderer/src/shellFeatures.ts`.
+3. Run the conflict test (the default table must stay conflict-free) and update the overlay is
+   automatic because it is generated from the registry.
+4. Component-local keys (menu arrows, queue-row editing) stay in their components.
+
 ## Related contracts
 
 - New provider shape and canonical option order: [main/lyric-sources.md](main/lyric-sources.md).
@@ -109,3 +120,5 @@ them in the panel. The full interaction contract is in
 - `PlaybackEngine` interface: [renderer/playback.md](renderer/playback.md).
 - Settings defaults and normalization: [persistence.md](persistence.md).
 - Preload/IPC surface: [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md).
+- Shortcut registry and Escape layers: [renderer/shortcuts.md](renderer/shortcuts.md).
+- Session files and restore flow: [main/window-and-session.md](main/window-and-session.md).

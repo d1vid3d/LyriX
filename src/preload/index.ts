@@ -4,8 +4,11 @@ import type { LyricPreference, LyricSources } from '../shared/lyrics/sources'
 import type {
   LibraryApi,
   LibrarySnapshot,
+  MediaKeyAction,
   PlaybackSettingsInput,
   ScanProgress,
+  SessionPositionState,
+  SessionQueueState,
   Settings,
   TranslationSettingsInput,
   UiState
@@ -26,6 +29,11 @@ const library: LibraryApi = {
   revealTrack: (trackId: string): Promise<boolean> =>
     ipcRenderer.invoke('library:reveal-track', trackId),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
+  getSession: () => ipcRenderer.invoke('session:get'),
+  saveSessionQueue: (state: SessionQueueState): Promise<void> =>
+    ipcRenderer.invoke('session:save-queue', state),
+  saveSessionPosition: (state: SessionPositionState): Promise<void> =>
+    ipcRenderer.invoke('session:save-position', state),
   saveVolume: (volume: number): Promise<void> =>
     ipcRenderer.invoke('settings:set-volume', volume),
   saveUiState: (state: UiState): Promise<void> =>
@@ -43,7 +51,8 @@ const library: LibraryApi = {
   saveTranslationSettings: (input: TranslationSettingsInput): Promise<void> =>
     ipcRenderer.invoke('settings:set-translation', input),
   onScanProgress: (listener) => subscribe<ScanProgress>('library:scan-progress', listener),
-  onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener)
+  onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener),
+  onMediaKey: (listener) => subscribe<MediaKeyAction>('media:key', listener)
 }
 
 contextBridge.exposeInMainWorld('library', library)

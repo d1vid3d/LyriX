@@ -22,23 +22,28 @@ handling, section choice, and the stateless view renderers.
 
 - Looks up all DOM elements once through `getAppElements()`.
 - Creates the `HtmlAudioEngine`, `PlaybackQueue`, `LyricsController`, `LyricView`, `PlayerBar`,
-  `TracksList`, `QueuePanel`/`QueuePanelController`, `ContextMenu`, `ContextActions`, and `Toast`.
+  `TracksList`, `QueuePanel`/`QueuePanelController`, `ContextMenu`, `ContextActions`, `Toast`, and
+  `ShortcutOverlay`.
 - Constructs every controller with explicit dependency interfaces and wires cross-controller calls
   through callbacks.
-- Attaches menu triggers to album cards, artist rows, detail tracks, virtual track rows, queue rows,
-  and the player-bar current-track target, and builds the matching menus.
-- Subscribes to engine, library, lyric, queue, and queue-panel events, starts `library.initialize()`,
-  and cleans up on `beforeunload`.
+- Uses `contextMenus.ts` for every menu trigger (album cards, artist rows, detail tracks, virtual
+  track rows, queue rows, current track) and `shellFeatures.ts` for shortcut commands, the Escape
+  layer stack, session tracking, and Media Session wiring.
+- Subscribes to engine, library, lyric, queue, and queue-panel events, starts the restore/session/
+  media flow after `library.initialize()`, and cleans up on `beforeunload`.
 - `applySettings` restores volume, shuffle/repeat, view/sort, lyric preference, and translation
   settings without writing them back to disk.
 
-It owns no routing, playback, search, queue-panel, menu, or rendering state; those live in the
-controllers below. The queue panel and context-menu behavior are owned by
+It owns no routing, playback, search, queue-panel, menu, shortcut, session, or rendering state; those
+live in the controllers below. The queue panel and context-menu behavior are owned by
 [renderer/queue-panel.md](queue-panel.md) and
-[renderer/context-menu-and-toasts.md](context-menu-and-toasts.md).
+[renderer/context-menu-and-toasts.md](context-menu-and-toasts.md); the shortcut/Escape/session/media
+wiring by [renderer/shortcuts.md](shortcuts.md) and
+[main/window-and-session.md](../main/window-and-session.md).
 
-UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 335 lines. It remains
-composition/wiring only, but the original “under 180 lines” claim no longer holds.
+UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 338 lines. It remains
+composition/wiring only, but the original “under 180 lines” claim no longer holds; shell feature
+wiring lives in `shellFeatures.ts` and menu building in `contextMenus.ts`.
 
 ## Element lookup (`src/renderer/src/dom.ts`)
 
@@ -71,10 +76,11 @@ Owns `sortByView`, `appliedSearch`, and the 150 ms search debounce.
 - `syncViewControls` updates `aria-pressed`, the sort options, and the selected value.
 - `applySearch` closes Now Playing if necessary, re-renders the active library view, then restores
   the appropriate section.
-- `Ctrl/Cmd+F` and `/` focus the search box; `Escape` clears it only after the context menu, source
-  menu, queue panel, and Now Playing have had priority.
-- `Q` toggles the queue panel when no text input has focus and no floating menu is open.
+- `focusSearch()` and `clearSearch()` are called by the shortcut command map and the search-clear
+  Escape layer; the shortcut table now owns Ctrl/Cmd+F, `/`, Q, and the Escape chain
+  ([renderer/shortcuts.md](shortcuts.md)).
 - Sort and view changes persist through the `saveUiState` callback.
+- `dispose()` only clears the pending search timer; the old global keydown handler was removed.
 
 The search/sort definitions and validators live in
 [renderer/library-query-and-lists.md](library-query-and-lists.md). The keyboard map is in

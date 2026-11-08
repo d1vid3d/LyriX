@@ -1,0 +1,130 @@
+:root {
+  --shortcut-overlay-z-index: 35;
+  --shortcut-overlay-backdrop: rgba(0, 0, 0, 0.55);
+  --shortcut-overlay-width: min(640px, 92vw);
+  --shortcut-overlay-max-height: 82vh;
+  --shortcut-overlay-padding: 18px 20px;
+  --shortcut-overlay-radius: 12px;
+  --shortcut-overlay-background: var(--panel);
+  --shortcut-overlay-border: var(--border);
+  --shortcut-overlay-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shortcut-overlay-muted: var(--muted);
+  --shortcut-overlay-key-background: #2a2a30;
+  --shortcut-overlay-key-border: #3a3a42;
+  --shortcut-overlay-key-radius: 4px;
+  --shortcut-overlay-key-padding: 2px 6px;
+}
+
+.shortcut-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--shortcut-overlay-z-index);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortcut-overlay[hidden] {
+  display: none;
+}
+
+.shortcut-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--shortcut-overlay-backdrop);
+}
+
+.shortcut-overlay__dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--shortcut-overlay-width);
+  max-height: var(--shortcut-overlay-max-height);
+  padding: var(--shortcut-overlay-padding);
+  border: 1px solid var(--shortcut-overlay-border);
+  border-radius: var(--shortcut-overlay-radius);
+  background: var(--shortcut-overlay-background);
+  box-shadow: var(--shortcut-overlay-shadow);
+  outline: none;
+}
+
+.shortcut-overlay__header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--shortcut-overlay-border);
+}
+
+.shortcut-overlay__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.shortcut-overlay__close {
+  width: 30px;
+  padding: 4px 0;
+  border: 1px solid var(--shortcut-overlay-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--shortcut-overlay-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shortcut-overlay__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.shortcut-overlay__body {
+  overflow-y: auto;
+  padding-top: 10px;
+}
+
+.shortcut-overlay__group + .shortcut-overlay__group {
+  margin-top: 16px;
+}
+
+.shortcut-overlay__group-title {
+  margin: 0 0 6px;
+  color: var(--shortcut-overlay-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shortcut-overlay__list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.shortcut-overlay__label {
+  margin: 0;
+  font-size: 13px;
+}
+
+.shortcut-overlay__chords {
+  margin: 0;
+  color: var(--shortcut-overlay-muted);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.shortcut-overlay__chords kbd {
+  padding: var(--shortcut-overlay-key-padding);
+  border: 1px solid var(--shortcut-overlay-key-border);
+  border-radius: var(--shortcut-overlay-key-radius);
+  background: var(--shortcut-overlay-key-background);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11px;
+}

@@ -1,4 +1,10 @@
-import type { Album, PlaybackSettingsInput, Track } from '../../shared/types'
+import type {
+  Album,
+  PlaybackSettingsInput,
+  SessionPositionState,
+  SessionQueueState,
+  Track
+} from '../../shared/types'
 import { getArtistTracks } from '../library/artistTracks'
 import type { ArtistItem } from '../library/query'
 import type { PlaybackEngine } from '../player/engine'
@@ -29,6 +35,8 @@ export interface TransportDeps {
   syncTime(time: number): void
   resetTime(): void
   updateDuration(duration: number): void
+  /** Called when a slider drag finishes so session/media position can be saved immediately. */
+  onSeekEnd(): void
 }
 
 interface PlaybackAttempt {
@@ -54,6 +62,8 @@ export class TransportController {
   private isSeeking = false
   private activeAttempt: PlaybackAttempt | null = null
   private consecutiveFailures = 0
+  /** Position to apply on the next `loadedmetadata` after a session restore. */
+  private pendingRestorePosition: number | null = null
 
   constructor(deps: TransportDeps) {
     this.deps = deps
@@ -143,6 +153,7 @@ export class TransportController {
       return
     }
 
+    this.pendingRestorePosition = null
     const attempt: PlaybackAttempt = { failed: false }
     this.activeAttempt = attempt
 
@@ -162,6 +173,7 @@ export class TransportController {
 
   resetPlayback(): void {
     this.activeAttempt = null
+    this.pendingRestorePosition = null
     this.consecutiveFailures = 0
     this.deps.queue.clear()
     this.deps.engine.pause()
@@ -178,6 +190,47 @@ export class TransportController {
 
     const reconciled = this.deps.queue.reconcile((trackId) => this.findTrackById(trackId))
     if (!reconciled) this.resetPlayback()
+  }
+
+  /**
+   * Restores a saved queue and loads its current track paused. The saved position is applied once
+   * metadata arrives; nothing autoplays.
+   */
+  restoreSession(state: SessionQueueState, position: SessionPositionState | null): boolean {
+    const current = this.deps.queue.importState(state, (trackId) =>
+      this.findTrackById(trackId)
+    )
+
+    this.consecutiveFailures = 0
+    this.activeAttempt = null
+
+    if (!current) {
+      this.pendingRestorePosition = null
+      this.deps.engine.pause()
+      this.deps.setLyricsTrack(null)
+      this.resetTimeUi()
+      this.deps.updateControls()
+      this.deps.updateNowPlaying()
+      this.deps.updateTrackHighlight()
+      return false
+    }
+
+    const savedPosition =
+      position &&
+      position.entryId === current.entryId &&
+      position.trackId === current.track.id &&
+      position.position > 0
+        ? position.position
+        : null
+    this.pendingRestorePosition = savedPosition
+
+    this.deps.engine.load(current.track)
+    this.deps.setLyricsTrack(current.track.id)
+    this.resetTimeUi()
+    this.deps.updateNowPlaying()
+    this.deps.updateTrackHighlight()
+    this.deps.updateControls()
+    return true
   }
 
   /** Subscribes to engine events and returns a single disposer for all of them. */
@@ -197,7 +250,23 @@ export class TransportController {
       }),
       engine.on('pause', () => this.deps.updateControls()),
       engine.on('ended', () => this.handleEnded()),
-      engine.on('loadedmetadata', (duration) => this.deps.updateDuration(duration)),
+      engine.on('loadedmetadata', (duration) => {
+        this.deps.updateDuration(duration)
+        if (this.pendingRestorePosition === null) return
+
+        const target = Math.max(
+          0,
+          Math.min(
+            this.pendingRestorePosition,
+            duration > 0 ? Math.max(0, duration - 0.05) : this.pendingRestorePosition
+          )
+        )
+        this.pendingRestorePosition = null
+        engine.seek(target)
+        this.deps.syncTime(target)
+        engine.pause()
+        this.deps.onSeekEnd()
+      }),
       engine.on('timeupdate', (position) => {
         if (!this.isSeeking) this.deps.syncTime(position)
       }),
@@ -210,9 +279,9 @@ export class TransportController {
   private bindControls(): void {
     const { elements, engine } = this.deps
 
-    elements.previousButton.addEventListener('click', () => this.previous())
-    elements.playPauseButton.addEventListener('click', () => this.togglePlayPause())
-    elements.nextButton.addEventListener('click', () => this.next())
+    elements.previousButton.addEventListener('click', () => this.previousTrack())
+    elements.playPauseButton.addEventListener('click', () => this.playPause())
+    elements.nextButton.addEventListener('click', () => this.nextTrack())
 
     elements.seekBar.addEventListener('pointerdown', () => {
       this.isSeeking = true
@@ -228,7 +297,9 @@ export class TransportController {
     })
 
     const finishSeeking = (): void => {
+      const wasSeeking = this.isSeeking
       this.isSeeking = false
+      if (wasSeeking) this.deps.onSeekEnd()
     }
 
     elements.seekBar.addEventListener('change', finishSeeking)
@@ -250,7 +321,7 @@ export class TransportController {
     this.deps.resetTime()
   }
 
-  private previous(): void {
+  public previousTrack(): void {
     const { engine, queue } = this.deps
     if (!queue.getSnapshot().current) return
 
@@ -276,7 +347,7 @@ export class TransportController {
     this.deps.syncTime(0)
   }
 
-  private togglePlayPause(): void {
+  public playPause(): void {
     const { engine, queue } = this.deps
     if (!queue.getSnapshot().current) return
 
@@ -289,10 +360,55 @@ export class TransportController {
     this.resumeCurrentTrack()
   }
 
-  private next(): void {
+  public play(): void {
+    if (!this.deps.queue.getSnapshot().current) return
+    if (this.deps.engine.isPlaying()) return
+    this.consecutiveFailures = 0
+    this.resumeCurrentTrack()
+  }
+
+  public pause(): void {
+    this.deps.engine.pause()
+  }
+
+  public nextTrack(): void {
     this.consecutiveFailures = 0
     const entry = this.deps.queue.advance('skip')
     if (entry) this.startCurrentTrack(true)
+  }
+
+  /** Seek relative to the current position; used by shortcuts and media-session actions. */
+  public seekBy(delta: number): void {
+    if (!Number.isFinite(delta)) return
+    this.seekTo(this.deps.engine.getPosition() + delta)
+  }
+
+  /** Seek to an absolute position, clamped to the loaded duration. */
+  public seekTo(seconds: number): void {
+    if (!Number.isFinite(seconds)) return
+    if (!this.deps.queue.getSnapshot().current) return
+
+    const { engine } = this.deps
+    const duration = engine.getDuration()
+    const target = Math.min(
+      Math.max(0, seconds),
+      duration > 0 ? duration : Number.POSITIVE_INFINITY
+    )
+    engine.seek(target)
+    this.deps.syncTime(target)
+    this.deps.onSeekEnd()
+  }
+
+  /** Changes the volume by a delta and persists it exactly like the slider does. */
+  public adjustVolume(delta: number): void {
+    if (!Number.isFinite(delta)) return
+
+    const { elements, engine } = this.deps
+    const current = Number(elements.volumeSlider.value)
+    const next = Math.min(1, Math.max(0, (Number.isFinite(current) ? current : 1) + delta))
+    engine.setVolume(next)
+    elements.volumeSlider.value = String(next)
+    this.deps.saveVolume(next)
   }
 
   private resumeCurrentTrack(): void {

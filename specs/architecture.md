@@ -30,6 +30,10 @@ of every module. Exact imports and call graphs belong to graphify, not to this f
 - Queue an album, an artist, or the visible filtered list (tracks view) with a queue context.
 - Control playback with shuffle and off/all/one repeat over an editable queue model, and inspect,
   reorder, remove, clear, or jump within it from a virtualized slide-over queue panel.
+- Restore the last session paused (queue, current entry, position) and remember window bounds, with a
+  single-instance lock protecting the machine-local data files.
+- Drive playback from a declarative global shortcut table, a generated help overlay, OS media keys,
+  and the Windows Media Session overlay.
 - Right-click (or `Shift+F10`) tracks, albums, artists, queue rows, and the current track for
   playback, queue, navigation, and reveal actions, with non-blocking status toasts.
 - Load embedded lyrics on demand and display them in a **Now Playing** view.
@@ -60,6 +64,9 @@ state, and lyric presentation.**
 │    ├─ cache.ts / settings.ts / json-file.ts ── persistence           │
 │    ├─ covers.ts ── embedded/folder art → cached JPEGs                │
 │    ├─ reveal.ts + pathContainment.ts ── reveal validated FLAC        │
+│    ├─ windowBounds.ts + windowState.ts ── bounds restore/save        │
+│    ├─ sessionValidation.ts + sessionStore.ts ── resume session       │
+│    ├─ mediaKeys.ts ── opt-in global media-key fallback               │
 │    ├─ lyrics/ ── embedded + sidecar providers, choice store          │
 │    └─ media-protocol.ts + range.ts ── media:// serving + ranges      │
 │                                                                      │
@@ -94,6 +101,9 @@ state, and lyric presentation.**
 │    ├─ player/queue/ ── editable queue + shuffle + repeat             │
 │    ├─ queue/ ── pure panel rows + drag/keyboard geometry             │
 │    ├─ menus/ ── pure menu builders, action dispatch, toast text      │
+│    ├─ shortcuts/ ── registry, commands, Escape layers, overlay model │
+│    ├─ session/ ── resume-session tracking (debounced)                │
+│    ├─ media/ ── Media Session metadata/actions + API wiring          │
 │    ├─ library/artistTracks.ts ── pure artist playback ordering       │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
 │    ├─ ui/queuePanel.ts ── virtualized queue slide-over               │
@@ -121,6 +131,8 @@ state, and lyric presentation.**
 | Audio bytes | Main (`media://track/<id>`) | `<audio src>` only |
 | Lyrics from embedded tags and sidecars | Main | `getLyricSources(trackId)` |
 | Reveal a scanned file in the OS file manager | Main | `revealTrack(trackId)` → boolean |
+| Window state + resume session | Main | `getSession`, `saveSessionQueue`, `saveSessionPosition` |
+| Media keys/overlay | Main (mode) + renderer (Media Session) | `onMediaKey` in fallback mode |
 | Translation alignment/attachment | Renderer (pure shared module) | Direct |
 | Playback position/transport | Renderer | Direct |
 | Library queries, search, sort | Renderer | Direct |
@@ -147,7 +159,13 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | Path | Responsibility |
 | --- | --- |
 | `index.ts` | App lifecycle + startup wiring. |
-| `window.ts` | BrowserWindow creation + renderer sends. |
+| `window.ts` | BrowserWindow creation/restore + renderer sends. |
+| `windowBounds.ts` | Pure window-bounds resolution/clamping/recentering. |
+| `windowState.ts` | Debounced atomic `window-state.json` read/write. |
+| `sessionValidation.ts` | Pure session queue/position validation and caps. |
+| `sessionWritePolicy.ts` | Pure session write-throttle decision. |
+| `sessionStore.ts` | Session files, folder check, in-memory latest payload, flush. |
+| `mediaKeys.ts` | Opt-in globalShortcut media-key fallback. |
 | `ipc.ts` | IPC channel registration + validation. |
 | `scanCoordinator.ts` | Scan generation, progress, folder persistence. |
 | `store.ts` | Shared settings/cache state container. |
@@ -209,6 +227,19 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `menus/contextMenuModels.ts` | Pure track/album/artist/queue-row/current-track menu builders. |
 | `menus/contextActions.ts` | Menu-action dispatch with injected queue/transport/navigation/toast/reveal dependencies. |
 | `menus/toastMessages.ts` | Exact toast strings and title truncation. |
+| `shortcuts/shortcutRegistry.ts` | Pure definitions, chord matching, conflict check, labels. |
+| `shortcuts/defaultShortcuts.ts` | Declarative shortcut table. |
+| `shortcuts/typingGuard.ts` | Pure typing/native-activation guard. |
+| `shortcuts/layerStack.ts` | Pure Escape priority stack. |
+| `shortcuts/shortcutCommands.ts` | Command-id → injected handler map. |
+| `shortcuts/shortcutController.ts` | Single global keydown listener. |
+| `shortcuts/overlayModel.ts` | Pure grouped help-overlay model. |
+| `session/sessionTiming.ts` | Pure session send-interval rules. |
+| `session/sessionController.ts` | Debounced queue/position session updates. |
+| `media/mediaSessionModel.ts` | Pure Media Session metadata + action mapping. |
+| `media/mediaSession.ts` | Feature-detected Media Session wiring. |
+| `ui/shortcutOverlay.ts` | Generated modal shortcuts dialog. |
+| `styles/shortcutOverlay.css` | Shortcuts overlay styling. |
 | `lyrics/lyricsController.ts` | Source fetch/parse/select/state/cache. |
 | `lyrics/translationState.ts` | Pure translation layer + document attachment. |
 | `lyrics/translationMenuModel.ts` | Pure translation section + quick-toggle model. |

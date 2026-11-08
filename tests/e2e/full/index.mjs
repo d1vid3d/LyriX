@@ -7,6 +7,7 @@ import { LIBRARY_STATE_EXPRESSION } from '../lib/dom.mjs'
 import { runSuite } from '../lib/runner.mjs'
 import { runStartup, runRescan } from './library.mjs'
 import * as playback from './playback.mjs'
+import * as sessionResume from './session.mjs'
 import * as views from './views.mjs'
 
 async function run() {
@@ -45,10 +46,24 @@ async function run() {
         ctx.cdp = ctx.app.cdp
 
         await views.run(ctx)
+        const viewsHealth = {
+          consoleErrors: [...ctx.cdp.consoleErrors],
+          exceptions: [...ctx.cdp.exceptions]
+        }
+
+        await sessionResume.run(ctx)
 
         runner.step('full: renderer health')
-        const consoleErrors = [...session.consoleErrors, ...ctx.cdp.consoleErrors]
-        const exceptions = [...session.exceptions, ...ctx.cdp.exceptions]
+        const consoleErrors = [
+          ...session.consoleErrors,
+          ...viewsHealth.consoleErrors,
+          ...ctx.cdp.consoleErrors
+        ]
+        const exceptions = [
+          ...session.exceptions,
+          ...viewsHealth.exceptions,
+          ...ctx.cdp.exceptions
+        ]
         const unexpected = consoleErrors.filter((message) => !message.includes('Could not play broken'))
         runner.check('no unexpected renderer console errors', unexpected.length === 0, unexpected.join(' | '))
         runner.check('no renderer exceptions', exceptions.length === 0, exceptions.join(' | '))

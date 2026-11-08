@@ -50,6 +50,46 @@ export interface UiState {
 
 export type RepeatMode = 'off' | 'all' | 'one'
 
+/** The library slice a queue was built from (serialized with the session). */
+export interface QueueContext {
+  kind: 'album' | 'artist' | 'tracks' | 'search' | 'other'
+  label: string
+}
+
+/** How a queue entry entered the queue. */
+export type QueueOrigin = 'context' | 'playNext' | 'added'
+
+/** Plain-JSON queue state persisted with the session; tracks are referenced by id. */
+export interface SessionQueueEntry {
+  entryId: string
+  trackId: string
+  origin: QueueOrigin
+}
+
+export interface SessionQueueState {
+  version: 1
+  entries: SessionQueueEntry[]
+  originalOrder: string[]
+  currentEntryId: string | null
+  context: QueueContext | null
+}
+
+/** Position of the current entry; stored separately so it can be written cheaply. */
+export interface SessionPositionState {
+  entryId: string
+  trackId: string
+  position: number
+}
+
+/** Session returned to the renderer only when it belongs to the current library folder. */
+export interface RestoredSession {
+  queue: SessionQueueState
+  position: SessionPositionState | null
+}
+
+export type MediaKeyAction = 'playpause' | 'next' | 'previous' | 'stop'
+
+
 /** Playback preferences persisted between launches. */
 export interface PlaybackSettingsInput {
   shuffle: boolean
@@ -92,6 +132,9 @@ export interface LibraryApi {
   saveVolume(volume: number): Promise<void>
   saveUiState(state: UiState): Promise<void>
   savePlaybackSettings(settings: PlaybackSettingsInput): Promise<void>
+  getSession(): Promise<RestoredSession | null>
+  saveSessionQueue(state: SessionQueueState): Promise<void>
+  saveSessionPosition(state: SessionPositionState): Promise<void>
   getLyricSources(trackId: string): Promise<LyricSources | null>
   saveLyricChoice(trackId: string, sourceId: string | null): Promise<void>
   saveLyricPreference(preference: LyricPreference): Promise<void>
@@ -99,4 +142,5 @@ export interface LibraryApi {
   saveTranslationSettings(input: TranslationSettingsInput): Promise<void>
   onScanProgress(listener: (progress: ScanProgress) => void): () => void
   onLibraryUpdated(listener: (snapshot: LibrarySnapshot) => void): () => void
+  onMediaKey(listener: (action: MediaKeyAction) => void): () => void
 }

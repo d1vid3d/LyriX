@@ -250,11 +250,6 @@ export class ContextMenu<Item extends MenuItem = MenuItem> {
     if (!this.openState) return
 
     switch (event.key) {
-      case 'Escape':
-        event.preventDefault()
-        event.stopPropagation()
-        this.close(true)
-        return
       case 'Tab':
         this.close(false)
         return

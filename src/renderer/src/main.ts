@@ -4,27 +4,25 @@ import '../styles/lyricSourceMenu.css'
 import '../styles/contextMenu.css'
 import '../styles/queuePanel.css'
 import '../styles/toast.css'
+import '../styles/shortcutOverlay.css'
 import type { Album } from '../../shared/types'
 import { LyricsController } from '../lyrics/lyricsController'
 import type { ArtistItem, TrackItem } from '../library/query'
 import { ContextActions } from '../menus/contextActions'
-import {
-  buildAlbumMenu,
-  buildArtistMenu,
-  buildCurrentTrackMenu,
-  buildQueueRowMenu,
-  buildTrackMenu
-} from '../menus/contextMenuModels'
 import type { ContextMenuItem } from '../menus/contextMenuModels'
 import { HtmlAudioEngine } from '../player/engine'
 import { PlaybackQueue } from '../player/queue'
 import type { QueuePanelEntryRow } from '../queue/queuePanelModel'
+import { DEFAULT_SHORTCUTS } from '../shortcuts/defaultShortcuts'
 import { ContextMenu } from '../ui/contextMenu'
 import type { MenuPosition } from '../ui/contextMenu'
 import { LyricView } from '../ui/lyricView'
 import { attachMenuTrigger } from '../ui/menuTrigger'
 import { QueuePanel } from '../ui/queuePanel'
+import { ShortcutOverlay } from '../ui/shortcutOverlay'
 import { Toast } from '../ui/toast'
+import { createContextMenuOpeners } from './contextMenus'
+import type { ContextMenuOpeners } from './contextMenus'
 import { getAppElements } from './dom'
 import { attachCoverFallbacks } from './format'
 import { LibraryController } from './libraryController'
@@ -33,6 +31,8 @@ import { NowPlayingController } from './nowPlaying'
 import { PlayerBar } from './playerBar'
 import { QueuePanelController } from './queuePanelController'
 import { ScreenController } from './screen'
+import { createShellFeatures } from './shellFeatures'
+import type { ShellFeatures } from './shellFeatures'
 import { ToolbarController } from './toolbar'
 import { TransportController } from './transport'
 import { TracksList } from './views/tracksList'
@@ -51,8 +51,13 @@ let nowPlaying: NowPlayingController
 let library: LibraryController
 let contextActions: ContextActions
 let queuePanelController: QueuePanelController
+let shellFeatures: ShellFeatures | null = null
+let openers: ContextMenuOpeners
+
+const isMac = /mac/i.test(navigator.platform)
 
 const toast = new Toast({ container: elements.toastRegion })
+const shortcutOverlay = new ShortcutOverlay(DEFAULT_SHORTCUTS, isMac)
 const contextMenu = new ContextMenu<ContextMenuItem>({
   onSelect: (item) => contextActions.run(item),
   onOpen: () => nowPlaying.closeSourceMenu()
@@ -101,7 +106,7 @@ const queuePanel = new QueuePanel(
       queuePanelController.handleReorderEntry(entryId, slot),
     onMoveEntry: (entryId, direction) =>
       queuePanelController.handleMoveEntry(entryId, direction),
-    onOpenMenu: (row, position) => openQueueRowMenu(row, position)
+    onOpenMenu: (row, position) => openers.openQueueRowMenu(row, position)
   }
 )
 
@@ -113,7 +118,7 @@ const tracksList = new TracksList({
   getCurrentTrackId: () => transport.getCurrentTrack()?.id ?? null,
   onPlayTrack: (index) => transport.playVisibleTrack(index),
   onOpenTrackMenu: (item, _index, play, position) =>
-    openTrackMenu(item, play, position)
+    openers.openTrackMenu(item, play, position)
 })
 
 const playerBar = new PlayerBar({
@@ -130,50 +135,9 @@ const playerBar = new PlayerBar({
   toggleQueuePanel: () => queuePanelController.toggle()
 })
 
-attachMenuTrigger(elements.nowPlayingTarget, (position) => openCurrentTrackMenu(position))
-
-function openTrackMenu(item: TrackItem, play: () => void, position: MenuPosition): void {
-  contextMenu.show(
-    buildTrackMenu({ track: item.track, album: item.album, play }),
-    position
-  )
-}
-
-function openAlbumTrackMenu(
-  album: Album,
-  track: Album['tracks'][number],
-  play: () => void,
-  position: MenuPosition
-): void {
-  contextMenu.show(buildTrackMenu({ track, album, play }), position)
-}
-
-function openAlbumMenu(album: Album, position: MenuPosition): void {
-  contextMenu.show(buildAlbumMenu({ album }), position)
-}
-
-function openArtistMenu(artist: ArtistItem, position: MenuPosition): void {
-  contextMenu.show(buildArtistMenu({ artist }), position)
-}
-
-function openQueueRowMenu(row: QueuePanelEntryRow, position: MenuPosition): void {
-  contextMenu.show(buildQueueRowMenu(row), position)
-}
-
-function openCurrentTrackMenu(position: MenuPosition): void {
-  const track = transport.getCurrentTrack()
-  if (!track) return
-
-  const album = library.findAlbumForTrack(track)
-  contextMenu.show(
-    buildCurrentTrackMenu({
-      track,
-      albumId: album?.id ?? null,
-      artistName: album?.artist ?? track.artist
-    }),
-    position
-  )
-}
+attachMenuTrigger(elements.nowPlayingTarget, (position) =>
+  openers.openCurrentTrackMenu(position)
+)
 
 function renderNowPlaying(): void {
   playerBar.updateNowPlaying()
@@ -202,7 +166,11 @@ transport = new TransportController({
   updateTrackHighlight: () => screen.updateTrackHighlight(),
   syncTime: (time) => playerBar.syncTime(time),
   resetTime: () => playerBar.resetTime(),
-  updateDuration: (duration) => playerBar.updateDuration(duration)
+  updateDuration: (duration) => playerBar.updateDuration(duration),
+  onSeekEnd: () => {
+    shellFeatures?.sessionController.noteSeek()
+    shellFeatures?.mediaSession.syncPosition()
+  }
 })
 
 navigation = new NavigationController({
@@ -242,17 +210,9 @@ toolbar = new ToolbarController({
   switchView: (view) => navigation.switchView(view),
   isNowPlayingOpen: () => nowPlaying.isOpen(),
   leaveNowPlaying: () => nowPlaying.leaveForNavigation(),
-  closeNowPlaying: () => nowPlaying.closeNowPlaying(),
   showCurrentSection: () => navigation.showSection(navigation.currentSection()),
   renderLibraryView: (view) => screen.renderLibraryView(view),
-  saveUiState: () => saveUiState(),
-  isContextMenuOpen: () => contextMenu.isOpen(),
-  closeContextMenu: () => contextMenu.close(true),
-  isSourceMenuOpen: () => nowPlaying.isSourceMenuOpen(),
-  closeSourceMenu: () => nowPlaying.closeSourceMenu(),
-  isQueuePanelOpen: () => queuePanelController.isOpen(),
-  closeQueuePanel: () => queuePanelController.close(),
-  toggleQueuePanel: () => queuePanelController.toggle()
+  saveUiState: () => saveUiState()
 })
 
 screen = new ScreenController({
@@ -274,12 +234,12 @@ screen = new ScreenController({
   onShuffleAlbum: (album) => transport.shuffleAlbum(album),
   onPlayArtist: (artist) => transport.playArtist(artist),
   onShuffleArtist: (artist) => transport.shuffleArtist(artist),
-  onOpenAlbumMenu: (album, position) => openAlbumMenu(album, position),
-  onOpenArtistMenu: (artist, position) => openArtistMenu(artist, position),
+  onOpenAlbumMenu: (album, position) => openers.openAlbumMenu(album, position),
+  onOpenArtistMenu: (artist, position) => openers.openArtistMenu(artist, position),
   onOpenTrackRowMenu: (item, _index, play, position) =>
-    openTrackMenu(item, play, position),
+    openers.openTrackMenu(item, play, position),
   onOpenAlbumTrackMenu: (album, track, play, position) =>
-    openAlbumTrackMenu(album, track, play, position),
+    openers.openAlbumTrackMenu(album, track, play, position),
   syncViewControls: () => toolbar.syncViewControls()
 })
 
@@ -331,7 +291,7 @@ queuePanelController = new QueuePanelController({
   findAlbum: (track) => library.findAlbumForTrack(track),
   startCurrentTrack: () => transport.startCurrentTrack(true),
   toast: (message) => toast.show(message),
-  openRowMenu: (row, position) => openQueueRowMenu(row, position),
+  openRowMenu: (row, position) => openers.openQueueRowMenu(row, position),
   onStateChange: () => playerBar.updateControls()
 })
 
@@ -341,6 +301,29 @@ function saveUiState(): void {
     .catch((error) => console.error('[renderer] Could not save view settings', error))
 }
 
+openers = createContextMenuOpeners({
+  menu: contextMenu,
+  getCurrentTrack: () => transport.getCurrentTrack(),
+  findAlbumForTrack: (track) => library.findAlbumForTrack(track)
+})
+
+shellFeatures = createShellFeatures({
+  elements,
+  queue,
+  engine,
+  transport,
+  nowPlaying,
+  contextMenu,
+  toolbar,
+  queuePanel: queuePanelController,
+  overlay: shortcutOverlay,
+  getAlbumForTrack: (track) => library.findAlbumForTrack(track),
+  subscribeMediaKey: (listener) => window.library.onMediaKey(listener),
+  isMac
+})
+
+elements.shortcutsHelpButton.addEventListener('click', () => shortcutOverlay.open())
+
 engine.setVolume(Number(elements.volumeSlider.value))
 
 const disposers = [
@@ -348,13 +331,32 @@ const disposers = [
   library.start(),
   nowPlaying.start(),
   queuePanelController.start(),
-  queue.subscribe(() => playerBar.updateControls())
+  queue.subscribe(() => playerBar.updateControls()),
+  shellFeatures.shortcutController.start()
 ]
 
 toolbar.syncViewControls()
-void library.initialize()
+
+async function initializeApp(): Promise<void> {
+  await library.initialize()
+  try {
+    const restored = await window.library.getSession()
+    if (restored) transport.restoreSession(restored.queue, restored.position)
+  } catch (error) {
+    console.error('[renderer] Could not restore the last session', error)
+  }
+
+  // Writes start only after restore, so applying the session never overwrites it.
+  shellFeatures?.sessionController.start()
+  shellFeatures?.mediaSession.start()
+}
+
+void initializeApp()
 
 window.addEventListener('beforeunload', () => {
+  shellFeatures?.sessionController.flush()
+  shellFeatures?.sessionController.dispose()
+  shellFeatures?.mediaSession.dispose()
   for (const dispose of disposers) dispose()
   toolbar.dispose()
   nowPlaying.destroy()
@@ -362,5 +364,6 @@ window.addEventListener('beforeunload', () => {
   tracksList.destroy()
   queuePanel.destroy()
   contextMenu.destroy()
+  shortcutOverlay.destroy()
   toast.destroy()
 })

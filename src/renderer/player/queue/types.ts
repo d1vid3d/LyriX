@@ -1,18 +1,11 @@
-import type { RepeatMode, Track } from '../../../shared/types'
+import type { QueueContext, QueueOrigin, RepeatMode, Track } from '../../../shared/types'
 
-export type { RepeatMode } from '../../../shared/types'
-
-export type QueueOrigin = 'context' | 'playNext' | 'added'
+export type { QueueContext, QueueOrigin, RepeatMode } from '../../../shared/types'
 
 export interface QueueEntry {
   entryId: string
   track: Track
   origin: QueueOrigin
-}
-
-export interface QueueContext {
-  kind: 'album' | 'artist' | 'tracks' | 'search' | 'other'
-  label: string
 }
 
 export interface QueueSnapshot {

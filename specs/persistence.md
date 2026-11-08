@@ -4,9 +4,9 @@
 atomic-write helpers shared by all stores.
 
 **Owning source paths:** `src/main/cache.ts`, `src/main/settings.ts`, `src/main/lyrics/choices.ts`,
-`src/main/json-file.ts`.
+`src/main/json-file.ts`, `src/main/windowState.ts`, `src/main/sessionStore.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md) (invariants 6 and 8),
 [data-model.md](data-model.md), [main/library-scanning.md](main/library-scanning.md),
@@ -21,6 +21,9 @@ All paths are under Electron `userData`.
 | `settings.json` | `lastFolder`, `volume`, `lastView`, `sortByView`, `lyricPreference`, `translationEnabled`, `translationLanguage`, `shuffle`, `repeat`. | Normalized, atomic. |
 | `library-cache.json` | Version, folder, per-path tag entries with `mtimeMs`/`size`. | Validated, atomic. |
 | `lyric-choices.json` | Version 1 plus `tracks` and optional `translations`: `Record<trackId, sourceId>`. | Validated, atomic, capped at 5000 entries per map. |
+| `window-state.json` | Version 1, normal bounds `{ x, y, width, height }`, maximized flag. | Debounced 500 ms, atomic, flushed on close. |
+| `session-queue.json` | Version 1, library folder, and the exported queue state (entries by track id, natural order, current entry, context). | Validated, atomic, change-driven. |
+| `session-position.json` | Version 1, library folder, and `{ entryId, trackId, position }` for the current entry. | Validated, atomic, throttled to 1 s. |
 | `covers/<albumId>.jpg` | Full cover JPEG. Dimensions and quality are owned by [main/covers-and-media.md](main/covers-and-media.md). | Atomic. |
 | `covers/<albumId>-small.jpg` | Small cover JPEG, generated from the full cover. Dimensions are owned by [main/covers-and-media.md](main/covers-and-media.md). | Atomic. |
 
@@ -31,6 +34,10 @@ the entry map from the current directory walk.
 Sidecar `.lrc` files are user-owned inputs and are never written by LyriX. Per-track source and
 translation choices are independent of the library cache, so they survive rescans and
 path-preserving tag updates. A missing `translations` map is equivalent to an empty one.
+
+Window state and both session files are machine-local: they are never stored in the music library,
+and the session only contains track ids (never paths). Their validation and restore rules are owned
+by [main/window-and-session.md](main/window-and-session.md).
 
 ## Library cache (`src/main/cache.ts`)
 

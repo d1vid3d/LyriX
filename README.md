@@ -59,6 +59,12 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/main/media-protocol.ts` | `media://` protocol for tracks and covers, with HTTP range support. |
 | `src/main/pathContainment.ts` | Pure strict path-containment and reveal-path guards. |
 | `src/main/reveal.ts` | Resolves, canonicalizes and validates a scanned track before revealing it in the OS file manager. |
+| `src/main/windowBounds.ts` | Pure window-bounds fallback/clamp/recenter logic. |
+| `src/main/windowState.ts` | Debounced atomic `userData/window-state.json` read/write. |
+| `src/main/sessionValidation.ts` | Pure session queue/position validation and caps. |
+| `src/main/sessionWritePolicy.ts` | Pure session write-throttle decision. |
+| `src/main/sessionStore.ts` | Two-file resume session (queue + position) with folder check and flush. |
+| `src/main/mediaKeys.ts` | Opt-in globalShortcut media-key fallback. |
 | `src/main/range.ts` | Parses `Range` headers for partial-content responses. |
 | `src/preload/index.ts` | Exposes the typed `window.library` API via `contextBridge`. |
 | `src/preload/index.d.ts` | Global `Window` typing for the preload API. |
@@ -72,6 +78,11 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/renderer/menus/contextMenuModels.ts` | Pure track/album/artist/queue-row/current-track menu builders and typed payloads. |
 | `src/renderer/menus/contextActions.ts` | Menu-action dispatch with injected queue, transport, navigation, toast and reveal dependencies. |
 | `src/renderer/menus/toastMessages.ts` | Exact toast strings and title truncation. |
+| `src/renderer/shortcuts/` | Declarative shortcut table, pure matching/typing guard/conflict check, Escape layer stack, command map, single keydown controller and overlay model. |
+| `src/renderer/session/` | Pure session send timing and the debounced queue/position tracker. |
+| `src/renderer/media/` | Pure Media Session metadata/action mapping and the feature-detected wiring. |
+| `src/renderer/ui/shortcutOverlay.ts` | Generated modal keyboard-shortcuts dialog with focus trap. |
+| `src/renderer/styles/shortcutOverlay.css` | Shortcuts overlay styling. |
 | `src/renderer/player/transportDecisions.ts` | Pure ended/previous/failure/repeat-mode decisions. |
 | `src/renderer/library/artistTracks.ts` | Pure artist playback ordering (album year → title, then disc → track → title). |
 | `src/renderer/lyrics/lyricsController.ts` | On-demand lyric source fetch/parse/selection, translation-layer state, stale-response guard and LRU source cache (no DOM). |
@@ -96,7 +107,9 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/renderer/styles/queuePanel.css` | Queue slide-over, row grid, drag handle, current/history and insertion-indicator styling. |
 | `src/renderer/styles/toast.css` | Bottom-center toast region and pill styling. |
 | `src/renderer/src/queuePanelController.ts` | Queue-panel model, queue mutations and playback intents. |
-| `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, context-menu/action/toast wiring, scanning UI and UI-state persistence. |
+| `src/renderer/src/shellFeatures.ts` | Wires shortcut commands/layers, session tracking and Media Session with injected dependencies. |
+| `src/renderer/src/contextMenus.ts` | Builds every context menu from library/queue state. |
+| `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, context-menu/action/toast wiring, shortcut/session/media wiring, scanning UI and UI-state persistence. |
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
 | `src/shared/lyrics/types.ts` | Lyric format, document, line, segment, metadata and parse-option types. |
@@ -120,6 +133,17 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `tests/contextActions.test.ts` | Vitest coverage for play/queue dispatch, empty-queue fallback, navigation misses, reveal failure and queue-row actions. |
 | `tests/toastMessages.test.ts` | Vitest coverage for exact toast strings, pluralization and title truncation. |
 | `tests/revealPath.test.ts` | Vitest coverage for containment, traversal/sibling rejection and reveal extension guards. |
+| `tests/queueSession.test.ts` | Vitest coverage for queue export/import round-trips, shuffled natural order, vanished tracks/current, malformed input and duplicate ids. |
+| `tests/windowBounds.test.ts` | Vitest coverage for default fallback, invalid data, min-size clamp, partial overlap, unplugged monitors and the maximized flag. |
+| `tests/sessionValidation.test.ts` | Vitest coverage for queue/position validation, caps, ids, origins, current entry and position matching. |
+| `tests/sessionWritePolicy.test.ts` | Vitest coverage for queue/position write decisions and throttling. |
+| `tests/sessionStore.test.ts` | Vitest coverage for folder mismatch discard, corrupt files, independent queue/position writes and validation. |
+| `tests/sessionTiming.test.ts` | Vitest coverage for the 5 s position interval and immediate send reasons. |
+| `tests/sessionController.test.ts` | Vitest coverage for no-writeback before start, queue debounce, position throttling, track changes, flush and seek hooks. |
+| `tests/shortcutRegistry.test.ts` | Vitest coverage for exact modifiers, mod mapping, when/scopes, conflicts, labels and the typing guard. |
+| `tests/layerStack.test.ts` | Vitest coverage for priority ordering, single-layer close, closed layers and ties. |
+| `tests/overlayModel.test.ts` | Vitest coverage for overlay grouping and platform-aware chord labels. |
+| `tests/mediaSessionModel.test.ts` | Vitest coverage for metadata/artwork and action mapping. |
 | `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
 | `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, translation enable/selection, stable derived-document identity, reload, stale responses, caching and eviction. |
 | `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
@@ -310,13 +334,34 @@ process, which re-resolves and validates the file against the selected library f
 the OS to reveal it. Toasts appear bottom-center above the player bar, replace the previous message,
 auto-dismiss after about 2.5 seconds, and never take focus or block clicks.
 
+## Window, session resume, shortcuts, and media keys
+
+LyriX remembers its normal window size/position and maximized state across launches, recenters the
+window if the saved monitor is gone, and allows only one instance at a time (a second launch focuses
+the existing window). It also restores the last queue and the paused position of its current entry
+when the same music folder is loaded; a session from another folder is discarded. Nothing autoplays
+on launch.
+
+Global shortcuts now live in one table: **Space** play/pause, **N/P** or **Ctrl+←/→** previous/next,
+**J/L** seek, **Ctrl+↑/↓** volume, **S** shuffle, **R** repeat, **Q** queue, **Ctrl+F** or **/**
+search, **Ctrl+L** Now Playing, **T** translation (when available), and **?** for the generated
+shortcut help dialog (also reached from the toolbar `?` button). Typing in a text field keeps the
+native keys. **Escape** closes exactly one layer at a time: context menu, shortcuts dialog, lyric
+source menu, queue panel, Now Playing, then clears search.
+
+Playback metadata is published to the OS through Chromium's Media Session API so the Windows media
+overlay and hardware media keys can control playback while LyriX is in the background. The
+global-shortcut media-key fallback is implemented but disabled because the Media Session route is the
+one LyriX uses.
+
 ## Out of scope (for now)
 
-Gapless playback, crossfade, queue-contents persistence,
+Gapless playback, crossfade, queue-contents export/save as a playlist,
 fuzzy search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
 virtualization, online lyric or translation lookup, singer-specific lyric styling, translation
 editing, swapping original/translation, side-by-side translation layout, word-level translation
 timing, per-language fonts, TTML, tag editing and packaging are intentionally not implemented.
 
 The queue panel intentionally omits undo, multi-select and saving the queue as a playlist; context
-menus do not implement submenus; and tracks cannot be dragged from the library into the queue.
+menus do not implement submenus; tracks cannot be dragged from the library into the queue; shortcut
+overrides are not user-configurable; and the resume session stores only the current entry's position.

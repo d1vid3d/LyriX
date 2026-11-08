@@ -262,9 +262,9 @@ export async function setSort(cdp, sort) {
   return changed
 }
 
-export async function pressKey(cdp, key, { ctrlKey = false } = {}) {
+export async function pressKey(cdp, key, { ctrlKey = false, shiftKey = false } = {}) {
   await cdp.evaluate(
-    `window.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, ctrlKey: ${ctrlKey}, bubbles: true }))`
+    `window.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}, bubbles: true }))`
   )
 }
 

@@ -8,23 +8,31 @@ that owns the detailed contract.
 **Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md),
+[main/window-and-session.md](main/window-and-session.md),
 [main/library-scanning.md](main/library-scanning.md), [renderer/playback.md](renderer/playback.md),
+[renderer/shortcuts.md](renderer/shortcuts.md),
 [renderer/queue-panel.md](renderer/queue-panel.md),
 [renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md),
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md).
 
 ## Startup
 
-1. Main registers the privileged `media` scheme.
+1. Main registers the privileged `media` scheme and checks the single-instance lock; a second launch
+   focuses the existing window and exits.
 2. Main loads settings and the library cache, then restores the cached snapshot for the last folder.
-3. Main installs the media handler, IPC, and creates the window.
+3. Main loads the saved window bounds, loads the resume session when its folder matches, installs the
+   media handler, IPC, and creates the window.
 4. Preload exposes `window.library`.
 5. Renderer subscribes to library events, loads settings, applies view/sort plus persisted
    shuffle/repeat, then calls `getState`.
 6. `getState` triggers a one-time background refresh; the cached library is already visible.
 7. When the refresh finishes, `library:updated` replaces the snapshot and the UI re-renders.
+8. The renderer then calls `session:get`. If a session exists, it imports the queue, loads the current
+   track, seeks to the saved position once metadata arrives, and leaves it paused. Session writes
+   start only after this restore.
 
 Details: [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md),
+[main/window-and-session.md](main/window-and-session.md),
 [main/library-scanning.md](main/library-scanning.md),
 [renderer/shell-and-navigation.md](renderer/shell-and-navigation.md).
 
@@ -96,6 +104,20 @@ Details: [renderer/queue-panel.md](renderer/queue-panel.md),
 Details: [main/lyric-sources.md](main/lyric-sources.md),
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md),
 [renderer/lyric-view.md](renderer/lyric-view.md).
+
+## Session save, shortcuts, and media keys
+
+1. While playing, the renderer debounces queue changes by ~1 s and sends position at most every ~5 s;
+   pause, seek end, and track change send immediately. Main validates, folder-stamps, throttles the
+   position write, and flushes both files on quit.
+2. Global shortcuts go through one registry-driven listener. Typing and native activation targets win
+   over plain keys; modified shortcuts still work while typing. Escape closes exactly one layer in the
+   priority order owned by [renderer/shortcuts.md](renderer/shortcuts.md).
+3. Media Session metadata/playback state/position follow the current queue and engine; hardware keys
+   and the Windows overlay use that route, with a disabled global-shortcut fallback.
+
+Details: [main/window-and-session.md](main/window-and-session.md),
+[renderer/shortcuts.md](renderer/shortcuts.md).
 
 ## Now Playing open/close
 

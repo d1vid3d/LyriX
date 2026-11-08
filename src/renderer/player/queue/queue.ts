@@ -1,8 +1,8 @@
 import type { Track } from '../../../shared/types'
+import type { QueueContext, SessionQueueState } from '../../../shared/types'
 import { shuffleArray, shuffleEntriesAvoidingTrack } from './shuffle'
 import type { QueueRandom } from './shuffle'
 import type {
-  QueueContext,
   QueueEntry,
   QueueOrigin,
   QueueSnapshot,
@@ -18,6 +18,16 @@ export type QueueListener = (snapshot: QueueSnapshot) => void
 interface QueueOptions {
   random?: QueueRandom
 }
+
+/** Matches the main-process session cap so a hostile payload cannot build a huge queue. */
+const IMPORT_ENTRY_LIMIT = 50_000
+const CONTEXT_KINDS: ReadonlySet<string> = new Set([
+  'album',
+  'artist',
+  'tracks',
+  'search',
+  'other'
+])
 
 function clampIndex(value: number, length: number): number {
   const requested = Number.isFinite(value) ? Math.trunc(value) : 0
@@ -388,6 +398,73 @@ export class PlaybackQueue {
     return kept[nextIndex]
   }
 
+  /** Plain-JSON snapshot of the play order, natural order, current entry, and context. */
+  exportState(): SessionQueueState {
+    return {
+      version: 1,
+      entries: this.entries.map((entry) => ({
+        entryId: entry.entryId,
+        trackId: entry.track.id,
+        origin: entry.origin
+      })),
+      originalOrder: [...this.originalOrder],
+      currentEntryId: this.currentEntry()?.entryId ?? null,
+      context: this.context ? { ...this.context } : null
+    }
+  }
+
+  /**
+   * Restores a previously exported state. Tracks are resolved by id; vanished entries are
+   * dropped, a vanished current entry restarts at the first survivor, and the natural order is
+   * rebuilt without shuffling.
+   */
+  importState(
+    state: unknown,
+    trackLookup: (trackId: string) => Track | null | undefined
+  ): QueueEntry | null {
+    const candidate = normalizeImportedState(state)
+    if (!candidate) {
+      this.entries = []
+      this.originalOrder = []
+      this.index = -1
+      this.context = null
+      this.commit()
+      return null
+    }
+
+    const kept: QueueEntry[] = []
+    const seen = new Set<string>()
+    for (const entry of candidate.entries) {
+      if (kept.length >= IMPORT_ENTRY_LIMIT) break
+      if (seen.has(entry.entryId)) continue
+
+      const track = trackLookup(entry.trackId)
+      if (!track) continue
+
+      seen.add(entry.entryId)
+      kept.push({ entryId: entry.entryId, track, origin: entry.origin })
+    }
+
+    this.entries = kept
+    this.originalOrder = rebuildOriginalOrder(kept, candidate.originalOrder)
+    this.entryCounter = highestEntryCounter(kept)
+
+    if (kept.length === 0) {
+      this.index = -1
+      this.context = null
+      this.commit()
+      return null
+    }
+
+    const currentIndex = candidate.currentEntryId
+      ? kept.findIndex((entry) => entry.entryId === candidate.currentEntryId)
+      : -1
+    this.index = currentIndex >= 0 ? currentIndex : 0
+    this.context = candidate.context
+    this.commit()
+    return this.currentEntry()
+  }
+
   private currentEntry(): QueueEntry | null {
     if (this.index < 0) return null
     return this.entries[this.index] ?? null
@@ -420,4 +497,89 @@ export class PlaybackQueue {
     const snapshot = this.getSnapshot()
     for (const listener of [...this.listeners]) listener(snapshot)
   }
+}
+
+interface ImportedState {
+  entries: Array<{ entryId: string; trackId: string; origin: QueueOrigin }>
+  originalOrder: string[]
+  currentEntryId: string | null
+  context: QueueContext | null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function boundedId(value: unknown): string | null {
+  return typeof value === 'string' && value !== '' && value.length <= 128 ? value : null
+}
+
+function normalizeImportedState(value: unknown): ImportedState | null {
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.entries)) return null
+
+  const entries: ImportedState['entries'] = []
+  for (const raw of value.entries.slice(0, IMPORT_ENTRY_LIMIT)) {
+    if (!isRecord(raw)) continue
+    const entryId = boundedId(raw.entryId)
+    const trackId = boundedId(raw.trackId)
+    if (!entryId || !trackId) continue
+    entries.push({
+      entryId,
+      trackId,
+      origin: normalizeOrigin(raw.origin)
+    })
+  }
+
+  const originalOrder: string[] = []
+  if (Array.isArray(value.originalOrder)) {
+    for (const raw of value.originalOrder.slice(0, IMPORT_ENTRY_LIMIT)) {
+      const id = boundedId(raw)
+      if (id && !originalOrder.includes(id)) originalOrder.push(id)
+    }
+  }
+
+  return {
+    entries,
+    originalOrder,
+    currentEntryId: boundedId(value.currentEntryId),
+    context: normalizeContext(value.context)
+  }
+}
+
+function normalizeOrigin(value: unknown): QueueOrigin {
+  return value === 'playNext' || value === 'added' ? value : 'context'
+}
+
+function normalizeContext(value: unknown): QueueContext | null {
+  if (!isRecord(value) || typeof value.kind !== 'string' || !CONTEXT_KINDS.has(value.kind)) {
+    return null
+  }
+  if (typeof value.label !== 'string' || value.label.length > 200) return null
+  return { kind: value.kind as QueueContext['kind'], label: value.label }
+}
+
+function rebuildOriginalOrder(
+  kept: readonly QueueEntry[],
+  savedOrder: readonly string[]
+): string[] {
+  const keptIds = new Set(kept.map((entry) => entry.entryId))
+  const ordered: string[] = []
+
+  for (const id of savedOrder) {
+    if (keptIds.has(id) && !ordered.includes(id)) ordered.push(id)
+  }
+  for (const entry of kept) {
+    if (!ordered.includes(entry.entryId)) ordered.push(entry.entryId)
+  }
+
+  return ordered
+}
+
+function highestEntryCounter(kept: readonly QueueEntry[]): number {
+  let highest = kept.length
+  for (const entry of kept) {
+    const match = /^entry-(\d+)$/.exec(entry.entryId)
+    if (match) highest = Math.max(highest, Number(match[1]))
+  }
+  return highest
 }
