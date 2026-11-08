@@ -160,6 +160,34 @@ export async function clickSelector(cdp, selector) {
   })()`)
 }
 
+/** Dispatches a right-click on the first match so context-menu triggers open like a real one. */
+export async function rightClickSelector(cdp, selector) {
+  return cdp.evaluate(`(() => {
+    const element = document.querySelector(${JSON.stringify(selector)})
+    if (!element) return false
+    const rect = element.getBoundingClientRect()
+    element.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: Math.round(rect.left + 12),
+      clientY: Math.round(rect.top + 12)
+    }))
+    return true
+  })()`)
+}
+
+/** Clicks an open context-menu item by its visible label. */
+export async function clickMenuItem(cdp, label) {
+  return cdp.evaluate(`(() => {
+    const item = [...document.querySelectorAll('.context-menu [data-menu-item]')].find(
+      (value) => value.querySelector('.context-menu__label')?.textContent === ${JSON.stringify(label)}
+    )
+    if (!item) return false
+    item.click()
+    return true
+  })()`)
+}
+
 export async function clickAlbum(cdp, title, artist) {
   return cdp.evaluate(`(() => {
     const card = [...document.querySelectorAll('#album-grid .album-card')].find((item) =>

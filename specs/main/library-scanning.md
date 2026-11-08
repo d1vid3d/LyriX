@@ -6,7 +6,7 @@ cancellable scans with progress events.
 **Owning source paths:** `src/main/library.ts`, `src/main/tags.ts`, `src/main/albums.ts`,
 `src/main/scanCoordinator.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 2, 4, 7, 8),
 [persistence.md](../persistence.md), [data-model.md](../data-model.md),
@@ -33,7 +33,8 @@ Key functions:
 - `collectFlacFiles(dir)` — skips symbolic links, ignores unreadable folders/files with a warning,
   matches `.flac` case-insensitively.
 - `getSnapshot()`, `getLibraryRoot()`, `resolveTrackFile(id)`, `getAlbumTrackPaths(albumId)`.
-- `isPathInside(root, target)` — relative-path containment used by the media protocol.
+- Containment itself lives in `src/main/pathContainment.ts` (`isPathInside`), shared by the media
+  protocol and the reveal path.
 
 The cache shape and reuse key are owned by [persistence.md](../persistence.md). The path index is
 what lets the renderer work with ids only (invariant 1 in [TechnicalSpecs.md](../TechnicalSpecs.md)).

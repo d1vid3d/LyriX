@@ -71,12 +71,17 @@ DOM-free helpers used by the transport:
   `NowPlayingDeps`; the controller itself stays DOM-free.
 
 `PlayerBar` owns the bottom bar: now-playing title/artist/cover, play/pause labels and disabled
-states, shuffle/repeat state, duration, seek value, and time labels. It reads the current track,
-playing state, queue snapshot, and next/previous availability through callbacks.
+states, shuffle/repeat state, queue toggle state, duration, seek value, and time labels. It reads the
+current track, playing state, queue snapshot, next/previous availability, and queue-panel open state
+through callbacks.
 
 - Shuffle sets `aria-pressed` and a `Shuffle: on|off` label/title.
 - Repeat sets `aria-pressed` (true for `all` and `one`), a `Repeat: <mode>` label/title, and
   `data-repeat`; the inline badge is shown only for `one`.
+- The Queue toggle sets `aria-pressed` and `aria-expanded` from the panel's open state.
+
+The visible queue panel, its row model, and reordering are owned by
+[renderer/queue-panel.md](queue-panel.md).
 
 UNVERIFIED/POSSIBLY STALE: the conceptual fields `nowPlayingOpen` and
 `libraryDirtyWhileNowPlaying` are currently implemented as the private `open` and `dirty` fields on

@@ -1,16 +1,37 @@
 import './style.css'
 import '../styles/lyrics.css'
 import '../styles/lyricSourceMenu.css'
+import '../styles/contextMenu.css'
+import '../styles/queuePanel.css'
+import '../styles/toast.css'
+import type { Album } from '../../shared/types'
 import { LyricsController } from '../lyrics/lyricsController'
+import type { ArtistItem, TrackItem } from '../library/query'
+import { ContextActions } from '../menus/contextActions'
+import {
+  buildAlbumMenu,
+  buildArtistMenu,
+  buildCurrentTrackMenu,
+  buildQueueRowMenu,
+  buildTrackMenu
+} from '../menus/contextMenuModels'
+import type { ContextMenuItem } from '../menus/contextMenuModels'
 import { HtmlAudioEngine } from '../player/engine'
 import { PlaybackQueue } from '../player/queue'
+import type { QueuePanelEntryRow } from '../queue/queuePanelModel'
+import { ContextMenu } from '../ui/contextMenu'
+import type { MenuPosition } from '../ui/contextMenu'
 import { LyricView } from '../ui/lyricView'
+import { attachMenuTrigger } from '../ui/menuTrigger'
+import { QueuePanel } from '../ui/queuePanel'
+import { Toast } from '../ui/toast'
 import { getAppElements } from './dom'
 import { attachCoverFallbacks } from './format'
 import { LibraryController } from './libraryController'
 import { NavigationController } from './navigation'
 import { NowPlayingController } from './nowPlaying'
 import { PlayerBar } from './playerBar'
+import { QueuePanelController } from './queuePanelController'
 import { ScreenController } from './screen'
 import { ToolbarController } from './toolbar'
 import { TransportController } from './transport'
@@ -21,6 +42,21 @@ const TRACK_ROW_HEIGHT = 52
 const elements = getAppElements()
 const engine = new HtmlAudioEngine(elements.audio)
 const queue = new PlaybackQueue()
+
+let transport: TransportController
+let navigation: NavigationController
+let toolbar: ToolbarController
+let screen: ScreenController
+let nowPlaying: NowPlayingController
+let library: LibraryController
+let contextActions: ContextActions
+let queuePanelController: QueuePanelController
+
+const toast = new Toast({ container: elements.toastRegion })
+const contextMenu = new ContextMenu<ContextMenuItem>({
+  onSelect: (item) => contextActions.run(item),
+  onOpen: () => nowPlaying.closeSourceMenu()
+})
 
 attachCoverFallbacks([
   elements.detailCoverImage,
@@ -46,12 +82,28 @@ const lyricView = new LyricView({
   engine
 })
 
-let transport: TransportController
-let navigation: NavigationController
-let toolbar: ToolbarController
-let screen: ScreenController
-let nowPlaying: NowPlayingController
-let library: LibraryController
+const queuePanel = new QueuePanel(
+  {
+    panel: elements.queuePanel,
+    scroll: elements.queueScroll,
+    context: elements.queueContextLabel,
+    summary: elements.queueSummaryLabel,
+    clearButton: elements.queueClearButton,
+    closeButton: elements.queueCloseButton
+  },
+  {
+    onClose: () => queuePanelController.close(),
+    onClear: () => queuePanelController.handleClear(),
+    onToggleHistory: () => queuePanelController.handleToggleHistory(),
+    onPlayEntry: (entryId) => queuePanelController.handlePlayEntry(entryId),
+    onRemoveEntry: (entryId) => queuePanelController.handleRemoveEntry(entryId),
+    onReorderEntry: (entryId, slot) =>
+      queuePanelController.handleReorderEntry(entryId, slot),
+    onMoveEntry: (entryId, direction) =>
+      queuePanelController.handleMoveEntry(entryId, direction),
+    onOpenMenu: (row, position) => openQueueRowMenu(row, position)
+  }
+)
 
 const tracksList = new TracksList({
   scroll: elements.trackScroll,
@@ -59,7 +111,9 @@ const tracksList = new TracksList({
   rowHeight: TRACK_ROW_HEIGHT,
   emptyMessage: () => library.emptyMessage(),
   getCurrentTrackId: () => transport.getCurrentTrack()?.id ?? null,
-  onPlayTrack: (index) => transport.playVisibleTrack(index)
+  onPlayTrack: (index) => transport.playVisibleTrack(index),
+  onOpenTrackMenu: (item, _index, play, position) =>
+    openTrackMenu(item, play, position)
 })
 
 const playerBar = new PlayerBar({
@@ -71,8 +125,55 @@ const playerBar = new PlayerBar({
   canGoPrevious: () => queue.canGoPrevious(),
   isPlaying: () => engine.isPlaying(),
   toggleShuffle: () => transport.toggleShuffle(),
-  cycleRepeat: () => transport.cycleRepeat()
+  cycleRepeat: () => transport.cycleRepeat(),
+  isQueuePanelOpen: () => queuePanelController.isOpen(),
+  toggleQueuePanel: () => queuePanelController.toggle()
 })
+
+attachMenuTrigger(elements.nowPlayingTarget, (position) => openCurrentTrackMenu(position))
+
+function openTrackMenu(item: TrackItem, play: () => void, position: MenuPosition): void {
+  contextMenu.show(
+    buildTrackMenu({ track: item.track, album: item.album, play }),
+    position
+  )
+}
+
+function openAlbumTrackMenu(
+  album: Album,
+  track: Album['tracks'][number],
+  play: () => void,
+  position: MenuPosition
+): void {
+  contextMenu.show(buildTrackMenu({ track, album, play }), position)
+}
+
+function openAlbumMenu(album: Album, position: MenuPosition): void {
+  contextMenu.show(buildAlbumMenu({ album }), position)
+}
+
+function openArtistMenu(artist: ArtistItem, position: MenuPosition): void {
+  contextMenu.show(buildArtistMenu({ artist }), position)
+}
+
+function openQueueRowMenu(row: QueuePanelEntryRow, position: MenuPosition): void {
+  contextMenu.show(buildQueueRowMenu(row), position)
+}
+
+function openCurrentTrackMenu(position: MenuPosition): void {
+  const track = transport.getCurrentTrack()
+  if (!track) return
+
+  const album = library.findAlbumForTrack(track)
+  contextMenu.show(
+    buildCurrentTrackMenu({
+      track,
+      albumId: album?.id ?? null,
+      artistName: album?.artist ?? track.artist
+    }),
+    position
+  )
+}
 
 function renderNowPlaying(): void {
   playerBar.updateNowPlaying()
@@ -130,7 +231,8 @@ nowPlaying = new NowPlayingController({
   showSection: (section) => navigation.showSection(section),
   currentSection: () => navigation.currentSection(),
   refreshScreen: () => screen.refresh(),
-  renderNowPlaying
+  renderNowPlaying,
+  closeContextMenu: () => contextMenu.close(false)
 })
 
 toolbar = new ToolbarController({
@@ -143,7 +245,14 @@ toolbar = new ToolbarController({
   closeNowPlaying: () => nowPlaying.closeNowPlaying(),
   showCurrentSection: () => navigation.showSection(navigation.currentSection()),
   renderLibraryView: (view) => screen.renderLibraryView(view),
-  saveUiState: () => saveUiState()
+  saveUiState: () => saveUiState(),
+  isContextMenuOpen: () => contextMenu.isOpen(),
+  closeContextMenu: () => contextMenu.close(true),
+  isSourceMenuOpen: () => nowPlaying.isSourceMenuOpen(),
+  closeSourceMenu: () => nowPlaying.closeSourceMenu(),
+  isQueuePanelOpen: () => queuePanelController.isOpen(),
+  closeQueuePanel: () => queuePanelController.close(),
+  toggleQueuePanel: () => queuePanelController.toggle()
 })
 
 screen = new ScreenController({
@@ -165,6 +274,12 @@ screen = new ScreenController({
   onShuffleAlbum: (album) => transport.shuffleAlbum(album),
   onPlayArtist: (artist) => transport.playArtist(artist),
   onShuffleArtist: (artist) => transport.shuffleArtist(artist),
+  onOpenAlbumMenu: (album, position) => openAlbumMenu(album, position),
+  onOpenArtistMenu: (artist, position) => openArtistMenu(artist, position),
+  onOpenTrackRowMenu: (item, _index, play, position) =>
+    openTrackMenu(item, play, position),
+  onOpenAlbumTrackMenu: (album, track, play, position) =>
+    openAlbumTrackMenu(album, track, play, position),
   syncViewControls: () => toolbar.syncViewControls()
 })
 
@@ -197,6 +312,29 @@ library = new LibraryController({
   refreshLyrics: () => lyricsController.clearCacheAndReload()
 })
 
+contextActions = new ContextActions({
+  queue,
+  transport,
+  findAlbum: (albumId) => library.getAlbums().find((album) => album.id === albumId) ?? null,
+  findArtist: (artistName) =>
+    library.getLibraryIndex().items.artists.find((artist) => artist.name === artistName) ??
+    null,
+  openAlbum: (albumId) => navigation.openAlbum(albumId),
+  openArtist: (artistName) => navigation.openArtist(artistName),
+  toast: (message) => toast.show(message),
+  revealTrack: (trackId) => window.library.revealTrack(trackId)
+})
+
+queuePanelController = new QueuePanelController({
+  panel: queuePanel,
+  queue,
+  findAlbum: (track) => library.findAlbumForTrack(track),
+  startCurrentTrack: () => transport.startCurrentTrack(true),
+  toast: (message) => toast.show(message),
+  openRowMenu: (row, position) => openQueueRowMenu(row, position),
+  onStateChange: () => playerBar.updateControls()
+})
+
 function saveUiState(): void {
   void window.library
     .saveUiState(toolbar.currentUiState())
@@ -209,6 +347,7 @@ const disposers = [
   transport.start(),
   library.start(),
   nowPlaying.start(),
+  queuePanelController.start(),
   queue.subscribe(() => playerBar.updateControls())
 ]
 
@@ -221,4 +360,7 @@ window.addEventListener('beforeunload', () => {
   nowPlaying.destroy()
   lyricView.destroy()
   tracksList.destroy()
+  queuePanel.destroy()
+  contextMenu.destroy()
+  toast.destroy()
 })

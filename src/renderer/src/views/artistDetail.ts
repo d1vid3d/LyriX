@@ -1,4 +1,6 @@
+import type { Album } from '../../../shared/types'
 import type { ArtistItem } from '../../library/query'
+import type { MenuPosition } from '../../ui/contextMenu'
 import { renderAlbumCards } from './albumCards'
 
 export interface ArtistDetailOptions {
@@ -9,6 +11,7 @@ export interface ArtistDetailOptions {
   shuffleButton: HTMLButtonElement
   albumGrid: HTMLElement
   onOpenAlbum(albumId: string): void
+  onOpenAlbumMenu?(album: Album, position: MenuPosition): void
   onPlayArtist(artist: ArtistItem): void
   onShuffleArtist(artist: ArtistItem): void
 }
@@ -26,5 +29,10 @@ export function renderArtistDetail(
   const trackLabel = artist.trackCount === 1 ? '1 track' : `${artist.trackCount} tracks`
   options.meta.textContent = `${albumLabel} · ${trackLabel}`
 
-  renderAlbumCards(options.albumGrid, artist.albums, options.onOpenAlbum)
+  renderAlbumCards(
+    options.albumGrid,
+    artist.albums,
+    options.onOpenAlbum,
+    options.onOpenAlbumMenu
+  )
 }

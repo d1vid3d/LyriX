@@ -9,7 +9,7 @@ handling, section choice, and the stateless view renderers.
 `src/renderer/src/screen.ts`, `src/renderer/src/views/`, `src/renderer/src/format.ts`,
 `src/renderer/library/artistTracks.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 8 and 10),
 [renderer/library-query-and-lists.md](library-query-and-lists.md),
@@ -18,22 +18,27 @@ handling, section choice, and the stateless view renderers.
 
 ## Composition root (`src/renderer/src/main.ts`)
 
-`main.ts` is deliberately thin (under 180 lines, composition only). It:
+`main.ts` is deliberately composition-only. It:
 
 - Looks up all DOM elements once through `getAppElements()`.
-- Creates the `HtmlAudioEngine`, `PlaybackQueue`, `LyricsController`, `LyricView`, `PlayerBar`, and
-  the tracks `TracksList`.
+- Creates the `HtmlAudioEngine`, `PlaybackQueue`, `LyricsController`, `LyricView`, `PlayerBar`,
+  `TracksList`, `QueuePanel`/`QueuePanelController`, `ContextMenu`, `ContextActions`, and `Toast`.
 - Constructs every controller with explicit dependency interfaces and wires cross-controller calls
   through callbacks.
-- Subscribes to engine, library, lyric, and queue events, starts `library.initialize()`, and cleans
-  up on `beforeunload`.
+- Attaches menu triggers to album cards, artist rows, detail tracks, virtual track rows, queue rows,
+  and the player-bar current-track target, and builds the matching menus.
+- Subscribes to engine, library, lyric, queue, and queue-panel events, starts `library.initialize()`,
+  and cleans up on `beforeunload`.
 - `applySettings` restores volume, shuffle/repeat, view/sort, lyric preference, and translation
   settings without writing them back to disk.
 
-It owns no routing, playback, search, or rendering state; those live in the controllers below.
+It owns no routing, playback, search, queue-panel, menu, or rendering state; those live in the
+controllers below. The queue panel and context-menu behavior are owned by
+[renderer/queue-panel.md](queue-panel.md) and
+[renderer/context-menu-and-toasts.md](context-menu-and-toasts.md).
 
-UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 203 lines, not under 180.
-The “composition only” description still matches the code; only the line-count claim is stale.
+UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 335 lines. It remains
+composition/wiring only, but the original “under 180 lines” claim no longer holds.
 
 ## Element lookup (`src/renderer/src/dom.ts`)
 
@@ -66,8 +71,9 @@ Owns `sortByView`, `appliedSearch`, and the 150 ms search debounce.
 - `syncViewControls` updates `aria-pressed`, the sort options, and the selected value.
 - `applySearch` closes Now Playing if necessary, re-renders the active library view, then restores
   the appropriate section.
-- `Ctrl/Cmd+F` and `/` focus the search box; `Escape` clears it (Now Playing `Escape` takes
-  priority).
+- `Ctrl/Cmd+F` and `/` focus the search box; `Escape` clears it only after the context menu, source
+  menu, queue panel, and Now Playing have had priority.
+- `Q` toggles the queue panel when no text input has focus and no floating menu is open.
 - Sort and view changes persist through the `saveUiState` callback.
 
 The search/sort definitions and validators live in
@@ -107,16 +113,18 @@ and refreshes the virtualized tracks list.
 
 ## View renderers (`src/renderer/src/views/*`)
 
-Each renderer takes data plus callbacks and owns no global state:
+Each renderer takes data plus callbacks and owns no global state. Album cards, artist rows, track
+lists, and detail tracks accept optional menu callbacks so the composition root can attach context
+menus without giving the views menu state.
 
 | File | Responsibility |
 | --- | --- |
-| `views/albumCards.ts` | Album card and card-grid DOM shared by albums and artist detail. |
-| `views/albumGrid.ts` | Albums grid plus empty state. |
-| `views/artistList.ts` | Artist rows with album/track counts plus empty state. |
-| `views/tracksList.ts` | Virtualized tracks list; owns the visible track list used for queueing. |
-| `views/albumDetail.ts` | Album header with Play/Shuffle, cover/year, and ordered track list. |
-| `views/artistDetail.ts` | Artist header with Play/Shuffle, counts, and album grid. |
+| `views/albumCards.ts` | Album card and card-grid DOM shared by albums and artist detail; optional card menu callback. |
+| `views/albumGrid.ts` | Albums grid plus empty state; forwards the optional card menu callback. |
+| `views/artistList.ts` | Artist rows with album/track counts plus empty state; optional row menu callback. |
+| `views/tracksList.ts` | Virtualized tracks list; owns the visible track list used for queueing and takes an optional row menu callback. |
+| `views/albumDetail.ts` | Album header with Play/Shuffle, cover/year, ordered track list, and optional track menu callback. |
+| `views/artistDetail.ts` | Artist header with Play/Shuffle, counts, album grid, and optional card menu callback. |
 
 `src/renderer/library/artistTracks.ts` holds the pure `getArtistTracks(artist)` helper used for
 artist Play/Shuffle ordering (album year → title, then disc → track → title).

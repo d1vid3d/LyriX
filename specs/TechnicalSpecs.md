@@ -65,7 +65,9 @@ them.
 | Embedded lyric tags, sidecar discovery/decoding, provider order | [main/lyric-sources.md](main/lyric-sources.md) |
 | Composition root, DOM lookup, routing, toolbar, snapshot, screen, views | [renderer/shell-and-navigation.md](renderer/shell-and-navigation.md) |
 | Library index, search, sort registry, virtual track list | [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md) |
-| Transport, Now Playing lifecycle, player bar, engine, queue | [renderer/playback.md](renderer/playback.md) |
+| Transport, Now Playing lifecycle, player bar, engine, queue model | [renderer/playback.md](renderer/playback.md) |
+| Visible queue panel, row model, drag/keyboard reorder, queue toggle | [renderer/queue-panel.md](renderer/queue-panel.md) |
+| Right-click menus, menu actions, toasts, reveal-in-file-manager | [renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md) |
 | Lyric fetch/select/cache, translation state, word grouping | [renderer/lyrics-controller.md](renderer/lyrics-controller.md) |
 | Lyric DOM, rAF sync, scrolling, seek, translation children | [renderer/lyric-view.md](renderer/lyric-view.md) |
 | Source-menu models, popover DOM, keyboard/ARIA, quick toggle | [renderer/lyric-source-menu.md](renderer/lyric-source-menu.md) |
@@ -112,7 +114,9 @@ contracts that the graph cannot.
 | [main/lyric-sources.md](main/lyric-sources.md) | Embedded tags, sidecar discovery/decoding, canonical provider list. |
 | [renderer/shell-and-navigation.md](renderer/shell-and-navigation.md) | Composition root, DOM lookup, route stack, navigation, toolbar, library state, screen, view renderers. |
 | [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md) | Pure view/sort/search registry and the fixed-row virtual scroller. |
-| [renderer/playback.md](renderer/playback.md) | Transport, queue, engine, Now Playing, player bar. |
+| [renderer/playback.md](renderer/playback.md) | Transport, queue model, engine, Now Playing, player bar. |
+| [renderer/queue-panel.md](renderer/queue-panel.md) | Visible queue panel, pure row model, drag/keyboard reordering, queue toggle. |
+| [renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md) | Generic context menu, menu builders/actions, toasts, reveal IPC path. |
 | [renderer/lyrics-controller.md](renderer/lyrics-controller.md) | Lyric source fetch/parse/select/state/LRU cache, translation state, word grouping. |
 | [renderer/lyric-view.md](renderer/lyric-view.md) | Lyric DOM construction, rAF synchronization, auto-scroll, line seek. |
 | [renderer/lyric-source-menu.md](renderer/lyric-source-menu.md) | Source/translation menu models, popover, keyboard/ARIA, quick toggle. |

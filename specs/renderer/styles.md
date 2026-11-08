@@ -4,13 +4,15 @@
 source menu, and translation controls.
 
 **Owning source paths:** `src/renderer/src/style.css`, `src/renderer/styles/lyrics.css`,
-`src/renderer/styles/lyricSourceMenu.css`.
+`src/renderer/styles/lyricSourceMenu.css`, `src/renderer/styles/contextMenu.css`,
+`src/renderer/styles/queuePanel.css`, `src/renderer/styles/toast.css`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md),
 [renderer/lyric-view.md](lyric-view.md), [renderer/lyric-source-menu.md](lyric-source-menu.md),
-[renderer/ui-map.md](ui-map.md).
+[renderer/queue-panel.md](queue-panel.md),
+[renderer/context-menu-and-toasts.md](context-menu-and-toasts.md), [renderer/ui-map.md](ui-map.md).
 
 ## App shell and layout (`src/renderer/src/style.css`)
 
@@ -63,6 +65,53 @@ Menu visual rules:
 - Focus-visible outlines use the accent color on the chip, rows, preference options, translation
   switch/rows, quick toggle, and Reload.
 
+## Context menu (`src/renderer/styles/contextMenu.css`)
+
+Floating menu presentation. Variables at the top: `--context-menu-x`, `--context-menu-y`,
+`--context-menu-z-index`, `--context-menu-min-width`, `--context-menu-max-width`,
+`--context-menu-padding`, `--context-menu-gap`, `--context-menu-radius`, `--context-menu-item-radius`,
+`--context-menu-item-padding`, `--context-menu-font-size`, `--context-menu-hint-size`,
+`--context-menu-background`, `--context-menu-border`, `--context-menu-hover`, `--context-menu-text`,
+`--context-menu-muted`, and `--context-menu-shadow`.
+
+The menu is `position: fixed` at the `--context-menu-x/y` custom properties (set by JS), sits above
+the queue panel and source menu, and animates in with a short fade/slide. Items are full-width
+buttons with hover and accent focus-visible states; disabled items dim and lose the pointer cursor;
+hints are small muted text; separators are 1 px inset lines.
+
+## Queue panel (`src/renderer/styles/queuePanel.css`)
+
+Slide-over presentation. Variables at the top: `--queue-panel-width`, `--queue-panel-z-index`,
+`--queue-panel-background`, `--queue-panel-border`, `--queue-panel-radius`, `--queue-panel-shadow`,
+`--queue-panel-header-padding`, `--queue-panel-row-height`, `--queue-panel-row-padding`,
+`--queue-panel-row-gap`, `--queue-panel-cover-size`, `--queue-panel-muted`,
+`--queue-panel-current-background`, `--queue-panel-hover`, `--queue-panel-insert-color`,
+`--queue-panel-insert-height`, `--queue-panel-insert-top`, `--queue-panel-row-shift`,
+`--queue-panel-drag-x`, `--queue-panel-drag-y`, `--queue-panel-drag-width`,
+`--queue-panel-drag-transition`, `--queue-panel-ghost-background`, and
+`--queue-panel-ghost-z-index`.
+
+The panel is absolutely positioned on the right edge of the content area, above the views and Now
+Playing but below the player bar and the lyric source menu. The header is fixed; the row area scrolls.
+Entry rows use a grid of drag handle / small cover / title+artist / duration / remove. The current row
+uses an accent left bar and tinted background; history rows dim. Section rows are uppercase muted
+labels with a count and optional chevron. The insertion indicator is a 2 px accent line positioned by
+`--queue-panel-insert-top`.
+
+While dragging (`.queue-panel--dragging`), upcoming entry rows transition `transform` over
+`--queue-panel-drag-transition` and are individually shifted by `--queue-panel-row-shift` to open the
+drop hole; the source row (`.queue-entry--source`) is transparent but keeps its space. The floating
+clone (`.queue-drag-ghost`) is fixed at `--queue-panel-drag-x/y` with `--queue-panel-drag-width`, sits
+in a higher layer, and is non-interactive. Dragging also sets a grabbing cursor on the body.
+
+## Toasts (`src/renderer/styles/toast.css`)
+
+Variables: `--toast-bottom`, `--toast-z-index`, `--toast-padding`, `--toast-radius`,
+`--toast-background`, `--toast-border`, `--toast-shadow`, and `--toast-font-size`. The region is fixed
+bottom-center above the player bar, centered with a transform, and non-interactive. The single toast
+is a small dark pill with a border/shadow, truncates long text, and fades/slides in when shown. There
+is no toast stack.
+
 ## Lyric visual rules
 
 - Upcoming lines are dim; past lines are dimmer; the current line is full opacity, slightly larger,
@@ -87,8 +136,10 @@ Menu visual rules:
   `data-repeat="one"`. Detail-view Play/Shuffle buttons reuse the header button styling.
 
 For lyric presentation, JavaScript never sets inline visual styles except the `--progress` custom
-property. (The virtual list and layout code still set structural inline styles such as position and
-transform.)
+property. Floating menu positions, the queue insertion indicator, drag ghost position, and row shift
+distances likewise use CSS custom properties (`--context-menu-x/y`, `--queue-panel-insert-top`,
+`--queue-panel-drag-x/y/width`, `--queue-panel-row-shift`). (The virtual list and layout code still
+set structural inline styles such as position, height, and transform.)
 
 Class names, `data-*` attributes, and ARIA roles are owned by [renderer/lyric-view.md](lyric-view.md),
 [renderer/lyric-source-menu.md](lyric-source-menu.md), and [renderer/ui-map.md](ui-map.md).

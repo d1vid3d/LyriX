@@ -1,6 +1,7 @@
 import type { Album, Track } from '../../shared/types'
 import { queryLibrary } from '../library/query'
-import type { ArtistItem, LibraryIndex, LibraryView } from '../library/query'
+import type { ArtistItem, LibraryIndex, LibraryView, TrackItem } from '../library/query'
+import type { MenuPosition } from '../ui/contextMenu'
 import type { AppElements } from './dom'
 import type { DetailRoute } from './routeStack'
 import { renderAlbumDetail } from './views/albumDetail'
@@ -37,6 +38,20 @@ export interface ScreenDeps {
   onShuffleAlbum(album: Album): void
   onPlayArtist(artist: ArtistItem): void
   onShuffleArtist(artist: ArtistItem): void
+  onOpenAlbumMenu(album: Album, position: MenuPosition): void
+  onOpenArtistMenu(artist: ArtistItem, position: MenuPosition): void
+  onOpenTrackRowMenu(
+    item: TrackItem,
+    index: number,
+    play: () => void,
+    position: MenuPosition
+  ): void
+  onOpenAlbumTrackMenu(
+    album: Album,
+    track: Track,
+    play: () => void,
+    position: MenuPosition
+  ): void
   syncViewControls(): void
 }
 
@@ -86,7 +101,9 @@ export class ScreenController {
           container: this.deps.elements.albumGrid,
           emptyState: this.deps.elements.emptyState,
           emptyMessage: () => this.deps.emptyMessage(),
-          onOpenAlbum: (albumId) => this.deps.onOpenAlbum(albumId)
+          onOpenAlbum: (albumId) => this.deps.onOpenAlbum(albumId),
+          onOpenAlbumMenu: (album, position) =>
+            this.deps.onOpenAlbumMenu(album, position)
         },
         queryLibrary(index, { view: 'albums', search, sort: this.deps.getSort('albums') })
       )
@@ -99,7 +116,9 @@ export class ScreenController {
           list: this.deps.elements.artistList,
           empty: this.deps.elements.artistsEmpty,
           emptyMessage: () => this.deps.emptyMessage(),
-          onOpenArtist: (artistName) => this.deps.onOpenArtist(artistName)
+          onOpenArtist: (artistName) => this.deps.onOpenArtist(artistName),
+          onOpenArtistMenu: (artist, position) =>
+            this.deps.onOpenArtistMenu(artist, position)
         },
         queryLibrary(index, { view: 'artists', search, sort: this.deps.getSort('artists') })
       )
@@ -148,6 +167,8 @@ export class ScreenController {
         backLabel: () => this.deps.navigation.backLabel(),
         getCurrentTrackId: () => this.deps.getCurrentTrackId(),
         onPlayTrack: (albumItem, track) => this.deps.onPlayAlbumTrack(albumItem, track),
+        onOpenTrackMenu: (albumItem, track, play, position) =>
+          this.deps.onOpenAlbumTrackMenu(albumItem, track, play, position),
         onPlayAlbum: (albumItem) => this.deps.onPlayAlbum(albumItem),
         onShuffleAlbum: (albumItem) => this.deps.onShuffleAlbum(albumItem)
       },
@@ -174,6 +195,8 @@ export class ScreenController {
         shuffleButton: this.deps.elements.artistShuffleButton,
         albumGrid: this.deps.elements.artistAlbumGrid,
         onOpenAlbum: (albumId) => this.deps.onOpenAlbum(albumId),
+        onOpenAlbumMenu: (albumItem, position) =>
+          this.deps.onOpenAlbumMenu(albumItem, position),
         onPlayArtist: (artistItem) => this.deps.onPlayArtist(artistItem),
         onShuffleArtist: (artistItem) => this.deps.onShuffleArtist(artistItem)
       },

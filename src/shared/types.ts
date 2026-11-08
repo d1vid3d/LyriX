@@ -87,6 +87,7 @@ export interface LibraryApi {
   getState(): Promise<LibrarySnapshot>
   openFolder(): Promise<LibrarySnapshot | null>
   rescan(): Promise<LibrarySnapshot | null>
+  revealTrack(trackId: string): Promise<boolean>
   getSettings(): Promise<Settings>
   saveVolume(volume: number): Promise<void>
   saveUiState(state: UiState): Promise<void>

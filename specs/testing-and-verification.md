@@ -15,9 +15,9 @@ This is the **only** file where volatile verification numbers (test counts, file
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 437 tests pass across 22 files. |
+| `npm test` | 489 tests pass across 28 files. |
 | `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
-| `npm run test:e2e` | Passes; 64 checks (Tier 1 smoke). |
+| `npm run test:e2e` | Passes; 93 checks (Tier 1 smoke). |
 | `npm run test:e2e:full` | Passes; 150 checks (Tier 2 regression). |
 | `npm run test:e2e:visual` | Passes; 29 checks (Tier 3 visual). |
 | `npm run dev` | Starts electron-vite and Electron. |
@@ -51,6 +51,12 @@ filesystem scanning, audio playback, and DOM behavior. The E2E tiers are not par
 | `tests/sidecar.test.ts` | Exact/variant matching; case-insensitive names and extension; ignored names and directories; 1 MiB cap; UTF-8/UTF-16 BOM decoding; symlink skip where supported; unreadable directory. |
 | `tests/query.test.ts` | `normalizeText`; every-word and order-independent search; substring matching; empty search; all three views and every sort key; unknown-sort fallback; exact album-artist grouping (`"A, B"` separate from `"A"`); album search by track title; view/sort validators and defaults. |
 | `tests/queue.test.ts` | Editable queue: start clamping, empty queue, advance/peek with repeat-one/all, shuffle on/off with injectable RNG, play-next/add ordering, remove/move/jump, clear/clear-upcoming, snapshot freezing/memoization/version, subscriptions, reconcile, and origins. |
+| `tests/queuePanelModel.test.ts` | Queue-panel rows and sections, collapsed/expanded history, current/upcoming/history classification, counts/duration/context labels, empty text, singular/plural labels, album-lookup fallbacks, and drag/remove affordances. |
+| `tests/dragReorder.test.ts` | Pointer row-gap rounding with scroll offset, upcoming-slot conversion, post-removal move destinations, drop-hole slots, per-row shift direction, keyboard move bounds, edge auto-scroll direction, and insertion-indicator offsets. |
+| `tests/contextMenuModels.test.ts` | Exact track/album/artist/queue-row/current-track labels, pluralized queue counts, separators, payloads, play closures, album first-track reveal payload/disabled state, and current-row disabled actions. |
+| `tests/contextActions.test.ts` | Play vs queue dispatch, empty-queue play-next/add fallback, album/artist play/shuffle, album/track go-to-artist navigation, album reveal via the first track, missing navigation targets, reveal failure toast, queue-row jump/move/remove, and disabled-item no-ops. |
+| `tests/toastMessages.test.ts` | Exact toast strings, single/multiple track messages, empty input, and title truncation. |
+| `tests/revealPath.test.ts` | Strict path containment, sibling-prefix/traversal rejection, FLAC-extension requirement, and null root/file guards. |
 | `tests/transportDecisions.test.ts` | Ended (stop/play/restart), previous (>3 s restart), failure cap, and repeat-mode cycling. |
 | `tests/artistTracks.test.ts` | Artist playback order: album year then title (unknown last), disc then track then title, missing disc as one, input not reordered. |
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
@@ -89,7 +95,7 @@ Three tiers drive the built app through raw Chrome DevTools Protocol (CDP). They
 
 | Tier | Command | Scope | When to run |
 | --- | --- | --- | --- |
-| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
+| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel open/close and context menu + Escape priority, fluid queue drag (ghost follows pointer, neighbouring row shifts, drop commits), album-card menu Go to artist navigation, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
 | 2 — full | `npm run test:e2e:full` | Startup and cached settings, library metadata, transport wiring, volume persistence, rescan, relaunch, views/search/sort, virtualization with 600 tracks, renderer health. | Opt-in for risky refactors and broad regression coverage. |
 | 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting plus player-bar button colors, sizes, icons, shuffle/repeat active states, and active/upcoming lyric states. | Optional after CSS/UI changes. |
 
@@ -171,4 +177,6 @@ Expected:
 - `npm run dev` opens the app with no console errors.
 - Lyrics still load for line, word, and plain fixtures; missing lyrics shows the empty state.
 - Shuffle and repeat toggle their labels/active states and survive a relaunch.
+- The Queue button and `Q` toggle the panel; opening a context menu then pressing Escape closes the
+  menu before the queue panel.
 - Now Playing open/close preserves search, view, and scroll.

@@ -5,7 +5,7 @@ of every module. Exact imports and call graphs belong to graphify, not to this f
 
 **Owning source paths:** `src/main/`, `src/preload/`, `src/renderer/`, `src/shared/`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md) (invariants), [build-and-config.md](build-and-config.md),
 [data-model.md](data-model.md), [flows.md](flows.md).
@@ -28,8 +28,10 @@ of every module. Exact imports and call graphs belong to graphify, not to this f
 - Browse **Albums**, **Artists**, and **Tracks** views with search and per-view sorting.
 - Play tracks through a `media://` protocol with byte-range seeking.
 - Queue an album, an artist, or the visible filtered list (tracks view) with a queue context.
-- Control playback with shuffle and off/all/one repeat, including an editable queue model
-  (play-next, add, remove, move, jump, clear) without a queue UI.
+- Control playback with shuffle and off/all/one repeat over an editable queue model, and inspect,
+  reorder, remove, clear, or jump within it from a virtualized slide-over queue panel.
+- Right-click (or `Shift+F10`) tracks, albums, artists, queue rows, and the current track for
+  playback, queue, navigation, and reveal actions, with non-blocking status toasts.
 - Load embedded lyrics on demand and display them in a **Now Playing** view.
 - Render line-timed LRC, word-timed enhanced LRC, and plain untimed lyrics.
 - Render an aligned translation under each lyric line, with a menu picker and quick toggle.
@@ -57,6 +59,7 @@ state, and lyric presentation.**
 │    │    └─ ids.ts ── SHA-1 ids                                       │
 │    ├─ cache.ts / settings.ts / json-file.ts ── persistence           │
 │    ├─ covers.ts ── embedded/folder art → cached JPEGs                │
+│    ├─ reveal.ts + pathContainment.ts ── reveal validated FLAC        │
 │    ├─ lyrics/ ── embedded + sidecar providers, choice store          │
 │    └─ media-protocol.ts + range.ts ── media:// serving + ranges      │
 │                                                                      │
@@ -65,12 +68,12 @@ state, and lyric presentation.**
                                 │ contextBridge (typed, minimal)
 ┌───────────────────────────────┴──────────────────────────────────────┐
 │ Preload (contextIsolation, sandbox)                                  │
-│  window.library: getState, openFolder, rescan, getSettings,          │
-│                  saveVolume, saveUiState, savePlaybackSettings,      │
-│                  getLyricSources, saveLyricChoice,                   │
-│                  saveLyricPreference, saveTranslationChoice,         │
-│                  saveTranslationSettings, onScanProgress,            │
-│                  onLibraryUpdated                                    │
+│  window.library: getState, openFolder, rescan, revealTrack,            │
+│                  getSettings, saveVolume, saveUiState,                │
+│                  savePlaybackSettings, getLyricSources,              │
+│                  saveLyricChoice, saveLyricPreference,               │
+│                  saveTranslationChoice, saveTranslationSettings,     │
+│                  onScanProgress, onLibraryUpdated                    │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ no Node APIs in renderer
 ┌───────────────────────────────┴──────────────────────────────────────┐
@@ -83,13 +86,19 @@ state, and lyric presentation.**
 │    ├─ libraryController.ts ── snapshot, scan state, startup          │
 │    ├─ transport.ts ── queue + engine + seek + volume                 │
 │    ├─ nowPlaying.ts + playerBar.ts ── playback views                 │
+│    ├─ queuePanelController.ts ── panel model + queue intents        │
 │    ├─ screen.ts + views/* ── section choice + rendering              │
 │    ├─ library/query.ts ── pure index + view/sort registry + search   │
 │    ├─ player/engine.ts ── PlaybackEngine + HtmlAudioEngine           │
 │    ├─ player/transportDecisions.ts ── pure ended/prev/failure rules  │
 │    ├─ player/queue/ ── editable queue + shuffle + repeat             │
+│    ├─ queue/ ── pure panel rows + drag/keyboard geometry             │
+│    ├─ menus/ ── pure menu builders, action dispatch, toast text      │
 │    ├─ library/artistTracks.ts ── pure artist playback ordering       │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
+│    ├─ ui/queuePanel.ts ── virtualized queue slide-over               │
+│    ├─ ui/contextMenu.ts + menuTrigger.ts ── floating menu + triggers │
+│    ├─ ui/toast.ts ── one-at-a-time status toast                      │
 │    ├─ lyrics/lyricsController.ts ── fetch/parse/select/state/cache   │
 │    ├─ lyrics/translationState.ts ── pure translation-layer state     │
 │    ├─ lyrics/translationMenuModel.ts ── translation menu/toggle model│
@@ -98,7 +107,7 @@ state, and lyric presentation.**
 │    ├─ lyrics/segmentGroups.ts ── pure word grouping                  │
 │    ├─ ui/lyricView.ts ── lyric DOM + rAF sync + scroll + seek        │
 │    ├─ ui/translationToggle.ts ── translation quick-toggle pill       │
-│    └─ styles/lyrics.css + src/style.css ── all presentation          │
+│    └─ styles/*.css + src/style.css ── all presentation               │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -111,6 +120,7 @@ state, and lyric presentation.**
 | Cover extraction/resizing/cache | Main | Only via `media://cover/<id>` |
 | Audio bytes | Main (`media://track/<id>`) | `<audio src>` only |
 | Lyrics from embedded tags and sidecars | Main | `getLyricSources(trackId)` |
+| Reveal a scanned file in the OS file manager | Main | `revealTrack(trackId)` → boolean |
 | Translation alignment/attachment | Renderer (pure shared module) | Direct |
 | Playback position/transport | Renderer | Direct |
 | Library queries, search, sort | Renderer | Direct |
@@ -148,6 +158,8 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `settings.ts` | Settings normalization + persistence. |
 | `covers.ts` | Cover extraction/resizing/cache. |
 | `media-protocol.ts` | `media://` handler. |
+| `pathContainment.ts` | Pure strict-containment and reveal-path guards. |
+| `reveal.ts` | Resolve, canonicalize, and validate a track before revealing it in the OS file manager. |
 | `range.ts` | Range header parser. |
 | `lyrics/embedded.ts` | Embedded tag resolver. |
 | `lyrics/sidecar.ts` | Sidecar discovery + decoding. |
@@ -178,16 +190,25 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `src/transport.ts` | Queue, engine, seek, volume. |
 | `src/nowPlaying.ts` | Now Playing lifecycle + lyric subscription. |
 | `src/playerBar.ts` | Bottom bar + transport control view. |
+| `src/queuePanelController.ts` | Queue-panel model, queue mutations, and playback intents. |
 | `src/screen.ts` | Section choice + view rendering. |
 | `src/style.css` | Theme + app layout. |
 | `src/views/` | Album grid, artist list, tracks, detail renderers. |
 | `styles/lyrics.css` | Lyric + Now Playing styling. |
 | `styles/lyricSourceMenu.css` | Source chip/popover + translation toggle styling. |
+| `styles/contextMenu.css` | Floating context-menu styling. |
+| `styles/queuePanel.css` | Queue slide-over and drag-indicator styling. |
+| `styles/toast.css` | Bottom-center toast region styling. |
 | `library/query.ts` | Pure view/sort/search registry. |
 | `library/artistTracks.ts` | Pure artist playback ordering. |
 | `player/engine.ts` | Playback abstraction. |
 | `player/transportDecisions.ts` | Pure ended/previous/failure/repeat decisions. |
 | `player/queue/` | Editable queue, shuffle helpers, and queue types. |
+| `queue/queuePanelModel.ts` | Pure queue-panel rows, sections, counts, and header model. |
+| `queue/dragReorder.ts` | Pure pointer-slot, move-destination, keyboard bounds, and auto-scroll helpers. |
+| `menus/contextMenuModels.ts` | Pure track/album/artist/queue-row/current-track menu builders. |
+| `menus/contextActions.ts` | Menu-action dispatch with injected queue/transport/navigation/toast/reveal dependencies. |
+| `menus/toastMessages.ts` | Exact toast strings and title truncation. |
 | `lyrics/lyricsController.ts` | Source fetch/parse/select/state/cache. |
 | `lyrics/translationState.ts` | Pure translation layer + document attachment. |
 | `lyrics/translationMenuModel.ts` | Pure translation section + quick-toggle model. |
@@ -201,6 +222,10 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `ui/lyricSourceMenuView.ts` | Stateless popover body builder. |
 | `ui/translationToggle.ts` | Translation quick-toggle pill. |
 | `ui/virtualList.ts` | Fixed-row virtual scroller. |
+| `ui/contextMenu.ts` | Generic floating menu with ARIA, focus, positioning, and close rules. |
+| `ui/menuTrigger.ts` | Right-click and Shift+F10/Menu-key trigger wiring. |
+| `ui/queuePanel.ts` | Virtualized queue slide-over DOM, drag handling, focus, and context triggers. |
+| `ui/toast.ts` | Single non-blocking status toast with auto-dismiss. |
 
 UNVERIFIED/POSSIBLY STALE: `src/renderer/lyrics/lyricMenuText.ts` exists in the current tree and is
 imported by `sourceMenuModel.ts` and `translationMenuModel.ts`, but the original §4 layout and §17

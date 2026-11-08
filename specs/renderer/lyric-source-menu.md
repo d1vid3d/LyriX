@@ -8,7 +8,7 @@ and the quick translation pill.
 `src/renderer/lyrics/translationText.ts`, `src/renderer/ui/lyricSourceMenu.ts`,
 `src/renderer/ui/lyricSourceMenuView.ts`, `src/renderer/ui/translationToggle.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md),
 [renderer/lyrics-controller.md](lyrics-controller.md), [renderer/ui-map.md](ui-map.md),
@@ -64,8 +64,11 @@ onTranslationSelect, onReload }`. It knows nothing about the controller.
 
 - `update(model)` refreshes the chip and, while open, re-renders the popover in place. Focus is
   restored by item key when possible.
-- `open()` shows the popover, sets `aria-expanded="true"`, and focuses the first enabled item.
-- `close()` hides it and resets `aria-expanded`. `isOpen()` and `destroy()` complete the lifecycle.
+- `open()` shows the popover, calls the injected `onOpen` (so the context menu closes), sets
+  `aria-expanded="true"`, and focuses the first enabled item.
+- `close()` hides it and resets `aria-expanded`. `isOpen()`, `close()` from another popover's
+  `onOpen`, and `destroy()` complete the lifecycle, so the source menu and context menu are mutually
+  exclusive.
 - The chip is a `aria-haspopup="menu"` button. The popover is `role="menu"` with a labelled source
   `role="group"`, the preference `role="group"`, and a Translation section.
 - Source and preference rows are `role="menuitemradio"` with `aria-checked`; Reload is
@@ -80,7 +83,8 @@ onTranslationSelect, onReload }`. It knows nothing about the controller.
   ArrowUp/ArrowDown wrap over enabled items, Home/End jump, Enter/Space activate, Escape closes and
   returns focus to the chip, and Tab closes. The translation switch and enabled translation rows are
   part of the same navigation ring; disabled rows are skipped. Escape is consumed while the menu is
-  open so it does not also close Now Playing or clear search.
+  open so it does not also close Now Playing or clear search. Opening a context menu closes this
+  popover, so at most one floating menu is open at a time.
 - A capture-phase pointerdown listener closes the popover on outside clicks.
 
 `src/renderer/ui/lyricSourceMenuView.ts` builds the popover body (title, source rows, badges,

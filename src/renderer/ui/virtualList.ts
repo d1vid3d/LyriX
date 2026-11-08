@@ -5,6 +5,11 @@ export interface VirtualListOptions<T> {
   renderRow(item: T, index: number): HTMLElement
 }
 
+export interface SetItemsOptions {
+  /** Keep the current scroll offset instead of jumping back to the top. */
+  preserveScroll?: boolean
+}
+
 /**
  * Fixed-row virtual scroller. Only renders the visible rows plus an overscan buffer inside a
  * spacer whose height provides the real scrollbar range.
@@ -47,9 +52,9 @@ export class VirtualList<T> {
     this.resizeObserver.observe(this.container)
   }
 
-  setItems(items: readonly T[]): void {
+  setItems(items: readonly T[], options: SetItemsOptions = {}): void {
     this.items = [...items]
-    this.container.scrollTop = 0
+    if (!options.preserveScroll) this.container.scrollTop = 0
     this.invalidate()
   }
 

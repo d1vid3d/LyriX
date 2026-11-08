@@ -5,7 +5,7 @@ the tracks view.
 
 **Owning source paths:** `src/renderer/library/query.ts`, `src/renderer/ui/virtualList.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 8 and 10),
 [renderer/shell-and-navigation.md](shell-and-navigation.md),
@@ -36,9 +36,10 @@ grouping is listed in [testing-and-verification.md](../testing-and-verification.
 - Builds a spacer with the full height and an absolutely positioned window inside it.
 - Renders only the visible rows plus an overscan buffer (default 4) above and below.
 - Re-renders on scroll via `requestAnimationFrame` and on container resize via `ResizeObserver`.
-- `setItems` resets scroll and invalidates; `refresh` re-renders the current window (used when the
+- `setItems(items, { preserveScroll })` resets scroll and invalidates by default, or keeps the current
+  scroll offset when `preserveScroll` is `true`; `refresh` re-renders the current window (used when the
   playing highlight changes); `destroy` removes listeners and DOM.
-- Used only by the tracks view, with 52 px rows.
+- Used by the tracks view with 52 px rows and by the queue panel with 56 px rows.
 
 The tracks view renderer that supplies rows is owned by
 [renderer/shell-and-navigation.md](shell-and-navigation.md). The scrolling/animation budget is

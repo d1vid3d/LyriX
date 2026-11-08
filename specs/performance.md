@@ -6,13 +6,14 @@ intent without duplicating volatile values.
 
 **Owning source paths:** cross-cutting; see linked specs.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/library-scanning.md](main/library-scanning.md),
 [main/covers-and-media.md](main/covers-and-media.md),
 [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md),
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md),
 [renderer/lyric-view.md](renderer/lyric-view.md),
+[renderer/queue-panel.md](renderer/queue-panel.md),
 [testing-and-verification.md](testing-and-verification.md).
 
 - **Tag reads:** bounded concurrency, owned by
@@ -32,6 +33,10 @@ intent without duplicating volatile values.
 - **Lyrics:** fetched on demand; parsed source entries are cached with an LRU limit; one rAF loop runs
   while the view is visible. See [renderer/lyrics-controller.md](renderer/lyrics-controller.md) and
   [renderer/lyric-view.md](renderer/lyric-view.md).
+- **Queue panel:** the same fixed-row virtual scroller renders one flat row list, so a 2000+ entry
+  queue keeps a bounded DOM. Snapshot updates preserve the scroll offset; only opening the panel
+  scrolls the current entry into view. Drag auto-scroll adjusts `scrollTop` once per animation frame.
+  See [renderer/queue-panel.md](renderer/queue-panel.md).
 - **Lyric DOM:** built once per document; each frame reads the position once, runs the binary
   searches, and does one O(lines) flag pass whose DOM writes happen only for changed state. See
   [renderer/lyric-view.md](renderer/lyric-view.md).

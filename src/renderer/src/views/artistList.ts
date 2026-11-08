@@ -1,10 +1,13 @@
 import type { ArtistItem } from '../../library/query'
+import type { MenuPosition } from '../../ui/contextMenu'
+import { attachMenuTrigger } from '../../ui/menuTrigger'
 
 export interface ArtistListOptions {
   list: HTMLElement
   empty: HTMLElement
   emptyMessage(): string
   onOpenArtist(artistName: string): void
+  onOpenArtistMenu?(artist: ArtistItem, position: MenuPosition): void
 }
 
 export function renderArtistList(
@@ -42,6 +45,10 @@ export function renderArtistList(
 
     button.append(name, meta)
     button.addEventListener('click', () => options.onOpenArtist(artist.name))
+    if (options.onOpenArtistMenu) {
+      const onMenu = options.onOpenArtistMenu
+      attachMenuTrigger(button, (position) => onMenu(artist, position))
+    }
     item.append(button)
     fragment.append(item)
   }

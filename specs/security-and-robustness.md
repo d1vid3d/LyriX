@@ -3,11 +3,11 @@
 **Purpose:** the isolation, containment, validation, and failure-isolation rules that keep a local
 player predictable when inputs are malformed or files disappear.
 
-**Owning source paths:** `src/main/media-protocol.ts`, `src/main/ipc.ts`, `src/main/lyrics/`,
-`src/main/settings.ts`, `src/main/cache.ts`, `src/main/json-file.ts`, `src/preload/index.ts`,
-`src/renderer/index.html`.
+**Owning source paths:** `src/main/media-protocol.ts`, `src/main/ipc.ts`, `src/main/reveal.ts`,
+`src/main/pathContainment.ts`, `src/main/lyrics/`, `src/main/settings.ts`, `src/main/cache.ts`,
+`src/main/json-file.ts`, `src/preload/index.ts`, `src/renderer/index.html`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md) (invariants),
 [main/covers-and-media.md](main/covers-and-media.md), [main/library-scanning.md](main/library-scanning.md),
@@ -19,6 +19,10 @@ player predictable when inputs are malformed or files disappear.
 - **No renderer paths**: ids only; main resolves and validates.
 - **Path containment** in `media://` uses `realpath` on both the file and the root, then
   `isPathInside`.
+- **Reveal never trusts a renderer path**: `library:reveal-track` takes only a track id, resolves the
+  path from the scanned library, re-runs `realpath` on both the file and the root,
+  `isRevealPathAllowed` requires a strict descendant with a `.flac` extension, and the canonical path
+  must be a regular file before `shell.showItemInFolder`. Errors resolve to `false`.
 - **Symlinks are skipped** during scanning and sidecar discovery, preventing cycles and escapes.
 - **Only `.flac` regular files** are served; sidecar reads accept only regular files in the track's
   own directory and enforce the size cap owned by [main/lyric-sources.md](main/lyric-sources.md).

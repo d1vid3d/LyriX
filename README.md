@@ -57,6 +57,8 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/main/json-file.ts` | Tolerant JSON reads and atomic writes. |
 | `src/main/ids.ts` | Stable SHA-1 ids for file paths and albums. |
 | `src/main/media-protocol.ts` | `media://` protocol for tracks and covers, with HTTP range support. |
+| `src/main/pathContainment.ts` | Pure strict path-containment and reveal-path guards. |
+| `src/main/reveal.ts` | Resolves, canonicalizes and validates a scanned track before revealing it in the OS file manager. |
 | `src/main/range.ts` | Parses `Range` headers for partial-content responses. |
 | `src/preload/index.ts` | Exposes the typed `window.library` API via `contextBridge`. |
 | `src/preload/index.d.ts` | Global `Window` typing for the preload API. |
@@ -65,6 +67,11 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/renderer/ui/virtualList.ts` | Fixed-row virtual scroller used by the tracks view. |
 | `src/renderer/player/engine.ts` | `PlaybackEngine` interface and the single-`HTMLAudioElement` implementation. |
 | `src/renderer/player/queue/` | Editable playback queue with contexts, shuffle, repeat, play-next/add/remove/move and history-preserving snapshots (no DOM). |
+| `src/renderer/queue/queuePanelModel.ts` | Pure queue-panel rows, sections, counts, duration, context and empty-state model. |
+| `src/renderer/queue/dragReorder.ts` | Pure pointer-slot, move-destination, keyboard-bound and auto-scroll helpers. |
+| `src/renderer/menus/contextMenuModels.ts` | Pure track/album/artist/queue-row/current-track menu builders and typed payloads. |
+| `src/renderer/menus/contextActions.ts` | Menu-action dispatch with injected queue, transport, navigation, toast and reveal dependencies. |
+| `src/renderer/menus/toastMessages.ts` | Exact toast strings and title truncation. |
 | `src/renderer/player/transportDecisions.ts` | Pure ended/previous/failure/repeat-mode decisions. |
 | `src/renderer/library/artistTracks.ts` | Pure artist playback ordering (album year → title, then disc → track → title). |
 | `src/renderer/lyrics/lyricsController.ts` | On-demand lyric source fetch/parse/selection, translation-layer state, stale-response guard and LRU source cache (no DOM). |
@@ -79,9 +86,17 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/renderer/ui/lyricSourceMenu.ts` | Source chip and popover DOM, keyboard navigation, ARIA and focus handling. |
 | `src/renderer/ui/lyricSourceMenuView.ts` | Stateless popover row, badge, preference and translation-section DOM builders. |
 | `src/renderer/ui/translationToggle.ts` | Small translation on/off pill with `aria-pressed`, driven by the view model. |
+| `src/renderer/ui/contextMenu.ts` | Generic floating menu with ARIA, roving focus, edge positioning and close rules. |
+| `src/renderer/ui/menuTrigger.ts` | Right-click and Shift+F10/Menu-key trigger wiring. |
+| `src/renderer/ui/queuePanel.ts` | Virtualized queue slide-over DOM, drag reordering, focus and context triggers. |
+| `src/renderer/ui/toast.ts` | Single non-blocking status toast with auto-dismiss. |
 | `src/renderer/styles/lyrics.css` | Lyric and translation colors, sizes, transitions, progress fill and Now Playing layout. |
 | `src/renderer/styles/lyricSourceMenu.css` | Source chip/popover, translation section and quick-toggle styling, with restyle variables at the top. |
-| `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, scanning UI and UI-state persistence. |
+| `src/renderer/styles/contextMenu.css` | Context-menu surface, item, separator and focus styling. |
+| `src/renderer/styles/queuePanel.css` | Queue slide-over, row grid, drag handle, current/history and insertion-indicator styling. |
+| `src/renderer/styles/toast.css` | Bottom-center toast region and pill styling. |
+| `src/renderer/src/queuePanelController.ts` | Queue-panel model, queue mutations and playback intents. |
+| `src/renderer/src/main.ts` | View routing, rendering, search/sort, queue/transport wiring, context-menu/action/toast wiring, scanning UI and UI-state persistence. |
 | `src/renderer/src/style.css` | Dark theme and application layout. |
 | `src/shared/types.ts` | Types shared by main, preload and renderer (no runtime code). |
 | `src/shared/lyrics/types.ts` | Lyric format, document, line, segment, metadata and parse-option types. |
@@ -98,6 +113,13 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `tests/lyricChoices.test.ts` | Vitest coverage for main/translation choice round-trips, tolerant reads, invalid ids, independent 5000-entry caps and missing-map tolerance. |
 | `tests/lyricSourceProviders.test.ts` | Vitest coverage for canonical source assembly, variant extraction and provider failure isolation. |
 | `tests/lyricSources.test.ts` | Vitest coverage for saved/auto selection, preference order, usability rules and translation selection. |
+| `tests/queue.test.ts` | Vitest coverage for queue start/advance/previous, shuffle/repeat, insertion order, remove/move/jump, snapshots, subscriptions and reconcile. |
+| `tests/queuePanelModel.test.ts` | Vitest coverage for queue-panel rows, sections, counts/duration, history collapse, empty state and drag/remove affordances. |
+| `tests/dragReorder.test.ts` | Vitest coverage for pointer row gaps, post-removal destinations, keyboard bounds, auto-scroll and insertion offsets. |
+| `tests/contextMenuModels.test.ts` | Vitest coverage for exact menu labels, pluralized counts, payloads, separators and disabled queue-row actions. |
+| `tests/contextActions.test.ts` | Vitest coverage for play/queue dispatch, empty-queue fallback, navigation misses, reveal failure and queue-row actions. |
+| `tests/toastMessages.test.ts` | Vitest coverage for exact toast strings, pluralization and title truncation. |
+| `tests/revealPath.test.ts` | Vitest coverage for containment, traversal/sibling rejection and reveal extension guards. |
 | `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
 | `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, translation enable/selection, stable derived-document identity, reload, stale responses, caching and eviction. |
 | `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
@@ -268,10 +290,33 @@ track (stopping after one failure per queue entry). The last folder, volume, vie
 shuffle, repeat, lyric preference and translation toggle/language are stored in `userData/settings.json`
 and restored on the next launch.
 
+## Queue panel, context menus and toasts
+
+The **Queue** button in the player bar (or **Q** when no text input has focus) opens a slide-over
+showing the queue context and total time, a **Clear** action, the current entry, **Next up**, and a
+collapsed **History** section. The list is virtualized, so very long queues stay smooth. Double-click
+or press **Enter** on a row to play it; use a row's remove button, **Delete** or **Backspace** to drop
+an upcoming entry. Drag a **Next up** row by its handle (or press **Alt+Up/Down**) to reorder it; an
+accent line shows where it will land, dragging near an edge scrolls, and **Escape** cancels. The
+current entry cannot be removed or moved. **Escape** closes an open menu first, then the queue panel,
+then Now Playing, then clears search.
+
+Right-click (or focus a row and press **Shift+F10** / the Menu key) for playback, queue, navigation
+and file-manager actions on tracks, album cards, artist rows, queue rows, and the current track.
+**Play next** and **Add to queue** on an empty queue start playing the first added track immediately.
+**Go to album** / **Go to artist** close Now Playing through the normal navigation path; if the
+target is gone, a toast explains it. **Show in file manager** sends only the track id to the main
+process, which re-resolves and validates the file against the selected library folder before asking
+the OS to reveal it. Toasts appear bottom-center above the player bar, replace the previous message,
+auto-dismiss after about 2.5 seconds, and never take focus or block clicks.
+
 ## Out of scope (for now)
 
-Gapless playback, crossfade, a visible queue panel, queue-editing UI, queue-contents persistence,
+Gapless playback, crossfade, queue-contents persistence,
 fuzzy search, search history, filters, artist images, splitting multi-artist values, genres, grid/artist
 virtualization, online lyric or translation lookup, singer-specific lyric styling, translation
 editing, swapping original/translation, side-by-side translation layout, word-level translation
 timing, per-language fonts, TTML, tag editing and packaging are intentionally not implemented.
+
+The queue panel intentionally omits undo, multi-select and saving the queue as a playlist; context
+menus do not implement submenus; and tracks cannot be dragged from the library into the queue.

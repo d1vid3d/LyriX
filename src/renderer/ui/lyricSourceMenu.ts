@@ -13,6 +13,8 @@ export interface LyricSourceMenuCallbacks {
   onTranslationToggle(enabled: boolean): void
   onTranslationSelect(id: string | null): void
   onReload(): void
+  /** Called before the popover opens so another floating menu can close itself. */
+  onOpen?(): void
 }
 
 const MENU_ITEM_SELECTOR = '[data-menu-item]'
@@ -75,6 +77,7 @@ export class LyricSourceMenu {
   open(): void {
     if (this.openState || !this.model) return
 
+    this.callbacks.onOpen?.()
     this.openState = true
     this.popover.hidden = false
     this.trigger.setAttribute('aria-expanded', 'true')

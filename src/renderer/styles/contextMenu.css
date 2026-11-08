@@ -1,0 +1,97 @@
+:root {
+  --context-menu-x: 0px;
+  --context-menu-y: 0px;
+  --context-menu-z-index: 60;
+  --context-menu-min-width: 230px;
+  --context-menu-max-width: 320px;
+  --context-menu-padding: 5px;
+  --context-menu-gap: 1px;
+  --context-menu-radius: 8px;
+  --context-menu-item-radius: 5px;
+  --context-menu-item-padding: 7px 10px;
+  --context-menu-font-size: 13px;
+  --context-menu-hint-size: 11px;
+  --context-menu-background: #202024;
+  --context-menu-border: #34343a;
+  --context-menu-hover: #2b2b31;
+  --context-menu-text: var(--text);
+  --context-menu-muted: var(--muted);
+  --context-menu-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+}
+
+.context-menu {
+  position: fixed;
+  top: var(--context-menu-y);
+  left: var(--context-menu-x);
+  z-index: var(--context-menu-z-index);
+  display: flex;
+  flex-direction: column;
+  gap: var(--context-menu-gap);
+  min-width: var(--context-menu-min-width);
+  max-width: var(--context-menu-max-width);
+  padding: var(--context-menu-padding);
+  border: 1px solid var(--context-menu-border);
+  border-radius: var(--context-menu-radius);
+  background: var(--context-menu-background);
+  box-shadow: var(--context-menu-shadow);
+}
+
+.context-menu--open {
+  animation: context-menu-in 90ms ease-out;
+}
+
+@keyframes context-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: var(--context-menu-item-padding);
+  border: 0;
+  border-radius: var(--context-menu-item-radius);
+  background: transparent;
+  color: var(--context-menu-text);
+  font-size: var(--context-menu-font-size);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.context-menu__item:hover:not(:disabled),
+.context-menu__item:focus-visible {
+  background: var(--context-menu-hover);
+  outline: none;
+}
+
+.context-menu__item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.context-menu__item:disabled,
+.context-menu__item[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.context-menu__hint {
+  color: var(--context-menu-muted);
+  font-size: var(--context-menu-hint-size);
+}
+
+.context-menu__separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--context-menu-border);
+}

@@ -1,5 +1,7 @@
 import type { Track } from '../../../shared/types'
 import type { TrackItem } from '../../library/query'
+import type { MenuPosition } from '../../ui/contextMenu'
+import { attachMenuTrigger } from '../../ui/menuTrigger'
 import { VirtualList } from '../../ui/virtualList'
 import { createCover, formatTime, smallCoverUrl } from '../format'
 
@@ -10,6 +12,12 @@ export interface TracksListOptions {
   emptyMessage(): string
   getCurrentTrackId(): string | null
   onPlayTrack(index: number): void
+  onOpenTrackMenu?(
+    item: TrackItem,
+    index: number,
+    play: () => void,
+    position: MenuPosition
+  ): void
 }
 
 export class TracksList {
@@ -88,7 +96,12 @@ export class TracksList {
     duration.textContent = formatTime(item.track.duration)
 
     button.append(thumb, title, artist, album, duration)
-    button.addEventListener('click', () => this.options.onPlayTrack(index))
+    const play = (): void => this.options.onPlayTrack(index)
+    button.addEventListener('click', play)
+    const onMenu = this.options.onOpenTrackMenu
+    if (onMenu) {
+      attachMenuTrigger(button, (position) => onMenu(item, index, play, position))
+    }
     return button
   }
 }

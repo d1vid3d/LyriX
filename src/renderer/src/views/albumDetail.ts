@@ -1,4 +1,6 @@
 import type { Album, Track } from '../../../shared/types'
+import type { MenuPosition } from '../../ui/contextMenu'
+import { attachMenuTrigger } from '../../ui/menuTrigger'
 import { formatTime, setCoverImage } from '../format'
 
 export interface AlbumDetailOptions {
@@ -13,6 +15,12 @@ export interface AlbumDetailOptions {
   backLabel(): string
   getCurrentTrackId(): string | null
   onPlayTrack(album: Album, track: Track): void
+  onOpenTrackMenu?(
+    album: Album,
+    track: Track,
+    play: () => void,
+    position: MenuPosition
+  ): void
   onPlayAlbum(album: Album): void
   onShuffleAlbum(album: Album): void
 }
@@ -67,7 +75,12 @@ function renderTrackList(options: AlbumDetailOptions, album: Album): void {
 
     button.append(title, duration)
     button.prepend(number)
-    button.addEventListener('click', () => options.onPlayTrack(album, track))
+    const play = (): void => options.onPlayTrack(album, track)
+    button.addEventListener('click', play)
+    if (options.onOpenTrackMenu) {
+      const onMenu = options.onOpenTrackMenu
+      attachMenuTrigger(button, (position) => onMenu(album, track, play, position))
+    }
 
     item.append(button)
     fragment.append(item)

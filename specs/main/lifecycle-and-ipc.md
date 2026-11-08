@@ -4,9 +4,10 @@
 typed preload bridge.
 
 **Owning source paths:** `src/main/index.ts`, `src/main/window.ts`, `src/main/store.ts`,
-`src/main/ipc.ts`, `src/preload/index.ts`, `src/preload/index.d.ts`.
+`src/main/ipc.ts`, `src/main/reveal.ts`, `src/main/pathContainment.ts`, `src/preload/index.ts`,
+`src/preload/index.d.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 2, 5, 8),
 [persistence.md](../persistence.md), [data-model.md](../data-model.md),
@@ -65,6 +66,7 @@ subscribe.
 | `library:get-state` | — | `LibrarySnapshot` |
 | `library:open-folder` | — | `LibrarySnapshot \| null` (null on cancel/empty) |
 | `library:rescan` | — | `LibrarySnapshot \| null` (null when no root) |
+| `library:reveal-track` | `trackId: unknown` | `boolean` (false on any invalid/missing/failed path) |
 | `lyrics:get-sources` | `trackId: unknown` | `LyricSources \| null` |
 | `lyrics:set-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
 | `lyrics:set-translation-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
@@ -87,6 +89,13 @@ the language pattern; invalid input is a no-op. `settings:set-playback` requires
 normalizes `shuffle` (only `true` enables it) and `repeat` (`"all"`/`"one"`, otherwise `"off"`).
 Write failures are logged and never thrown across the boundary.
 
+`library:reveal-track` accepts only a valid track id, resolves the path from the scanned library,
+canonicalizes both the file and the library root, requires a `.flac` regular file strictly inside the
+root, and only then calls `shell.showItemInFolder`. Every failure is caught and resolves to `false`.
+The validation and security rationale are owned by
+[security-and-robustness.md](../security-and-robustness.md); the renderer side by
+[renderer/context-menu-and-toasts.md](../renderer/context-menu-and-toasts.md).
+
 The validators for ids and language patterns live in [data-model.md](../data-model.md) and
 [persistence.md](../persistence.md). Provider behavior behind `lyrics:get-sources` is owned by
 [main/lyric-sources.md](lyric-sources.md).
@@ -100,6 +109,7 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `getState()` | `library:get-state` | Returns the current snapshot. |
 | `openFolder()` | `library:open-folder` | `null` when the dialog is cancelled. |
 | `rescan()` | `library:rescan` | `null` when no folder is open. |
+| `revealTrack(trackId)` | `library:reveal-track` | Resolves `true` only when main revealed a validated file. |
 | `getSettings()` | `settings:get` | Returns normalized settings. |
 | `saveVolume(volume)` | `settings:set-volume` | Main clamps the value. |
 | `saveUiState(state)` | `settings:set-ui` | Main normalizes the value. |

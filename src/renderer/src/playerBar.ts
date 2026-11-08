@@ -13,6 +13,8 @@ export interface PlayerBarDeps {
   isPlaying(): boolean
   toggleShuffle(): void
   cycleRepeat(): void
+  isQueuePanelOpen(): boolean
+  toggleQueuePanel(): void
 }
 
 function repeatLabel(repeat: RepeatMode): string {
@@ -27,6 +29,9 @@ export class PlayerBar {
     this.deps = deps
     deps.elements.shuffleButton.addEventListener('click', () => this.deps.toggleShuffle())
     deps.elements.repeatButton.addEventListener('click', () => this.deps.cycleRepeat())
+    deps.elements.queueToggleButton.addEventListener('click', () =>
+      this.deps.toggleQueuePanel()
+    )
   }
 
   updateControls(): void {
@@ -34,6 +39,7 @@ export class PlayerBar {
     const hasCurrent = this.deps.getCurrentTrack() !== null
     const playing = this.deps.isPlaying()
     const snapshot = this.deps.getQueueSnapshot()
+    const queueOpen = this.deps.isQueuePanelOpen()
 
     const playLabel = playing ? 'Pause' : 'Play'
     elements.playPauseButton.dataset.playing = String(playing)
@@ -53,6 +59,9 @@ export class PlayerBar {
     elements.repeatButton.setAttribute('aria-label', repeatStateLabel)
     elements.repeatButton.title = repeatStateLabel
     elements.repeatButton.dataset.repeat = snapshot.repeat
+
+    elements.queueToggleButton.setAttribute('aria-pressed', String(queueOpen))
+    elements.queueToggleButton.setAttribute('aria-expanded', String(queueOpen))
   }
 
   updateDuration(duration: number): void {

@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import type { Dirent } from 'node:fs'
-import { basename, isAbsolute, join, relative, sep } from 'node:path'
+import { basename, join } from 'node:path'
 import type {
   CachedTrack,
   LibraryCache,
@@ -199,9 +199,4 @@ export function resolveTrackFile(trackId: string): string | null {
 
 export function getAlbumTrackPaths(albumId: string): string[] {
   return state.albumTrackPaths.get(albumId) ?? []
-}
-
-export function isPathInside(root: string, target: string): boolean {
-  const rel = relative(root, target)
-  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)
 }

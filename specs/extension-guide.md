@@ -6,11 +6,12 @@ the index routes by concern. Use `graphify query` for the current file/import ma
 
 **Owning source paths:** the paths named in each recipe.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/lyric-sources.md](main/lyric-sources.md),
 [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md),
-[renderer/playback.md](renderer/playback.md), [persistence.md](persistence.md).
+[renderer/playback.md](renderer/playback.md), [renderer/queue-panel.md](renderer/queue-panel.md),
+[renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md), [persistence.md](persistence.md).
 
 ## Add a lyric source
 
@@ -71,6 +72,34 @@ only needs `getPosition` and `seek`; the rest of the UI uses the interface.
 2. Add validation/defaults in `src/main/settings.ts`.
 3. Add an IPC handler if the renderer writes it, and expose it in the preload `LibraryApi`.
 4. Read it during renderer initialization and save on change.
+
+## Add a context-menu action
+
+1. Add the action id to `ContextActionId` and a menu item (label plus typed payload) in the relevant
+   builder in `src/renderer/menus/contextMenuModels.ts`.
+2. Handle the action in `ContextActions.run` in `src/renderer/menus/contextActions.ts`, using the
+   injected dependencies instead of reaching for globals.
+3. Reuse an existing toast string in `src/renderer/menus/toastMessages.ts` or add one there with a
+   test; never inline user-facing text in the dispatcher.
+4. If the action needs new data outside the existing payload, add it to the builder's payload type and
+   fill it at the composition-root call site in `src/renderer/src/main.ts`.
+
+Menus are generic: `src/renderer/ui/contextMenu.ts` only renders items and manages focus/positioning.
+The exact item contract and close rules are in
+[renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md).
+
+## Add an editable queue-row action
+
+1. Extend `QueuePanelModel` row/header data only if the action needs new information, and keep the
+   model pure (`src/renderer/queue/queuePanelModel.ts`).
+2. Add the queue intent to `QueuePanelController` so it calls the queue API, then refresh through the
+   existing snapshot subscription.
+3. Put pure geometry (pointer slot, move destination, bounds) in `src/renderer/queue/dragReorder.ts`
+   and unit-test it; keep the DOM wiring in `src/renderer/ui/queuePanel.ts`.
+
+Queue semantics themselves are owned by [renderer/playback.md](renderer/playback.md); do not duplicate
+them in the panel. The full interaction contract is in
+[renderer/queue-panel.md](renderer/queue-panel.md).
 
 ## Related contracts
 

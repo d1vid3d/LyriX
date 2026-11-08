@@ -1,4 +1,6 @@
+import type { Album } from '../../../shared/types'
 import type { AlbumItem } from '../../library/query'
+import type { MenuPosition } from '../../ui/contextMenu'
 import { renderAlbumCards } from './albumCards'
 
 export interface AlbumGridOptions {
@@ -6,6 +8,7 @@ export interface AlbumGridOptions {
   emptyState: HTMLElement
   emptyMessage(): string
   onOpenAlbum(albumId: string): void
+  onOpenAlbumMenu?(album: Album, position: MenuPosition): void
 }
 
 export function renderAlbumGrid(
@@ -25,6 +28,7 @@ export function renderAlbumGrid(
   renderAlbumCards(
     options.container,
     items.map((item) => item.album),
-    options.onOpenAlbum
+    options.onOpenAlbum,
+    options.onOpenAlbumMenu
   )
 }

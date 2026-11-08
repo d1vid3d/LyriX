@@ -20,6 +20,13 @@ export interface ToolbarDeps {
   showCurrentSection(): void
   renderLibraryView(view: LibraryView): void
   saveUiState(): void
+  isContextMenuOpen(): boolean
+  closeContextMenu(): void
+  isSourceMenuOpen(): boolean
+  closeSourceMenu(): void
+  isQueuePanelOpen(): boolean
+  closeQueuePanel(): void
+  toggleQueuePanel(): void
 }
 
 /** Search box, sort dropdown, view switcher, and keyboard shortcuts. */
@@ -146,6 +153,24 @@ export class ToolbarController {
   private onKeydown(event: KeyboardEvent): void {
     const { elements } = this.deps
 
+    if (event.key === 'Escape' && this.deps.isContextMenuOpen()) {
+      event.preventDefault()
+      this.deps.closeContextMenu()
+      return
+    }
+
+    if (event.key === 'Escape' && this.deps.isSourceMenuOpen()) {
+      event.preventDefault()
+      this.deps.closeSourceMenu()
+      return
+    }
+
+    if (event.key === 'Escape' && this.deps.isQueuePanelOpen()) {
+      event.preventDefault()
+      this.deps.closeQueuePanel()
+      return
+    }
+
     if (event.key === 'Escape' && this.deps.isNowPlayingOpen()) {
       event.preventDefault()
       this.deps.closeNowPlaying()
@@ -178,6 +203,21 @@ export class ToolbarController {
       event.preventDefault()
       elements.searchInput.focus()
       elements.searchInput.select()
+      return
+    }
+
+    if (
+      event.key.toLowerCase() === 'q' &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !isTextInput(event.target) &&
+      !this.deps.isContextMenuOpen() &&
+      !this.deps.isSourceMenuOpen()
+    ) {
+      event.preventDefault()
+      this.deps.toggleQueuePanel()
     }
   }
 }

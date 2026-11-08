@@ -43,6 +43,7 @@ export interface AppElements {
   playPauseButton: HTMLButtonElement
   nextButton: HTMLButtonElement
   repeatButton: HTMLButtonElement
+  queueToggleButton: HTMLButtonElement
   currentTimeLabel: HTMLSpanElement
   seekBar: HTMLInputElement
   durationLabel: HTMLSpanElement
@@ -63,6 +64,14 @@ export interface AppElements {
   lyricsStatus: HTMLParagraphElement
   lyricScroll: HTMLDivElement
   lyricLines: HTMLDivElement
+
+  queuePanel: HTMLElement
+  queueScroll: HTMLDivElement
+  queueContextLabel: HTMLElement
+  queueSummaryLabel: HTMLElement
+  queueClearButton: HTMLButtonElement
+  queueCloseButton: HTMLButtonElement
+  toastRegion: HTMLDivElement
 }
 
 function getElement<T extends HTMLElement>(id: string): T {
@@ -120,6 +129,7 @@ export function getAppElements(): AppElements {
     playPauseButton: getElement<HTMLButtonElement>('play-pause'),
     nextButton: getElement<HTMLButtonElement>('next'),
     repeatButton: getElement<HTMLButtonElement>('repeat'),
+    queueToggleButton: getElement<HTMLButtonElement>('queue-toggle'),
     currentTimeLabel: getElement<HTMLSpanElement>('current-time'),
     seekBar: getElement<HTMLInputElement>('seek'),
     durationLabel: getElement<HTMLSpanElement>('duration'),
@@ -139,6 +149,14 @@ export function getAppElements(): AppElements {
     translationToggle: getElement<HTMLDivElement>('translation-toggle'),
     lyricsStatus: getElement<HTMLParagraphElement>('lyrics-status'),
     lyricScroll: getElement<HTMLDivElement>('lyric-scroll'),
-    lyricLines: getElement<HTMLDivElement>('lyric-lines')
+    lyricLines: getElement<HTMLDivElement>('lyric-lines'),
+
+    queuePanel: getElement<HTMLElement>('queue-panel'),
+    queueScroll: getElement<HTMLDivElement>('queue-scroll'),
+    queueContextLabel: getElement<HTMLElement>('queue-context'),
+    queueSummaryLabel: getElement<HTMLElement>('queue-summary'),
+    queueClearButton: getElement<HTMLButtonElement>('queue-clear'),
+    queueCloseButton: getElement<HTMLButtonElement>('queue-close'),
+    toastRegion: getElement<HTMLDivElement>('toast-region')
   }
 }

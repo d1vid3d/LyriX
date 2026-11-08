@@ -3,6 +3,7 @@ import { getSnapshot, resolveTrackFile } from './library'
 import { isValidLyricSourceId, isValidTrackId } from './lyrics/choices'
 import type { LyricChoiceStore } from './lyrics/choices'
 import { getLyricSources } from './lyrics/sources'
+import { revealTrackFile } from './reveal'
 import type { ScanCoordinator } from './scanCoordinator'
 import type { TranslationSettingsInput } from '../shared/types'
 import {
@@ -37,6 +38,11 @@ export function registerIpc(
 
   ipcMain.handle('library:open-folder', () => scan.chooseFolder())
   ipcMain.handle('library:rescan', () => scan.rescan())
+
+  ipcMain.handle('library:reveal-track', async (_event, trackId: unknown) => {
+    // The renderer sends an id only; reveal.ts resolves and validates the path.
+    return revealTrackFile(trackId)
+  })
 
   ipcMain.handle('lyrics:get-sources', async (_event, trackId: unknown) => {
     if (!isValidTrackId(trackId)) return null

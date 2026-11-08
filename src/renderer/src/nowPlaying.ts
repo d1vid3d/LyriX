@@ -36,6 +36,7 @@ export interface NowPlayingDeps {
   currentSection(): HTMLElement
   refreshScreen(): void
   renderNowPlaying(): void
+  closeContextMenu(): void
 }
 
 /** Owns the Now Playing section lifecycle, its lyric subscription, and the source menu. */
@@ -53,7 +54,8 @@ export class NowPlayingController {
       onPreference: (preference) => deps.setLyricPreference(preference),
       onTranslationToggle: (enabled) => deps.setTranslationEnabled(enabled),
       onTranslationSelect: (id) => deps.selectTranslation(id),
-      onReload: () => deps.reloadLyrics()
+      onReload: () => deps.reloadLyrics(),
+      onOpen: () => deps.closeContextMenu()
     })
     this.translationToggle = new TranslationToggle(deps.elements.translationToggle, {
       onToggle: (enabled) => deps.setTranslationEnabled(enabled)
@@ -71,6 +73,14 @@ export class NowPlayingController {
 
   isOpen(): boolean {
     return this.open
+  }
+
+  isSourceMenuOpen(): boolean {
+    return this.menu.isOpen()
+  }
+
+  closeSourceMenu(): void {
+    this.menu.close()
   }
 
   markDirty(): void {

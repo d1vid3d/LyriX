@@ -8,6 +8,7 @@ import { copyFixtureTree, launchApp, makeTempRoot, stopAllApps } from './lib/app
 import { delay } from './lib/cdp.mjs'
 import {
   clickAlbum,
+  clickMenuItem,
   clickSelector,
   clickTrack,
   clickView,
@@ -15,6 +16,7 @@ import {
   pressKey,
   readNowPlaying,
   readState,
+  rightClickSelector,
   setSearch
 } from './lib/dom.mjs'
 import { runSuite } from './lib/runner.mjs'
@@ -101,6 +103,294 @@ async function main(runner, ctx) {
   ui = await readState(cdp)
   runner.equal('repeat returns to off', ui.repeatLabel, 'Repeat: off')
   runner.equal('shuffle returns to off', ui.shuffleLabel, 'Shuffle: off')
+
+  runner.step('queue panel and context menu')
+  const queueOpened = await clickSelector(cdp, '#queue-toggle')
+  runner.check('queue toggle opens the panel', queueOpened)
+  await cdp.waitFor(
+    'queue panel visible',
+    `document.querySelector('#queue-panel').hidden === false`
+  )
+
+  let queue = await cdp.evaluate(`(() => {
+    const toggle = document.querySelector('#queue-toggle')
+    const current = document.querySelector('#queue-scroll .queue-entry--current')
+    const spacer = document.querySelector('#queue-scroll .virtual-list-spacer')
+    return {
+      pressed: toggle?.getAttribute('aria-pressed') ?? '',
+      expanded: toggle?.getAttribute('aria-expanded') ?? '',
+      context: document.querySelector('#queue-context')?.textContent ?? '',
+      summary: document.querySelector('#queue-summary')?.textContent ?? '',
+      currentTitle: current?.querySelector('.queue-entry-title')?.textContent ?? '',
+      currentArtist: current?.querySelector('.queue-entry-artist')?.textContent ?? '',
+      hasNextUp: [...document.querySelectorAll('#queue-scroll .queue-section-label')].some(
+        (label) => label.textContent === 'Next up'
+      ),
+      clearDisabled: document.querySelector('#queue-clear')?.disabled ?? true,
+      spacerHeight: spacer ? parseFloat(spacer.style.height) : 0
+    }
+  })()`)
+  runner.check(
+    'queue toggle reflects the open panel',
+    queue.pressed === 'true' && queue.expanded === 'true',
+    JSON.stringify(queue)
+  )
+  runner.equal('queue header shows the album context', queue.context, 'Album · Lyric Album')
+  runner.check(
+    'queue summary counts and times the queue',
+    /^20 tracks · \d+:\d{2}$/.test(queue.summary),
+    queue.summary
+  )
+  runner.check(
+    'queue shows the current row',
+    queue.currentTitle === 'Lyric Test' && queue.currentArtist === 'Lyric Artist',
+    JSON.stringify(queue)
+  )
+  runner.check('queue renders the Next up section', queue.hasNextUp)
+  runner.equal('clear is enabled with upcoming tracks', queue.clearDisabled, false)
+  // 20 entries plus the Now playing and Next up headers, all at the shared 56px row height.
+  runner.equal('queue spacer covers every row and header', queue.spacerHeight, 22 * 56)
+
+  const queueMenuOpened = await rightClickSelector(cdp, '#queue-scroll .queue-entry--current')
+  runner.check('queue row opens a context menu', queueMenuOpened)
+  await cdp.waitFor(
+    'queue row menu visible',
+    `document.querySelector('.context-menu').hidden === false`
+  )
+  const queueMenu = await cdp.evaluate(`(() => {
+    const menu = document.querySelector('.context-menu')
+    const items = [...menu.querySelectorAll('[data-menu-item]')]
+    return {
+      role: menu.getAttribute('role') ?? '',
+      labels: items.map((item) => item.querySelector('.context-menu__label')?.textContent ?? ''),
+      disabled: items.map((item) => item.disabled),
+      focused: document.activeElement?.querySelector('.context-menu__label')?.textContent ?? ''
+    }
+  })()`)
+  runner.equal('context menu exposes the menu role', queueMenu.role, 'menu')
+  runner.equal(
+    'queue row menu lists every row action',
+    queueMenu.labels.join('|'),
+    'Play now|Play next|Move to top of Next up|Move to bottom|Remove|Go to album|Go to artist|Show in file manager'
+  )
+  runner.check(
+    'current queue row disables move and remove actions',
+    !queueMenu.disabled[0] &&
+      queueMenu.disabled[1] &&
+      queueMenu.disabled[2] &&
+      queueMenu.disabled[3] &&
+      queueMenu.disabled[4],
+    JSON.stringify(queueMenu.disabled)
+  )
+  runner.equal('context menu focuses its first item', queueMenu.focused, 'Play now')
+
+  await pressKey(cdp, 'Escape')
+  await cdp.waitFor(
+    'Escape closes the context menu',
+    `document.querySelector('.context-menu').hidden === true`
+  )
+  const panelSurvivedMenu = await cdp.evaluate(
+    `document.querySelector('#queue-panel').hidden === false`
+  )
+  runner.check('Escape closes the menu before the queue panel', panelSurvivedMenu)
+
+  runner.step('fluid queue drag reorder')
+  const dragStart = await cdp.evaluate(`(() => {
+    const upcoming = [...document.querySelectorAll('#queue-scroll .queue-entry')].filter(
+      (row) =>
+        !row.classList.contains('queue-entry--current') &&
+        !row.classList.contains('queue-entry--history')
+    )
+    const titles = upcoming.map(
+      (row) => row.querySelector('.queue-entry-title')?.textContent ?? ''
+    )
+    const source = upcoming[2]
+    const handle = source?.querySelector('.queue-drag-handle')
+    if (!source || !handle) return null
+
+    const rect = handle.getBoundingClientRect()
+    const x = Math.round(rect.left + rect.width / 2)
+    const y = Math.round(rect.top + rect.height / 2)
+    handle.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        isPrimary: true,
+        button: 0,
+        buttons: 1,
+        clientX: x,
+        clientY: y
+      })
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        isPrimary: true,
+        buttons: 1,
+        clientX: x,
+        clientY: y + 56
+      })
+    )
+    return { titles, sourceTitle: titles[2] }
+  })()`)
+  runner.check('drag starts from a Next up handle', dragStart !== null)
+
+  await cdp.waitFor(
+    'drag ghost follows the pointer',
+    `document.querySelectorAll('.queue-drag-ghost').length === 1`
+  )
+  const dragVisuals = await cdp.evaluate(`(() => {
+    const ghost = document.querySelector('.queue-drag-ghost')
+    const shifted = [...document.querySelectorAll('#queue-scroll .queue-entry--shifted')]
+    return {
+      ghostTitle: ghost?.querySelector('.queue-entry-title')?.textContent ?? '',
+      ghostHidden: ghost?.getAttribute('aria-hidden') ?? '',
+      hasSource: !!document.querySelector('#queue-scroll .queue-entry--source'),
+      shiftedCount: shifted.length,
+      shiftTransform: shifted[0] ? getComputedStyle(shifted[0]).transform : ''
+    }
+  })()`)
+  runner.equal(
+    'drag ghost mirrors the dragged row',
+    dragVisuals.ghostTitle,
+    dragStart?.sourceTitle
+  )
+  runner.equal('drag ghost is decorative', dragVisuals.ghostHidden, 'true')
+  runner.check('dragged row leaves its slot', dragVisuals.hasSource)
+  runner.check(
+    'neighbouring row makes way with a transform',
+    dragVisuals.shiftedCount >= 1 && dragVisuals.shiftTransform !== 'none',
+    JSON.stringify(dragVisuals)
+  )
+
+  await cdp.evaluate(
+    `window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }))`
+  )
+  await cdp.waitFor(
+    'drag ghost is removed',
+    `document.querySelectorAll('.queue-drag-ghost').length === 0`
+  )
+  const dragResult = await cdp.evaluate(`(() => {
+    const upcoming = [...document.querySelectorAll('#queue-scroll .queue-entry')].filter(
+      (row) =>
+        !row.classList.contains('queue-entry--current') &&
+        !row.classList.contains('queue-entry--history')
+    )
+    return {
+      titles: upcoming.map(
+        (row) => row.querySelector('.queue-entry-title')?.textContent ?? ''
+      ),
+      leftovers:
+        document.querySelectorAll('#queue-scroll .queue-entry--shifted').length +
+        document.querySelectorAll('#queue-scroll .queue-entry--source').length
+    }
+  })()`)
+  runner.check(
+    'dropping commits the one-slot move',
+    dragResult.titles[2] === dragStart?.titles[3] &&
+      dragResult.titles[3] === dragStart?.titles[2],
+    JSON.stringify({ before: dragStart?.titles, after: dragResult.titles })
+  )
+  runner.equal('drag classes are cleared after the drop', dragResult.leftovers, 0)
+
+  await pressKey(cdp, 'Escape')
+  await cdp.waitFor(
+    'Escape closes the queue panel',
+    `document.querySelector('#queue-panel').hidden === true`
+  )
+  queue = await cdp.evaluate(`(() => {
+    const toggle = document.querySelector('#queue-toggle')
+    return {
+      pressed: toggle?.getAttribute('aria-pressed') ?? '',
+      expanded: toggle?.getAttribute('aria-expanded') ?? ''
+    }
+  })()`)
+  runner.check(
+    'queue toggle clears the open state',
+    queue.pressed === 'false' && queue.expanded === 'false',
+    JSON.stringify(queue)
+  )
+
+  await pressKey(cdp, 'q')
+  await cdp.waitFor(
+    'Q opens the queue panel',
+    `document.querySelector('#queue-panel').hidden === false`
+  )
+  const qOpened = await cdp.evaluate(`document.querySelector('#queue-toggle').getAttribute('aria-pressed') === 'true'`)
+  runner.check('Q toggles the queue panel open', qOpened)
+  await pressKey(cdp, 'q')
+  await cdp.waitFor(
+    'Q closes the queue panel',
+    `document.querySelector('#queue-panel').hidden === true`
+  )
+
+  const trackMenuOpened = await rightClickSelector(cdp, '#track-list .track')
+  runner.check('album track row opens a context menu', trackMenuOpened)
+  await cdp.waitFor(
+    'album track menu visible',
+    `document.querySelector('.context-menu').hidden === false`
+  )
+  const trackMenuLabels = await cdp.evaluate(
+    `[...document.querySelectorAll('.context-menu [data-menu-item]')].map(
+      (item) => item.querySelector('.context-menu__label')?.textContent ?? ''
+    )`
+  )
+  runner.check(
+    'track menu offers playback, navigation, and reveal',
+    trackMenuLabels.join('|') ===
+      'Play|Play next|Add to queue|Go to album|Go to artist|Show in file manager',
+    trackMenuLabels.join('|')
+  )
+  await pressKey(cdp, 'Escape')
+  await cdp.waitFor(
+    'album track menu closed',
+    `document.querySelector('.context-menu').hidden === true`
+  )
+
+  runner.step('album card menu navigation')
+  await clickSelector(cdp, '#back')
+  await cdp.waitFor(
+    'back to the album grid',
+    `document.querySelector('#grid-view').hidden === false &&
+      document.querySelectorAll('#album-grid .album-card').length === 1`
+  )
+  const albumMenuOpened = await rightClickSelector(cdp, '#album-grid .album-card')
+  runner.check('album card opens a context menu', albumMenuOpened)
+  await cdp.waitFor(
+    'album card menu visible',
+    `document.querySelector('.context-menu').hidden === false`
+  )
+  const albumMenuLabels = await cdp.evaluate(
+    `[...document.querySelectorAll('.context-menu [data-menu-item]')].map(
+      (item) => item.querySelector('.context-menu__label')?.textContent ?? ''
+    )`
+  )
+  runner.check(
+    'album menu offers queue, navigation, and reveal actions',
+    albumMenuLabels.join('|') ===
+      'Play|Shuffle|Play next (20 tracks)|Add to queue (20 tracks)|Go to artist|Show in file manager',
+    albumMenuLabels.join('|')
+  )
+
+  const goToArtistClicked = await clickMenuItem(cdp, 'Go to artist')
+  runner.check('album menu Go to artist runs', goToArtistClicked)
+  await cdp.waitFor(
+    'artist detail opens from the album menu',
+    `document.querySelector('#artist-detail-view').hidden === false &&
+      document.querySelector('#artist-name').textContent === 'Lyric Artist'`
+  )
+
+  await clickSelector(cdp, '#artist-back')
+  await cdp.waitFor(
+    'artist back returns to the album grid',
+    `document.querySelector('#grid-view').hidden === false`
+  )
+  const albumReopened = await clickAlbum(cdp, 'Lyric Album', 'Lyric Artist')
+  runner.check('album reopened after menu navigation', albumReopened)
+  await cdp.waitFor('detail view after reopen', `document.querySelector('#detail-view').hidden === false`)
 
   runner.step('open Now Playing and read line-timed lyrics')
   const openedNowPlaying = await clickSelector(cdp, '#now-playing')

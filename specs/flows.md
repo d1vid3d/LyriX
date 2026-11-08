@@ -5,10 +5,12 @@ that owns the detailed contract.
 
 **Owning source paths:** cross-cutting; see the linked specs.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md),
 [main/library-scanning.md](main/library-scanning.md), [renderer/playback.md](renderer/playback.md),
+[renderer/queue-panel.md](renderer/queue-panel.md),
+[renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md),
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md).
 
 ## Startup
@@ -55,6 +57,28 @@ Details: [main/library-scanning.md](main/library-scanning.md),
 
 Details: [renderer/playback.md](renderer/playback.md).
 
+## Queue panel and context-menu actions
+
+1. The player-bar Queue button or `Q` toggles the slide-over. The controller rebuilds the pure row
+   model from the latest snapshot, and the panel virtualizes the flat current/upcoming/history rows.
+   Opening scrolls the current row into view; later snapshot updates keep the scroll offset.
+2. Row intents are translated by the controller: play (double-click/Enter) jumps and starts,
+   remove calls `queue.remove` (the current row is refused), and drag/Alt+Arrow reordering calls
+   `queue.move` with a post-removal destination.
+3. Right-click or `Shift+F10` on a track, album, artist, queue row, or the current-track target opens
+   one context menu. Opening it closes the lyric source menu; selecting an item closes the menu and
+   dispatches through `ContextActions`.
+4. Play next / add to queue with no current entry starts the first added track immediately; otherwise
+   the entries are inserted after the current entry or appended.
+5. Go to album/artist validates the target and navigates through the normal route stack, which closes
+   Now Playing; a missing target shows a toast instead.
+6. Show in file manager sends only the track id over IPC. Main resolves, canonicalizes, and validates
+   the path before revealing it; a `false` result shows a toast.
+7. Each toast replaces the previous one and auto-dismisses; toasts never take focus.
+
+Details: [renderer/queue-panel.md](renderer/queue-panel.md),
+[renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md).
+
 ## Lyric load and display
 
 1. `setTrack` checks the LRU cache; a hit applies immediately.
@@ -80,11 +104,14 @@ Details: [main/lyric-sources.md](main/lyric-sources.md),
 3. The hidden library DOM is not re-rendered, preserving scroll/search/view.
 4. If a library snapshot arrives while open, `libraryDirtyWhileNowPlaying` is set and the screen stays
    on Now Playing.
-5. The close button or `Escape` closes it; if the library changed, the screen re-renders, otherwise the
-   previous section is shown exactly as it was.
+5. Once no context menu, source menu, or queue panel is open, the close button or `Escape` closes
+   Now Playing; if the library changed, the screen re-renders, otherwise the previous section is
+   shown exactly as it was.
 6. Navigating (open album/artist, back, switch view, search, open folder) closes Now Playing first.
 
 Details: [renderer/playback.md](renderer/playback.md),
+[renderer/queue-panel.md](renderer/queue-panel.md),
+[renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md),
 [renderer/shell-and-navigation.md](renderer/shell-and-navigation.md),
 [renderer/ui-map.md](renderer/ui-map.md).
 

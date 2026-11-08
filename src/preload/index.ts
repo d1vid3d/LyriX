@@ -23,6 +23,8 @@ const library: LibraryApi = {
   getState: (): Promise<LibrarySnapshot> => ipcRenderer.invoke('library:get-state'),
   openFolder: (): Promise<LibrarySnapshot | null> => ipcRenderer.invoke('library:open-folder'),
   rescan: (): Promise<LibrarySnapshot | null> => ipcRenderer.invoke('library:rescan'),
+  revealTrack: (trackId: string): Promise<boolean> =>
+    ipcRenderer.invoke('library:reveal-track', trackId),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   saveVolume: (volume: number): Promise<void> =>
     ipcRenderer.invoke('settings:set-volume', volume),

@@ -5,7 +5,7 @@ element and cover images.
 
 **Owning source paths:** `src/main/covers.ts`, `src/main/media-protocol.ts`, `src/main/range.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 1–3),
 [main/library-scanning.md](library-scanning.md), [persistence.md](../persistence.md),
@@ -38,7 +38,8 @@ ready.
 
 1. Validates the 40-hex id.
 2. Resolves the indexed path and the library root.
-3. `realpath`s both and rejects anything outside the root.
+3. `realpath`s both and rejects anything outside the root (shared `isPathInside` in
+   `src/main/pathContainment.ts`).
 4. Requires a regular `.flac` file.
 5. Supports `HEAD`.
 6. Serves `200` with the whole file when there is no `Range`, `206` with `Content-Range` for a valid

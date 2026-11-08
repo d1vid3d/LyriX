@@ -5,7 +5,7 @@ albums.
 
 **Owning source paths:** `src/shared/types.ts`, `src/main/ids.ts`.
 
-**Last verified:** 2026-11-06 against LyriX 0.1.0.
+**Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [persistence.md](persistence.md),
 [shared-lyric-core.md](shared-lyric-core.md), [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md).
@@ -33,6 +33,9 @@ albums.
 
 Queue-only types (`QueueEntry`, `QueueContext`, `QueueSnapshot`, `QueueOrigin`) live in
 `src/renderer/player/queue/types.ts`; they are renderer-local and do not cross the process boundary.
+The visible queue-panel row model and the context-menu item/action types are also renderer-local
+(`src/renderer/queue/queuePanelModel.ts`, `src/renderer/menus/contextMenuModels.ts`). The only reveal
+shape that crosses IPC is `trackId: string` in and `boolean` out (`LibraryApi.revealTrack`).
 
 The lyric document types (`LyricFormat`, `LyricDocument`, `LyricLine`, `LyricSegment`, and parse
 options) live in [shared-lyric-core.md](shared-lyric-core.md); they are not duplicated here.
