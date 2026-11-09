@@ -1,5 +1,6 @@
 import type { Album, Track } from '../../shared/types'
 import type { QueueSnapshot, RepeatMode } from '../player/queue'
+import { createFavoriteButton, updateFavoriteButton } from '../ui/favoriteButton'
 import type { AppElements } from './dom'
 import { formatTime, setCoverImage, smallCoverUrl } from './format'
 
@@ -15,6 +16,8 @@ export interface PlayerBarDeps {
   cycleRepeat(): void
   isQueuePanelOpen(): boolean
   toggleQueuePanel(): void
+  isFavorite(trackId: string): boolean
+  onToggleFavorite(trackId: string): void
 }
 
 function repeatLabel(repeat: RepeatMode): string {
@@ -99,6 +102,7 @@ export class PlayerBar {
     if (!track) {
       elements.nowTitle.textContent = 'Nothing playing'
       elements.nowArtist.textContent = ''
+      elements.favoriteCurrentHost.replaceChildren()
       setCoverImage(elements.nowCoverImage, null, '')
       return
     }
@@ -106,10 +110,26 @@ export class PlayerBar {
     const album = this.deps.getAlbumForTrack(track)
     elements.nowTitle.textContent = track.title
     elements.nowArtist.textContent = track.artist
+    this.renderFavorite(track)
     setCoverImage(
       elements.nowCoverImage,
       album ? smallCoverUrl(album.coverUrl) : null,
       album ? `${album.title} cover` : ''
+    )
+  }
+
+  private renderFavorite(track: Track): void {
+    const host = this.deps.elements.favoriteCurrentHost
+    const existing = host.querySelector<HTMLButtonElement>('[data-favorite-track-id]')
+    if (existing?.dataset.favoriteTrackId === track.id) {
+      updateFavoriteButton(existing, this.deps.isFavorite(track.id))
+      return
+    }
+
+    host.replaceChildren(
+      createFavoriteButton(track.id, this.deps.isFavorite(track.id), (trackId) =>
+        this.deps.onToggleFavorite(trackId)
+      )
     )
   }
 }

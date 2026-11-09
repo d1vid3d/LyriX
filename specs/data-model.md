@@ -28,6 +28,9 @@ albums.
 | `SessionPositionState` | `entryId`, `trackId`, `position` (finite, non-negative). |
 | `RestoredSession` | `queue` plus `position | null` after main's folder/validation checks. |
 | `MediaKeyAction` | `"playpause"`, `"next"`, `"previous"`, or `"stop"` for the shortcut fallback. |
+| `LyrixDataStatus` | `state`, `writable`, `libraryId`, `message`; the renderer-facing LyrixData state. |
+| `FavoritesState` | `items: [{ trackId, addedAt }]` and `missing: [{ path, title, artist, album, addedAt }]`. |
+| `FavoritesSetResult` | `{ ok: true, state }` or `{ ok: false, reason }` with `read-only`, `unavailable`, `newer-version`, or `invalid`. |
 | `PlaybackSettingsInput` | `shuffle: boolean`, `repeat: RepeatMode` for the playback-settings IPC. |
 | `TranslationSettingsInput` | `enabled: boolean`, `language: string \| null` for the translation IPC. |
 | `ScanProgress` | `scanned`, `total`. |
@@ -43,7 +46,9 @@ Queue implementation types (`QueueEntry`, `QueueSnapshot`) live in
 `RepeatMode` from `src/shared/types.ts`. The visible queue-panel row model and the context-menu
 item/action types are renderer-local (`src/renderer/queue/queuePanelModel.ts`,
 `src/renderer/menus/contextMenuModels.ts`). The reveal shape that crosses IPC is `trackId: string` in
-and `boolean` out (`LibraryApi.revealTrack`); session IPC carries only id-based queue/position shapes.
+and `boolean` out (`LibraryApi.revealTrack`); session IPC carries only id-based queue/position shapes,
+and favorites IPC carries only track ids plus main-derived missing metadata. `TrackRef` and the
+LyrixData file shapes live in `src/main/lyrixdata/` and never cross the bridge.
 
 The lyric document types (`LyricFormat`, `LyricDocument`, `LyricLine`, `LyricSegment`, and parse
 options) live in [shared-lyric-core.md](shared-lyric-core.md); they are not duplicated here.

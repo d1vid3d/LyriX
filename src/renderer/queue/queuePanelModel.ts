@@ -87,6 +87,8 @@ export function queueContextLabel(context: QueueContext | null): string {
       return context.label ? `Search · ${context.label}` : 'Search results'
     case 'tracks':
       return 'Tracks'
+    case 'favorites':
+      return 'Favorites'
     default:
       return context.label || 'Queue'
   }

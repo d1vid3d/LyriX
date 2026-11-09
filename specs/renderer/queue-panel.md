@@ -30,7 +30,7 @@ entry), then emits one flat `rows` array for virtualization.
   `artistName`, `durationLabel`, `isCurrent`, `canDrag`, and `canRemove`. `canDrag` is true only for
   `Next up`; `canRemove` is false for the current entry.
 - The header model carries `contextLabel` from the queue context (`Album · …`, `Artist · …`,
-  `Search · …`, `Tracks`, or `Queue`), `countLabel` (`1 track` / `N tracks`), `durationLabel`, the
+  `Search · …`, `Tracks`, `Favorites`, or `Queue`), `countLabel` (`1 track` / `N tracks`), `durationLabel`, the
   combined `summaryLabel`, `clearDisabled`, `currentEntryId`, `currentIndex`, `currentRowIndex`,
   `upcomingStartRow`, `upcomingRowCount`, and `upcomingEntryIds`.
 - With no current entry, every entry is treated as upcoming, so a queue filled only by play-next is
@@ -62,8 +62,8 @@ Rows render through the shared `VirtualList` with the fixed 56 px row height, so
 keeps a bounded DOM. On queue updates while open, `VirtualList.setItems(rows, { preserveScroll: true })`
 keeps the current scroll offset; the current entry is scrolled into view only when the panel opens.
 
-Each entry row exposes a drag handle, a small cover, title, artist, duration, and a remove button. The
-current row is highlighted with `aria-current="true"`; history rows are dimmed.
+Each entry row exposes a drag handle, a small cover, title, artist, duration, and a remove button, plus
+a favorite heart. The current row is highlighted with `aria-current="true"`; history rows are dimmed.
 
 Interactions:
 

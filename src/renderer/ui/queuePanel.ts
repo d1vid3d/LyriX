@@ -9,6 +9,7 @@ import {
   upcomingSlotFromGap
 } from '../queue/dragReorder'
 import { smallCoverUrl } from '../src/format'
+import { createFavoriteButton } from './favoriteButton'
 import type { MenuPosition } from './contextMenu'
 import { attachMenuTrigger } from './menuTrigger'
 import { VirtualList } from './virtualList'
@@ -32,6 +33,8 @@ export interface QueuePanelCallbacks {
   onReorderEntry(entryId: string, slot: number): void
   onMoveEntry(entryId: string, direction: -1 | 1): void
   onOpenMenu(row: QueuePanelEntryRow, position: MenuPosition): void
+  isFavorite?(trackId: string): boolean
+  onToggleFavorite?(trackId: string): void
 }
 
 interface DragState {
@@ -134,6 +137,11 @@ export class QueuePanel {
 
   isOpen(): boolean {
     return this.openState
+  }
+
+  /** Re-renders visible rows, e.g. after a favorite state change. */
+  refresh(): void {
+    this.virtualList.refresh()
   }
 
   destroy(): void {
@@ -329,7 +337,17 @@ export class QueuePanel {
       remove.tabIndex = -1
     }
 
-    element.append(handle, cover, meta, duration, remove)
+    element.append(handle, cover, meta, duration)
+    if (this.callbacks.isFavorite && this.callbacks.onToggleFavorite) {
+      element.append(
+        createFavoriteButton(
+          row.track.id,
+          this.callbacks.isFavorite(row.track.id),
+          this.callbacks.onToggleFavorite
+        )
+      )
+    }
+    element.append(remove)
     element.addEventListener('dblclick', () => this.callbacks.onPlayEntry(row.entryId))
     element.addEventListener('keydown', (event) => this.handleRowKeydown(event, row, element))
     attachMenuTrigger(element, (position) => this.callbacks.onOpenMenu(row, position))

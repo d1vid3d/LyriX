@@ -10,6 +10,7 @@ import type {
 } from '../shared/types'
 import { groupTracks } from './albums'
 import { hashId } from './ids'
+import { isLyrixDataDirName } from './lyrixdata/paths'
 import { readTrackTags } from './tags'
 
 const TAG_CONCURRENCY = 8
@@ -147,7 +148,11 @@ export async function scanLibrary(
   return entries
 }
 
-async function collectFlacFiles(dir: string, files: ScannedFile[] = []): Promise<ScannedFile[]> {
+async function collectFlacFiles(
+  dir: string,
+  files: ScannedFile[] = [],
+  isLibraryRoot = true
+): Promise<ScannedFile[]> {
   let entries: Dirent[]
   try {
     entries = await fs.readdir(dir, { withFileTypes: true })
@@ -163,6 +168,8 @@ async function collectFlacFiles(dir: string, files: ScannedFile[] = []): Promise
 
     const fullPath = join(dir, entry.name)
     if (entry.isDirectory()) {
+      // LyrixData is LyriX's own portable data, never music or lyrics.
+      if (isLibraryRoot && isLyrixDataDirName(entry.name)) continue
       subfolders.push(fullPath)
     } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.flac')) {
       try {
@@ -175,7 +182,7 @@ async function collectFlacFiles(dir: string, files: ScannedFile[] = []): Promise
   }
 
   for (const subfolder of subfolders) {
-    await collectFlacFiles(subfolder, files)
+    await collectFlacFiles(subfolder, files, false)
   }
 
   return files

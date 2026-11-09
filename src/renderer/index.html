@@ -21,6 +21,7 @@
           <button type="button" data-view="albums" aria-pressed="true">Albums</button>
           <button type="button" data-view="artists" aria-pressed="false">Artists</button>
           <button type="button" data-view="tracks" aria-pressed="false">Tracks</button>
+          <button type="button" data-view="favorites" aria-pressed="false">Favorites</button>
         </div>
         <select id="sort-select" aria-label="Sort by"></select>
         <input
@@ -58,6 +59,50 @@
       <section id="tracks-view" class="view tracks-view" hidden>
         <div id="track-scroll" class="track-scroll"></div>
         <p id="tracks-empty" class="empty-state" hidden></p>
+      </section>
+
+      <section id="favorites-view" class="view favorites-view" hidden>
+        <header class="favorites-header">
+          <div class="favorites-heading">
+            <h1 class="favorites-title">Favorites</h1>
+            <p id="favorites-status" class="favorites-status"></p>
+          </div>
+          <div class="favorites-actions">
+            <button id="favorites-why" class="favorites-why" type="button" hidden>Why?</button>
+            <button
+              id="favorites-play"
+              class="action-primary"
+              type="button"
+              aria-label="Play favorites"
+            >
+              Play
+            </button>
+            <button
+              id="favorites-shuffle"
+              type="button"
+              aria-label="Shuffle favorites"
+              title="Shuffle favorites"
+            >
+              Shuffle
+            </button>
+          </div>
+        </header>
+        <div id="favorites-scroll" class="track-scroll"></div>
+        <p id="favorites-empty" class="empty-state" hidden>No favorites yet. Press the heart on any track.</p>
+        <section id="favorites-missing" class="favorites-missing" hidden>
+          <button
+            id="favorites-missing-toggle"
+            class="favorites-missing-toggle"
+            type="button"
+            aria-expanded="false"
+          ></button>
+          <div id="favorites-missing-body" class="favorites-missing-body" hidden>
+            <ul id="favorites-missing-list" class="favorites-missing-list"></ul>
+            <button id="favorites-remove-missing" class="favorites-remove-missing" type="button">
+              Remove missing
+            </button>
+          </div>
+        </section>
       </section>
 
       <section id="detail-view" class="view detail-view" hidden>
@@ -104,6 +149,7 @@
       <section id="now-playing-view" class="view now-playing-view" hidden>
         <div class="now-playing-header">
           <button id="now-playing-close" class="back" type="button">← Close</button>
+          <span id="favorite-now-playing-host" class="favorite-now-playing-host"></span>
         </div>
 
         <div class="now-playing-body">
@@ -174,6 +220,7 @@
           <span id="now-artist" class="now-artist"></span>
         </div>
       </div>
+      <span id="favorite-current-host" class="favorite-current-host"></span>
 
       <div class="controls">
         <button

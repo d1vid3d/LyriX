@@ -269,7 +269,7 @@ describe('artist grouping', () => {
 
 describe('view and sort helpers', () => {
   it('lists the view ids', () => {
-    expect(getViewIds()).toEqual(['albums', 'artists', 'tracks'])
+    expect(getViewIds()).toEqual(['albums', 'artists', 'tracks', 'favorites'])
   })
 
   it.each([

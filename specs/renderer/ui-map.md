@@ -14,11 +14,13 @@ and components named below.
 
 ## Markup regions (`src/renderer/index.html`)
 
-- **Toolbar** — Open Folder, Rescan, status, scan progress, view switcher, sort select, search, and a
-  `?` keyboard-shortcuts button.
+- **Toolbar** — Open Folder, Rescan, status, scan progress, Albums/Artists/Tracks/Favorites view
+  switcher, sort select, search, and a `?` keyboard-shortcuts button.
 - **Albums view** — album grid + empty state.
 - **Artists view** — artist list + empty state.
 - **Tracks view** — virtualized track list + empty state.
+- **Favorites view** — header with title, status line, optional Why, Play/Shuffle, a virtualized
+  favorites list, an exact empty state, and a collapsed missing-favorites section.
 - **Album detail** — back button, cover, title/artist/year, Play and Shuffle, ordered track list.
 - **Artist detail** — back button, artist name/counts, Play and Shuffle, album grid.
 - **Now Playing** — close button, large cover, title/artist/album, translation quick toggle, lyric
@@ -30,6 +32,8 @@ and components named below.
 - **Toast region** — bottom-center live region above the player bar, outside the content area.
 - **Shortcuts overlay** — modal `role="dialog"` generated from the shortcut registry, appended to
   `<body>` with a backdrop, category groups, focus trap, and a close button.
+- **Data disclaimer** — modal `role="dialog"` with the LyrixData reason, feature list, Retry (busy
+  state), and Close; focus-trapped and layer-closed.
 - **Audio element** — hidden `<audio id="audio">`.
 
 Element ids are looked up once by `getAppElements()`; see
@@ -55,8 +59,9 @@ listener; component-local keys are listed separately. The full table and matchin
 | `/` | Focus search when focus is not in a text-entry/range target. |
 | `Ctrl/Cmd+L` | Toggle Now Playing. |
 | `T` | Toggle translation when Now Playing is open and the toggle is available. |
+| `F` | Toggle the current track's favorite (plain key, typing-guarded). |
 | `?` (Shift+/) | Open the keyboard-shortcuts overlay. |
-| `Escape` | Close the highest-priority open layer: context menu, shortcuts overlay, lyric source menu, queue panel, Now Playing, then clear search if focused/non-empty. |
+| `Escape` | Close the highest-priority open layer: context menu, data disclaimer, shortcuts overlay, lyric source menu, queue panel, Now Playing, then clear search if focused/non-empty. |
 | `Tab` in the shortcuts overlay | Cycle focus inside the dialog; Escape or the backdrop closes it. |
 | `Shift+F10` / Menu key | Open the context menu for the focused track row, album card, artist row, queue row, or current-track target. |
 | `Enter`/`Space` | Activate the bottom-bar target or a focused lyric line. |
@@ -87,6 +92,8 @@ listener; component-local keys are listed separately. The full table and matchin
 - The shortcuts help button exposes `aria-keyshortcuts="?"`; the overlay uses `role="dialog"`,
   `aria-modal="true"`, a labelled title, `kbd` chord labels, a Tab focus trap, and returns focus to
   its opener.
+- Favorite hearts use `aria-pressed` with state-driven `aria-label`/title; the Favorites missing
+  disclosure uses `aria-expanded`; the data disclaimer uses the same modal/focus contract.
 - The queue panel is a `role="list"`; entry rows are list items, `aria-current="true"` marks the
   playing entry, the History header is a disclosure button with `aria-expanded`, and the insertion
   indicator is decorative.

@@ -15,12 +15,15 @@ the tracks view.
 
 - `normalizeText` strips diacritics, lowercases, trims, and collapses whitespace.
 - `filterBySearch` requires **every** query word to appear in the item's precomputed `searchText`.
-- `VIEWS` is the registry for albums, artists, and tracks:
+- `VIEWS` is the registry for albums, artists, tracks, and favorites:
   - Each view has a label, default sort, sort map, and item builder.
   - Albums: title, artist, year.
   - Artists: name, track count.
   - Tracks: title, artist, album.
-- `buildLibraryIndex(albums)` precomputes items for all views once per snapshot.
+  - Favorites: Recently added (default), title, artist, album; items are built from the current
+    albums filtered by the favorites ids and carry `addedAt`.
+- `buildLibraryIndex(albums, favorites?)` precomputes items for all views once per snapshot. The
+  favorites input is plain `{ ids, addedAt }`; the registry never depends on the DOM or controllers.
 - `queryLibrary(index, { view, search, sort })` filters and sorts without touching the DOM.
 - `getViewIds`, `getSortOptions`, `getDefaultSort`, `isLibraryView`, `isSortKey` support the UI and
   validate persisted values.
@@ -39,7 +42,8 @@ grouping is listed in [testing-and-verification.md](../testing-and-verification.
 - `setItems(items, { preserveScroll })` resets scroll and invalidates by default, or keeps the current
   scroll offset when `preserveScroll` is `true`; `refresh` re-renders the current window (used when the
   playing highlight changes); `destroy` removes listeners and DOM.
-- Used by the tracks view with 52 px rows and by the queue panel with 56 px rows.
+- Used by the tracks view with 52 px rows, the favorites list with 52 px rows, and the queue panel
+  with 56 px rows.
 
 The tracks view renderer that supplies rows is owned by
 [renderer/shell-and-navigation.md](shell-and-navigation.md). The scrolling/animation budget is

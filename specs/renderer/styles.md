@@ -6,7 +6,8 @@ source menu, and translation controls.
 **Owning source paths:** `src/renderer/src/style.css`, `src/renderer/styles/lyrics.css`,
 `src/renderer/styles/lyricSourceMenu.css`, `src/renderer/styles/contextMenu.css`,
 `src/renderer/styles/queuePanel.css`, `src/renderer/styles/toast.css`,
-`src/renderer/styles/shortcutOverlay.css`.
+`src/renderer/styles/shortcutOverlay.css`, `src/renderer/styles/favorites.css`,
+`src/renderer/styles/dataDisclaimer.css`.
 
 **Last verified:** 2026-11-08 against LyriX 0.1.0.
 
@@ -14,7 +15,8 @@ source menu, and translation controls.
 [renderer/lyric-view.md](lyric-view.md), [renderer/lyric-source-menu.md](lyric-source-menu.md),
 [renderer/queue-panel.md](queue-panel.md),
 [renderer/context-menu-and-toasts.md](context-menu-and-toasts.md),
-[renderer/shortcuts.md](shortcuts.md), [renderer/ui-map.md](ui-map.md).
+[renderer/shortcuts.md](shortcuts.md), [renderer/favorites.md](favorites.md),
+[renderer/ui-map.md](ui-map.md).
 
 ## App shell and layout (`src/renderer/src/style.css`)
 
@@ -125,6 +127,26 @@ Variables at the top: `--shortcut-overlay-z-index`, `--shortcut-overlay-backdrop
 The root is a fixed full-viewport layer with a dim backdrop and a centered dialog. The body scrolls
 inside the dialog; category headings are uppercase muted labels; each row is a two-column
 label/chords grid with `kbd` chips for the generated chord labels.
+
+## Favorites (`src/renderer/styles/favorites.css`)
+
+Variables at the top: `--favorite-size`, `--favorite-icon-size`, `--favorite-color`,
+`--favorite-color-on`, `--favorites-header-padding`, `--favorites-missing-border`, and
+`--favorites-missing-muted`.
+
+The heart is a borderless 28 px button; its inline SVG uses `currentColor`, fills only for
+`aria-pressed="true"`, and keeps a focus-visible ring. Tracks-view rows use a flex wrapper with the
+row button and heart as siblings; album-detail list items and queue rows place the heart next to the
+row. The Favorites view is a column with a fixed header/status/actions, a scrolling virtual list, an
+empty state, and a bordered missing section with a disclosure toggle.
+
+## Data disclaimer (`src/renderer/styles/dataDisclaimer.css`)
+
+Variables: `--data-disclaimer-z-index`, `--data-disclaimer-backdrop`, `--data-disclaimer-width`,
+`--data-disclaimer-padding`, `--data-disclaimer-radius`, `--data-disclaimer-background`,
+`--data-disclaimer-border`, `--data-disclaimer-shadow`, `--data-disclaimer-muted`, and
+`--data-disclaimer-warning`. The modal mirrors the shortcuts overlay: dim backdrop, centered dialog,
+header/close, message, warning-toned feature list, and right-aligned Retry/Close actions.
 
 ## Lyric visual rules
 

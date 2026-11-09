@@ -31,7 +31,7 @@ Key functions:
   reuses entries whose `mtimeMs` and `size` match, reads changed files with up to **8** concurrent
   workers, reports progress for cached and parsed files alike, and stops when cancelled.
 - `collectFlacFiles(dir)` — skips symbolic links, ignores unreadable folders/files with a warning,
-  matches `.flac` case-insensitively.
+  matches `.flac` case-insensitively, and skips a root-level `LyrixData` directory entirely.
 - `getSnapshot()`, `getLibraryRoot()`, `resolveTrackFile(id)`, `getAlbumTrackPaths(albumId)`.
 - Containment itself lives in `src/main/pathContainment.ts` (`isPathInside`), shared by the media
   protocol and the reveal path.

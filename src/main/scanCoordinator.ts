@@ -24,7 +24,10 @@ export class ScanCoordinator {
 
   constructor(
     private readonly store: AppStore,
-    private readonly window: ScanWindow
+    private readonly window: ScanWindow,
+    private readonly onLibraryApplied?: (
+      snapshot: LibrarySnapshot
+    ) => Promise<void> | void
   ) {}
 
   async runScan(folder: string, persistFolder: boolean): Promise<ScanOutcome> {
@@ -46,6 +49,11 @@ export class ScanCoordinator {
     const snapshot = applyLibrary(folder, entries)
     this.store.cache = { version: LIBRARY_CACHE_VERSION, folder, tracks: entries }
 
+    try {
+      await this.onLibraryApplied?.(snapshot)
+    } catch (error) {
+      console.error('[library] Could not bind LyrixData for the new library', error)
+    }
     try {
       await saveLibraryCache(this.store.cacheFile, this.store.cache)
     } catch (error) {

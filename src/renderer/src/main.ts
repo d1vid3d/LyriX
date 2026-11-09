@@ -5,7 +5,13 @@ import '../styles/contextMenu.css'
 import '../styles/queuePanel.css'
 import '../styles/toast.css'
 import '../styles/shortcutOverlay.css'
+import '../styles/favorites.css'
+import '../styles/dataDisclaimer.css'
 import type { Album } from '../../shared/types'
+import { buildDataDisclaimerModel } from '../favorites/dataDisclaimerModel'
+import { FavoritesController } from '../favorites/favoritesController'
+import { buildFavoritesStatusModel } from '../favorites/favoritesStatusModel'
+import { LyrixDataStatusController } from '../favorites/lyrixDataStatusController'
 import { LyricsController } from '../lyrics/lyricsController'
 import type { ArtistItem, TrackItem } from '../library/query'
 import { ContextActions } from '../menus/contextActions'
@@ -16,6 +22,8 @@ import type { QueuePanelEntryRow } from '../queue/queuePanelModel'
 import { DEFAULT_SHORTCUTS } from '../shortcuts/defaultShortcuts'
 import { ContextMenu } from '../ui/contextMenu'
 import type { MenuPosition } from '../ui/contextMenu'
+import { DataDisclaimer } from '../ui/dataDisclaimer'
+import { syncFavoriteButtons } from '../ui/favoriteButton'
 import { LyricView } from '../ui/lyricView'
 import { attachMenuTrigger } from '../ui/menuTrigger'
 import { QueuePanel } from '../ui/queuePanel'
@@ -35,6 +43,7 @@ import { createShellFeatures } from './shellFeatures'
 import type { ShellFeatures } from './shellFeatures'
 import { ToolbarController } from './toolbar'
 import { TransportController } from './transport'
+import { FavoritesView } from './views/favoritesView'
 import { TracksList } from './views/tracksList'
 
 const TRACK_ROW_HEIGHT = 52
@@ -61,6 +70,34 @@ const shortcutOverlay = new ShortcutOverlay(DEFAULT_SHORTCUTS, isMac)
 const contextMenu = new ContextMenu<ContextMenuItem>({
   onSelect: (item) => contextActions.run(item),
   onOpen: () => nowPlaying.closeSourceMenu()
+})
+
+const statusController = new LyrixDataStatusController({
+  api: window.library,
+  onStatusChange: () => screen.refreshFavoritesView()
+})
+
+const disclaimer = new DataDisclaimer({
+  onRetry: async () => {
+    const status = await statusController.retry()
+    await favoritesController.reload()
+    return status.writable
+  }
+})
+
+const favoritesController: FavoritesController = new FavoritesController({
+  api: window.library,
+  toast: (message) => toast.show(message),
+  onWriteBlocked: (reason, retryAction) => {
+    disclaimer.show(buildDataDisclaimerModel(reason), retryAction)
+  },
+  onStateChange: () => {
+    syncFavoriteButtons(document, (trackId) => favoritesController.isFavorite(trackId))
+    library.refreshFavorites()
+    playerBar.updateNowPlaying()
+    nowPlaying.updateContent()
+    queuePanel.refresh()
+  }
 })
 
 attachCoverFallbacks([
@@ -106,7 +143,9 @@ const queuePanel = new QueuePanel(
       queuePanelController.handleReorderEntry(entryId, slot),
     onMoveEntry: (entryId, direction) =>
       queuePanelController.handleMoveEntry(entryId, direction),
-    onOpenMenu: (row, position) => openers.openQueueRowMenu(row, position)
+    onOpenMenu: (row, position) => openers.openQueueRowMenu(row, position),
+    isFavorite: (trackId) => favoritesController.isFavorite(trackId),
+    onToggleFavorite: (trackId) => void favoritesController.toggle(trackId)
   }
 )
 
@@ -117,8 +156,52 @@ const tracksList = new TracksList({
   emptyMessage: () => library.emptyMessage(),
   getCurrentTrackId: () => transport.getCurrentTrack()?.id ?? null,
   onPlayTrack: (index) => transport.playVisibleTrack(index),
+  isFavorite: (trackId) => favoritesController.isFavorite(trackId),
+  onToggleFavorite: (trackId) => void favoritesController.toggle(trackId),
   onOpenTrackMenu: (item, _index, play, position) =>
     openers.openTrackMenu(item, play, position)
+})
+
+const favoritesList = new TracksList({
+  scroll: elements.favoritesScroll,
+  empty: elements.favoritesEmpty,
+  rowHeight: TRACK_ROW_HEIGHT,
+  emptyMessage: () =>
+    toolbar.getAppliedSearch().trim() === ''
+      ? 'No favorites yet. Press the heart on any track.'
+      : 'No results.',
+  getCurrentTrackId: () => transport.getCurrentTrack()?.id ?? null,
+  onPlayTrack: (index) =>
+    transport.playQueue(favoritesList.getVisibleTracks(), index, {
+      kind: 'favorites',
+      label: 'Favorites'
+    }),
+  isFavorite: (trackId) => favoritesController.isFavorite(trackId),
+  onToggleFavorite: (trackId) => void favoritesController.toggle(trackId),
+  onOpenTrackMenu: (item, _index, play, position) =>
+    openers.openTrackMenu(item, play, position)
+})
+
+const favoritesView = new FavoritesView({
+  elements,
+  onWhy: () => {
+    const status = buildFavoritesStatusModel(statusController.getStatus())
+    if (status.whyReason) {
+      disclaimer.show(buildDataDisclaimerModel(status.whyReason), () => undefined)
+    }
+  },
+  onPlay: () => {
+    void transport.playQueue(favoritesList.getVisibleTracks(), 0, {
+      kind: 'favorites',
+      label: 'Favorites'
+    })
+  },
+  onShuffle: () =>
+    transport.shuffleTracks(favoritesList.getVisibleTracks(), {
+      kind: 'favorites',
+      label: 'Favorites'
+    }),
+  onRemoveMissing: () => void favoritesController.removeMissing()
 })
 
 const playerBar = new PlayerBar({
@@ -132,7 +215,9 @@ const playerBar = new PlayerBar({
   toggleShuffle: () => transport.toggleShuffle(),
   cycleRepeat: () => transport.cycleRepeat(),
   isQueuePanelOpen: () => queuePanelController.isOpen(),
-  toggleQueuePanel: () => queuePanelController.toggle()
+  toggleQueuePanel: () => queuePanelController.toggle(),
+  isFavorite: (trackId) => favoritesController.isFavorite(trackId),
+  onToggleFavorite: (trackId) => void favoritesController.toggle(trackId)
 })
 
 attachMenuTrigger(elements.nowPlayingTarget, (position) =>
@@ -200,7 +285,9 @@ nowPlaying = new NowPlayingController({
   currentSection: () => navigation.currentSection(),
   refreshScreen: () => screen.refresh(),
   renderNowPlaying,
-  closeContextMenu: () => contextMenu.close(false)
+  closeContextMenu: () => contextMenu.close(false),
+  isFavorite: (trackId) => favoritesController.isFavorite(trackId),
+  onToggleFavorite: (trackId) => void favoritesController.toggle(trackId)
 })
 
 toolbar = new ToolbarController({
@@ -219,6 +306,10 @@ screen = new ScreenController({
   elements,
   navigation,
   tracksList,
+  favoritesList,
+  favoritesView,
+  getFavoritesState: () => favoritesController.getState(),
+  getFavoritesStatus: () => buildFavoritesStatusModel(statusController.getStatus()),
   isNowPlayingOpen: () => nowPlaying.isOpen(),
   getLibraryIndex: () => library.getLibraryIndex(),
   getAlbums: () => library.getAlbums(),
@@ -269,7 +360,12 @@ library = new LibraryController({
       { persist: false }
     )
   },
-  refreshLyrics: () => lyricsController.clearCacheAndReload()
+  refreshLyrics: () => lyricsController.clearCacheAndReload(),
+  getFavorites: () => ({
+    ids: favoritesController.getState().ids,
+    addedAt: favoritesController.getState().addedAt
+  }),
+  refreshFavorites: () => screen.refreshFavoritesView()
 })
 
 contextActions = new ContextActions({
@@ -282,7 +378,8 @@ contextActions = new ContextActions({
   openAlbum: (albumId) => navigation.openAlbum(albumId),
   openArtist: (artistName) => navigation.openArtist(artistName),
   toast: (message) => toast.show(message),
-  revealTrack: (trackId) => window.library.revealTrack(trackId)
+  revealTrack: (trackId) => window.library.revealTrack(trackId),
+  toggleFavorite: (trackId) => void favoritesController.toggle(trackId)
 })
 
 queuePanelController = new QueuePanelController({
@@ -304,7 +401,8 @@ function saveUiState(): void {
 openers = createContextMenuOpeners({
   menu: contextMenu,
   getCurrentTrack: () => transport.getCurrentTrack(),
-  findAlbumForTrack: (track) => library.findAlbumForTrack(track)
+  findAlbumForTrack: (track) => library.findAlbumForTrack(track),
+  isFavorite: (trackId) => favoritesController.isFavorite(trackId)
 })
 
 shellFeatures = createShellFeatures({
@@ -317,6 +415,11 @@ shellFeatures = createShellFeatures({
   toolbar,
   queuePanel: queuePanelController,
   overlay: shortcutOverlay,
+  disclaimer,
+  toggleCurrentFavorite: () => {
+    const track = transport.getCurrentTrack()
+    if (track) void favoritesController.toggle(track.id)
+  },
   getAlbumForTrack: (track) => library.findAlbumForTrack(track),
   subscribeMediaKey: (listener) => window.library.onMediaKey(listener),
   isMac
@@ -332,13 +435,17 @@ const disposers = [
   nowPlaying.start(),
   queuePanelController.start(),
   queue.subscribe(() => playerBar.updateControls()),
-  shellFeatures.shortcutController.start()
+  shellFeatures.shortcutController.start(),
+  statusController.start(),
+  favoritesController.start()
 ]
 
 toolbar.syncViewControls()
 
 async function initializeApp(): Promise<void> {
   await library.initialize()
+  await statusController.reload()
+  await favoritesController.reload()
   try {
     const restored = await window.library.getSession()
     if (restored) transport.restoreSession(restored.queue, restored.position)
@@ -362,8 +469,11 @@ window.addEventListener('beforeunload', () => {
   nowPlaying.destroy()
   lyricView.destroy()
   tracksList.destroy()
+  favoritesList.destroy()
+  favoritesView.destroy()
   queuePanel.destroy()
   contextMenu.destroy()
   shortcutOverlay.destroy()
+  disclaimer.destroy()
   toast.destroy()
 })

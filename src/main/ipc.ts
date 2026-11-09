@@ -1,5 +1,8 @@
 import { ipcMain } from 'electron'
 import { getSnapshot, resolveTrackFile } from './library'
+import { parseFavoriteSetInput } from './lyrixdata/favoritesIpc'
+import type { FavoritesStore } from './lyrixdata/favoritesStore'
+import type { LyrixDataStore } from './lyrixdata/lyrixDataStore'
 import { isValidLyricSourceId, isValidTrackId } from './lyrics/choices'
 import type { LyricChoiceStore } from './lyrics/choices'
 import { getLyricSources } from './lyrics/sources'
@@ -22,7 +25,9 @@ export function registerIpc(
   store: AppStore,
   scan: ScanCoordinator,
   choices: LyricChoiceStore,
-  session: SessionStore
+  session: SessionStore,
+  lyrixData: LyrixDataStore,
+  favorites: FavoritesStore
 ): void {
   let startupRefreshStarted = false
 
@@ -55,6 +60,42 @@ export function registerIpc(
 
   ipcMain.handle('session:save-position', (_event, value: unknown) => {
     session.updatePosition(value)
+  })
+
+  ipcMain.handle('lyrixdata:get-status', () => lyrixData.getStatus())
+
+  ipcMain.handle('lyrixdata:retry', async () => {
+    try {
+      return await lyrixData.retry()
+    } catch (error) {
+      console.error('[lyrixdata] Retry failed', error)
+      return lyrixData.getStatus()
+    }
+  })
+
+  ipcMain.handle('favorites:get', () => favorites.getState())
+
+  ipcMain.handle('favorites:set', async (_event, value: unknown) => {
+    const input = parseFavoriteSetInput(value)
+    if (!input) return { ok: false, reason: 'invalid' }
+
+    try {
+      return input.favorite
+        ? await favorites.add(input.trackIds)
+        : await favorites.remove(input.trackIds)
+    } catch (error) {
+      console.error('[favorites] Could not update favorites', error)
+      return { ok: false, reason: 'unavailable' }
+    }
+  })
+
+  ipcMain.handle('favorites:remove-missing', async () => {
+    try {
+      return await favorites.removeAllMissing()
+    } catch (error) {
+      console.error('[favorites] Could not remove missing favorites', error)
+      return { ok: false, reason: 'unavailable' }
+    }
   })
 
   ipcMain.handle('lyrics:get-sources', async (_event, trackId: unknown) => {

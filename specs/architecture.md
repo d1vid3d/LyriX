@@ -32,6 +32,9 @@ of every module. Exact imports and call graphs belong to graphify, not to this f
   reorder, remove, clear, or jump within it from a virtualized slide-over queue panel.
 - Restore the last session paused (queue, current entry, position) and remember window bounds, with a
   single-instance lock protecting the machine-local data files.
+- Keep portable Favorites inside `<library>/LyrixData` (created only on first write), with a Favorites
+  view, hearts on every track surface, missing-ref repair, and a read-only/newer/unavailable
+  disclaimer dialog.
 - Drive playback from a declarative global shortcut table, a generated help overlay, OS media keys,
   and the Windows Media Session overlay.
 - Right-click (or `Shift+F10`) tracks, albums, artists, queue rows, and the current track for
@@ -67,6 +70,7 @@ state, and lyric presentation.**
 │    ├─ windowBounds.ts + windowState.ts ── bounds restore/save        │
 │    ├─ sessionValidation.ts + sessionStore.ts ── resume session       │
 │    ├─ mediaKeys.ts ── opt-in global media-key fallback               │
+│    ├─ lyrixdata/ ── portable refs, safe store, favorites              │
 │    ├─ lyrics/ ── embedded + sidecar providers, choice store          │
 │    └─ media-protocol.ts + range.ts ── media:// serving + ranges      │
 │                                                                      │
@@ -104,6 +108,8 @@ state, and lyric presentation.**
 │    ├─ shortcuts/ ── registry, commands, Escape layers, overlay model │
 │    ├─ session/ ── resume-session tracking (debounced)                │
 │    ├─ media/ ── Media Session metadata/actions + API wiring          │
+│    ├─ favorites/ ── status/favorites controllers + pure models       │
+│    ├─ ui/favoriteButton.ts + dataDisclaimer.ts ── hearts/modal       │
 │    ├─ library/artistTracks.ts ── pure artist playback ordering       │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
 │    ├─ ui/queuePanel.ts ── virtualized queue slide-over               │
@@ -132,6 +138,7 @@ state, and lyric presentation.**
 | Lyrics from embedded tags and sidecars | Main | `getLyricSources(trackId)` |
 | Reveal a scanned file in the OS file manager | Main | `revealTrack(trackId)` → boolean |
 | Window state + resume session | Main | `getSession`, `saveSessionQueue`, `saveSessionPosition` |
+| Portable Favorites in `<library>/LyrixData` | Main | `getFavorites`, `setFavorite`, status/event subscriptions |
 | Media keys/overlay | Main (mode) + renderer (Media Session) | `onMediaKey` in fallback mode |
 | Translation alignment/attachment | Renderer (pure shared module) | Direct |
 | Playback position/transport | Renderer | Direct |
@@ -166,6 +173,15 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `sessionWritePolicy.ts` | Pure session write-throttle decision. |
 | `sessionStore.ts` | Session files, folder check, in-memory latest payload, flush. |
 | `mediaKeys.ts` | Opt-in globalShortcut media-key fallback. |
+| `lyrixdata/paths.ts` | Pure LyrixData names, portable paths, containment. |
+| `lyrixdata/trackRef.ts` | Pure TrackRef creation/index/resolution and fingerprint matching. |
+| `lyrixdata/fsAdapter.ts` | Injectable filesystem surface + error classification. |
+| `lyrixdata/versionedStore.ts` | Safe JSON versioning, `.bak`, size cap, unknown fields, atomic writes. |
+| `lyrixdata/lyrixDataStore.ts` | Bound root, status, ensureCreated, serialized/generation-guarded writes. |
+| `lyrixdata/favoritesStore.ts` | Read-modify-write favorites, healing, missing reporting, cap. |
+| `lyrixdata/formats.ts` | File shapes, `writtenBy`, validators, allowlisted ref checks. |
+| `lyrixdata/favoritesIpc.ts` | Pure `favorites:set` input validation. |
+| `lyrixdata/machineId.ts` | Machine-local stable `machineId` for `writtenBy`. |
 | `ipc.ts` | IPC channel registration + validation. |
 | `scanCoordinator.ts` | Scan generation, progress, folder persistence. |
 | `store.ts` | Shared settings/cache state container. |
@@ -238,6 +254,15 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `session/sessionController.ts` | Debounced queue/position session updates. |
 | `media/mediaSessionModel.ts` | Pure Media Session metadata + action mapping. |
 | `media/mediaSession.ts` | Feature-detected Media Session wiring. |
+| `favorites/favoritesController.ts` | Optimistic favorites state, rollback, retry/disclaimer hook. |
+| `favorites/lyrixDataStatusController.ts` | Mirrors status + retry. |
+| `favorites/dataDisclaimerModel.ts` | Pure disclaimer content + feature registry. |
+| `favorites/favoritesStatusModel.ts` | Pure Favorites header status line model. |
+| `ui/favoriteButton.ts` | Inline-SVG heart with ARIA state + bulk sync. |
+| `ui/dataDisclaimer.ts` | Modal disclaimer with focus trap and retry progress. |
+| `views/favoritesView.ts` | Favorites header/status/missing section rendering. |
+| `styles/favorites.css` | Heart/row/Favorites-view styling. |
+| `styles/dataDisclaimer.css` | Disclaimer modal styling. |
 | `ui/shortcutOverlay.ts` | Generated modal shortcuts dialog. |
 | `styles/shortcutOverlay.css` | Shortcuts overlay styling. |
 | `lyrics/lyricsController.ts` | Source fetch/parse/select/state/cache. |

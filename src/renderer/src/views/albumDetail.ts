@@ -1,5 +1,6 @@
 import type { Album, Track } from '../../../shared/types'
 import type { MenuPosition } from '../../ui/contextMenu'
+import { createFavoriteButton } from '../../ui/favoriteButton'
 import { attachMenuTrigger } from '../../ui/menuTrigger'
 import { formatTime, setCoverImage } from '../format'
 
@@ -14,6 +15,8 @@ export interface AlbumDetailOptions {
   trackList: HTMLElement
   backLabel(): string
   getCurrentTrackId(): string | null
+  isFavorite?(trackId: string): boolean
+  onToggleFavorite?(trackId: string): void
   onPlayTrack(album: Album, track: Track): void
   onOpenTrackMenu?(
     album: Album,
@@ -83,6 +86,15 @@ function renderTrackList(options: AlbumDetailOptions, album: Album): void {
     }
 
     item.append(button)
+    if (options.isFavorite && options.onToggleFavorite) {
+      item.append(
+        createFavoriteButton(
+          track.id,
+          options.isFavorite(track.id),
+          options.onToggleFavorite
+        )
+      )
+    }
     fragment.append(item)
   }
 

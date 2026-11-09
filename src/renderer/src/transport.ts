@@ -123,6 +123,13 @@ export class TransportController {
     this.playQueue(tracks, randomStartIndex(tracks.length), artistContext(artist))
   }
 
+  /** Shuffle an arbitrary visible list (used by the Favorites header). */
+  shuffleTracks(tracks: readonly Track[], context: QueueContext): void {
+    if (tracks.length === 0) return
+    this.deps.queue.setShuffle(true)
+    this.playQueue(tracks, randomStartIndex(tracks.length), context)
+  }
+
   playVisibleTrack(index: number): void {
     const search = this.deps.getSearchText()
     const context: QueueContext =

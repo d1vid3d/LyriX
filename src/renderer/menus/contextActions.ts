@@ -49,6 +49,7 @@ export interface ContextActionDeps {
   toast(message: string): void
   /** Resolves true when the file manager was asked to reveal the track. */
   revealTrack(trackId: string): Promise<boolean>
+  toggleFavorite(trackId: string): void
 }
 
 /**
@@ -97,6 +98,11 @@ export class ContextActions {
       case 'queueRow.reveal':
       case 'currentTrack.reveal':
         this.reveal(payload)
+        return
+      case 'track.toggleFavorite':
+      case 'queueRow.toggleFavorite':
+      case 'currentTrack.toggleFavorite':
+        this.toggleFavorite(payload)
         return
       case 'album.play':
         this.playAlbum(payload)
@@ -250,6 +256,12 @@ export class ContextActions {
     void this.deps.revealTrack(track.id).then((revealed) => {
       if (!revealed) this.deps.toast(TOAST_MESSAGES.revealFailed)
     })
+  }
+
+  private toggleFavorite(payload: ContextActionPayload): void {
+    const track = payload.track
+    if (!track) return
+    this.deps.toggleFavorite(track.id)
   }
 }
 

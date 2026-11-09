@@ -6,6 +6,7 @@ import { buildSourceMenuModel } from '../lyrics/sourceMenuModel'
 import type { SourceMenuModel } from '../lyrics/sourceMenuModel'
 import type { TranslationToggleModel } from '../lyrics/translationMenuModel'
 import { LyricSourceMenu } from '../ui/lyricSourceMenu'
+import { createFavoriteButton, updateFavoriteButton } from '../ui/favoriteButton'
 import { TranslationToggle } from '../ui/translationToggle'
 import type { AppElements } from './dom'
 import { setCoverImage } from './format'
@@ -38,6 +39,8 @@ export interface NowPlayingDeps {
   refreshScreen(): void
   renderNowPlaying(): void
   closeContextMenu(): void
+  isFavorite(trackId: string): boolean
+  onToggleFavorite(trackId: string): void
 }
 
 /** Owns the Now Playing section lifecycle, its lyric subscription, and the source menu. */
@@ -118,6 +121,7 @@ export class NowPlayingController {
       elements.nowPlayingTitle.textContent = 'Nothing playing'
       elements.nowPlayingArtist.textContent = ''
       elements.nowPlayingAlbum.textContent = ''
+      elements.favoriteNowPlayingHost.replaceChildren()
       setCoverImage(elements.nowPlayingCoverImage, null, '')
       return
     }
@@ -126,10 +130,26 @@ export class NowPlayingController {
     elements.nowPlayingTitle.textContent = track.title
     elements.nowPlayingArtist.textContent = track.artist
     elements.nowPlayingAlbum.textContent = track.album
+    this.renderFavorite(track)
     setCoverImage(
       elements.nowPlayingCoverImage,
       album ? album.coverUrl : null,
       album ? `${album.title} cover` : ''
+    )
+  }
+
+  private renderFavorite(track: Track): void {
+    const host = this.deps.elements.favoriteNowPlayingHost
+    const existing = host.querySelector<HTMLButtonElement>('[data-favorite-track-id]')
+    if (existing?.dataset.favoriteTrackId === track.id) {
+      updateFavoriteButton(existing, this.deps.isFavorite(track.id))
+      return
+    }
+
+    host.replaceChildren(
+      createFavoriteButton(track.id, this.deps.isFavorite(track.id), (trackId) =>
+        this.deps.onToggleFavorite(trackId)
+      )
     )
   }
 

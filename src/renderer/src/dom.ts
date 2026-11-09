@@ -14,6 +14,7 @@ export interface AppElements {
   detailView: HTMLElement
   artistsView: HTMLElement
   tracksView: HTMLElement
+  favoritesView: HTMLElement
   artistDetailView: HTMLElement
   albumGrid: HTMLDivElement
   emptyState: HTMLParagraphElement
@@ -22,6 +23,18 @@ export interface AppElements {
   artistsEmpty: HTMLParagraphElement
   trackScroll: HTMLDivElement
   tracksEmpty: HTMLParagraphElement
+
+  favoritesScroll: HTMLDivElement
+  favoritesEmpty: HTMLParagraphElement
+  favoritesStatus: HTMLParagraphElement
+  favoritesWhyButton: HTMLButtonElement
+  favoritesPlayButton: HTMLButtonElement
+  favoritesShuffleButton: HTMLButtonElement
+  favoritesMissing: HTMLElement
+  favoritesMissingToggle: HTMLButtonElement
+  favoritesMissingBody: HTMLElement
+  favoritesMissingList: HTMLUListElement
+  favoritesRemoveMissingButton: HTMLButtonElement
 
   backButton: HTMLButtonElement
   detailCoverImage: HTMLImageElement
@@ -52,6 +65,7 @@ export interface AppElements {
   nowCoverImage: HTMLImageElement
   nowTitle: HTMLSpanElement
   nowArtist: HTMLSpanElement
+  favoriteCurrentHost: HTMLSpanElement
 
   nowPlayingSection: HTMLElement
   nowPlayingTarget: HTMLElement
@@ -60,6 +74,7 @@ export interface AppElements {
   nowPlayingTitle: HTMLHeadingElement
   nowPlayingArtist: HTMLParagraphElement
   nowPlayingAlbum: HTMLParagraphElement
+  favoriteNowPlayingHost: HTMLSpanElement
   lyricSourceMenu: HTMLDivElement
   translationToggle: HTMLDivElement
   lyricsStatus: HTMLParagraphElement
@@ -101,6 +116,7 @@ export function getAppElements(): AppElements {
     detailView: getElement<HTMLElement>('detail-view'),
     artistsView: getElement<HTMLElement>('artists-view'),
     tracksView: getElement<HTMLElement>('tracks-view'),
+    favoritesView: getElement<HTMLElement>('favorites-view'),
     artistDetailView: getElement<HTMLElement>('artist-detail-view'),
     albumGrid: getElement<HTMLDivElement>('album-grid'),
     emptyState: getElement<HTMLParagraphElement>('empty-state'),
@@ -109,6 +125,18 @@ export function getAppElements(): AppElements {
     artistsEmpty: getElement<HTMLParagraphElement>('artists-empty'),
     trackScroll: getElement<HTMLDivElement>('track-scroll'),
     tracksEmpty: getElement<HTMLParagraphElement>('tracks-empty'),
+
+    favoritesScroll: getElement<HTMLDivElement>('favorites-scroll'),
+    favoritesEmpty: getElement<HTMLParagraphElement>('favorites-empty'),
+    favoritesStatus: getElement<HTMLParagraphElement>('favorites-status'),
+    favoritesWhyButton: getElement<HTMLButtonElement>('favorites-why'),
+    favoritesPlayButton: getElement<HTMLButtonElement>('favorites-play'),
+    favoritesShuffleButton: getElement<HTMLButtonElement>('favorites-shuffle'),
+    favoritesMissing: getElement<HTMLElement>('favorites-missing'),
+    favoritesMissingToggle: getElement<HTMLButtonElement>('favorites-missing-toggle'),
+    favoritesMissingBody: getElement<HTMLElement>('favorites-missing-body'),
+    favoritesMissingList: getElement<HTMLUListElement>('favorites-missing-list'),
+    favoritesRemoveMissingButton: getElement<HTMLButtonElement>('favorites-remove-missing'),
 
     backButton: getElement<HTMLButtonElement>('back'),
     detailCoverImage: getElement<HTMLImageElement>('detail-cover'),
@@ -139,6 +167,7 @@ export function getAppElements(): AppElements {
     nowCoverImage: getElement<HTMLImageElement>('now-cover'),
     nowTitle: getElement<HTMLSpanElement>('now-title'),
     nowArtist: getElement<HTMLSpanElement>('now-artist'),
+    favoriteCurrentHost: getElement<HTMLSpanElement>('favorite-current-host'),
 
     nowPlayingSection: getElement<HTMLElement>('now-playing-view'),
     nowPlayingTarget: getElement<HTMLElement>('now-playing'),
@@ -147,6 +176,7 @@ export function getAppElements(): AppElements {
     nowPlayingTitle: getElement<HTMLHeadingElement>('now-playing-title'),
     nowPlayingArtist: getElement<HTMLParagraphElement>('now-playing-artist'),
     nowPlayingAlbum: getElement<HTMLParagraphElement>('now-playing-album'),
+    favoriteNowPlayingHost: getElement<HTMLSpanElement>('favorite-now-playing-host'),
     lyricSourceMenu: getElement<HTMLDivElement>('lyric-source-menu'),
     translationToggle: getElement<HTMLDivElement>('translation-toggle'),
     lyricsStatus: getElement<HTMLParagraphElement>('lyrics-status'),

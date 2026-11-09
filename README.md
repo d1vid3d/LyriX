@@ -64,6 +64,7 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/main/sessionValidation.ts` | Pure session queue/position validation and caps. |
 | `src/main/sessionWritePolicy.ts` | Pure session write-throttle decision. |
 | `src/main/sessionStore.ts` | Two-file resume session (queue + position) with folder check and flush. |
+| `src/main/lyrixdata/` | Portable refs, safe versioned JSON, LyrixData status/writes, favorites storage and IPC validation. |
 | `src/main/mediaKeys.ts` | Opt-in globalShortcut media-key fallback. |
 | `src/main/range.ts` | Parses `Range` headers for partial-content responses. |
 | `src/preload/index.ts` | Exposes the typed `window.library` API via `contextBridge`. |
@@ -81,6 +82,12 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/renderer/shortcuts/` | Declarative shortcut table, pure matching/typing guard/conflict check, Escape layer stack, command map, single keydown controller and overlay model. |
 | `src/renderer/session/` | Pure session send timing and the debounced queue/position tracker. |
 | `src/renderer/media/` | Pure Media Session metadata/action mapping and the feature-detected wiring. |
+| `src/renderer/favorites/` | DOM-free status/favorites controllers and the pure status/disclaimer models. |
+| `src/renderer/ui/favoriteButton.ts` | Inline-SVG heart toggle with ARIA state. |
+| `src/renderer/ui/dataDisclaimer.ts` | Focus-trapped LyrixData disclaimer with Retry. |
+| `src/renderer/src/views/favoritesView.ts` | Favorites header/status/missing-section rendering. |
+| `src/renderer/styles/favorites.css` | Heart, row, and Favorites-view styling. |
+| `src/renderer/styles/dataDisclaimer.css` | Disclaimer modal styling. |
 | `src/renderer/ui/shortcutOverlay.ts` | Generated modal keyboard-shortcuts dialog with focus trap. |
 | `src/renderer/styles/shortcutOverlay.css` | Shortcuts overlay styling. |
 | `src/renderer/player/transportDecisions.ts` | Pure ended/previous/failure/repeat-mode decisions. |
@@ -144,6 +151,16 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `tests/layerStack.test.ts` | Vitest coverage for priority ordering, single-layer close, closed layers and ties. |
 | `tests/overlayModel.test.ts` | Vitest coverage for overlay grouping and platform-aware chord labels. |
 | `tests/mediaSessionModel.test.ts` | Vitest coverage for metadata/artwork and action mapping. |
+| `tests/lyrixDataPaths.test.ts` | Vitest coverage for portable paths, containment, fingerprint matching, relinking and ambiguity. |
+| `tests/versionedStore.test.ts` | Vitest coverage for versions, `.bak`, unknown fields, newer versions, size cap and atomic writes. |
+| `tests/lyrixDataStore.test.ts` | Vitest coverage for first-write creation, statuses, retry, generation guards, serialized writes and symlinks. |
+| `tests/favoritesStore.test.ts` | Vitest coverage for RMW, healing, missing refs, re-resolution and idempotence. |
+| `tests/favoritesCap.test.ts` | Vitest coverage for the 100,000-item cap. |
+| `tests/favoritesIpc.test.ts` | Vitest coverage for `favorites:set` input validation. |
+| `tests/favoritesController.test.ts` | Vitest coverage for optimistic updates, rollback, retry, external changes and missing removal. |
+| `tests/favoritesQuery.test.ts` | Vitest coverage for the Favorites view registry, Recently added order, sorts and search. |
+| `tests/dataDisclaimerModel.test.ts` | Vitest coverage for disclaimer/status-line text and Why reasons. |
+| `tests/scannerLyrixData.test.ts` | Vitest coverage that the scanner never treats LyrixData as music. |
 | `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
 | `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, translation enable/selection, stable derived-document identity, reload, stale responses, caching and eviction. |
 | `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
@@ -354,6 +371,22 @@ overlay and hardware media keys can control playback while LyriX is in the backg
 global-shortcut media-key fallback is implemented but disabled because the Media Session route is the
 one LyriX uses.
 
+## Favorites and LyrixData
+
+LyriX keeps its portable data in a `LyrixData` folder **inside the selected music folder**. It is
+created only on the first write (for example your first favorite), is safe to back up or delete, and
+travels with the library across disks. Deleting it resets favorites (and future history/playlists).
+Opening, scanning, and browsing a library never changes it. Settings, the session, window state,
+lyrics choices, and the tag cache remain machine-local under the app's data folder.
+
+Favorites are track-level. Hearts appear on Tracks rows, album detail rows, queue rows, the player
+bar current track, and the Now Playing header; the context menus and the **F** shortcut toggle the
+same state. The **Favorites** library view lists them with Recently added/Title/Artist/Album sorting
+and normal search, and its header can Play or Shuffle the visible list. Missing entries stay listed
+read-only under a collapsed section so you can inspect and remove them. If the library is read-only,
+unavailable, or was written by a newer LyriX version, the Favorites header explains why and the
+disclaimer dialog offers Retry; nothing is silently changed.
+
 ## Out of scope (for now)
 
 Gapless playback, crossfade, queue-contents export/save as a playlist,
@@ -365,3 +398,5 @@ timing, per-language fonts, TTML, tag editing and packaging are intentionally no
 The queue panel intentionally omits undo, multi-select and saving the queue as a playlist; context
 menus do not implement submenus; tracks cannot be dragged from the library into the queue; shortcut
 overrides are not user-configurable; and the resume session stores only the current entry's position.
+LyrixData currently stores favorites only; history, playlists, album-level favorites, multi-library
+switching, and any tag/lyric/sidecar editing are not implemented.

@@ -1,6 +1,7 @@
 import type { Track } from '../../../shared/types'
 import type { TrackItem } from '../../library/query'
 import type { MenuPosition } from '../../ui/contextMenu'
+import { createFavoriteButton } from '../../ui/favoriteButton'
 import { attachMenuTrigger } from '../../ui/menuTrigger'
 import { VirtualList } from '../../ui/virtualList'
 import { createCover, formatTime, smallCoverUrl } from '../format'
@@ -12,6 +13,8 @@ export interface TracksListOptions {
   emptyMessage(): string
   getCurrentTrackId(): string | null
   onPlayTrack(index: number): void
+  isFavorite?(trackId: string): boolean
+  onToggleFavorite?(trackId: string): void
   onOpenTrackMenu?(
     item: TrackItem,
     index: number,
@@ -35,7 +38,7 @@ export class TracksList {
     })
   }
 
-  render(items: readonly TrackItem[]): void {
+  render(items: readonly TrackItem[], options: { preserveScroll?: boolean } = {}): void {
     this.visibleItems = [...items]
 
     if (items.length === 0) {
@@ -48,7 +51,7 @@ export class TracksList {
 
     this.options.scroll.hidden = false
     this.options.empty.hidden = true
-    this.virtualList.setItems(items)
+    this.virtualList.setItems(items, options)
   }
 
   getVisibleTracks(): Track[] {
@@ -63,7 +66,10 @@ export class TracksList {
     this.virtualList.destroy()
   }
 
-  private createRow(item: TrackItem, index: number): HTMLButtonElement {
+  private createRow(item: TrackItem, index: number): HTMLElement {
+    const wrapper = document.createElement('div')
+    wrapper.className = 'track-row-wrap'
+
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'track-row'
@@ -102,6 +108,17 @@ export class TracksList {
     if (onMenu) {
       attachMenuTrigger(button, (position) => onMenu(item, index, play, position))
     }
-    return button
+
+    wrapper.append(button)
+    if (this.options.isFavorite && this.options.onToggleFavorite) {
+      wrapper.append(
+        createFavoriteButton(
+          item.track.id,
+          this.options.isFavorite(item.track.id),
+          this.options.onToggleFavorite
+        )
+      )
+    }
+    return wrapper
   }
 }

@@ -8,7 +8,10 @@ import { renderAlbumDetail } from './views/albumDetail'
 import { renderAlbumGrid } from './views/albumGrid'
 import { renderArtistDetail } from './views/artistDetail'
 import { renderArtistList } from './views/artistList'
+import type { FavoritesView } from './views/favoritesView'
 import type { TracksList } from './views/tracksList'
+import type { FavoritesControllerState } from '../favorites/favoritesController'
+import type { FavoritesStatusModel } from '../favorites/favoritesStatusModel'
 
 export interface NavigationReader {
   getActiveView(): LibraryView
@@ -23,6 +26,10 @@ export interface ScreenDeps {
   elements: AppElements
   navigation: NavigationReader
   tracksList: TracksList
+  favoritesList: TracksList
+  favoritesView: FavoritesView
+  getFavoritesState(): FavoritesControllerState
+  getFavoritesStatus(): FavoritesStatusModel
   isNowPlayingOpen(): boolean
   getLibraryIndex(): LibraryIndex
   getAlbums(): readonly Album[]
@@ -92,6 +99,16 @@ export class ScreenController {
   }
 
   renderLibraryView(view: LibraryView): void {
+    this.renderView(view, false)
+  }
+
+  /** Re-renders only the Favorites view after a favorites/status change, keeping scroll. */
+  refreshFavoritesView(): void {
+    if (this.deps.navigation.getActiveView() !== 'favorites') return
+    this.renderView('favorites', true)
+  }
+
+  private renderView(view: LibraryView, preserveFavoritesScroll: boolean): void {
     const index = this.deps.getLibraryIndex()
     const search = this.deps.getAppliedSearch()
 
@@ -125,6 +142,22 @@ export class ScreenController {
       return
     }
 
+    if (view === 'favorites') {
+      const items = queryLibrary(index, {
+        view: 'favorites',
+        search,
+        sort: this.deps.getSort('favorites')
+      })
+      const favorites = this.deps.getFavoritesState()
+      this.deps.favoritesView.render(
+        this.deps.getFavoritesStatus(),
+        favorites.missing,
+        items.length > 0
+      )
+      this.deps.favoritesList.render(items, { preserveScroll: preserveFavoritesScroll })
+      return
+    }
+
     this.deps.tracksList.render(
       queryLibrary(index, { view: 'tracks', search, sort: this.deps.getSort('tracks') })
     )
@@ -144,6 +177,7 @@ export class ScreenController {
     }
 
     this.deps.tracksList.refreshHighlight()
+    this.deps.favoritesList.refreshHighlight()
   }
 
   private renderAlbumDetail(albumId: string): void {

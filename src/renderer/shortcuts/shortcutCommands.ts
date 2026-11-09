@@ -12,6 +12,7 @@ export type ShortcutCommandId =
   | 'focusSearch'
   | 'toggleNowPlaying'
   | 'toggleTranslation'
+  | 'toggleCurrentFavorite'
   | 'showShortcuts'
 
 export interface ShortcutCommandDeps {
@@ -27,6 +28,7 @@ export interface ShortcutCommandDeps {
   toggleNowPlaying(): void
   translationAvailable(): boolean
   toggleTranslation(): void
+  toggleCurrentFavorite(): void
   openShortcuts(): void
 }
 
@@ -53,6 +55,7 @@ export function createShortcutCommands(
     toggleTranslation: () => {
       if (deps.translationAvailable()) deps.toggleTranslation()
     },
+    toggleCurrentFavorite: () => deps.toggleCurrentFavorite(),
     showShortcuts: () => deps.openShortcuts()
   }
 }

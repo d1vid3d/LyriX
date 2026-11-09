@@ -60,6 +60,8 @@ export interface ShellFeatureDeps {
   toolbar: ShellToolbar
   queuePanel: ShellQueuePanel
   overlay: ShortcutOverlay
+  disclaimer: { isOpen(): boolean; close(): void }
+  toggleCurrentFavorite(): void
   getAlbumForTrack(track: Track): Album | null
   subscribeMediaKey(listener: (action: MediaKeyAction) => void): () => void
   isMac: boolean
@@ -100,6 +102,7 @@ export function createShellFeatures(deps: ShellFeatureDeps): ShellFeatures {
     toggleNowPlaying: () => deps.nowPlaying.toggle(),
     translationAvailable: () => deps.nowPlaying.isTranslationAvailable(),
     toggleTranslation: () => deps.nowPlaying.toggleTranslation(),
+    toggleCurrentFavorite: () => deps.toggleCurrentFavorite(),
     openShortcuts: () => deps.overlay.open()
   })
 
@@ -116,6 +119,12 @@ export function createShellFeatures(deps: ShellFeatureDeps): ShellFeatures {
     priority: ESCAPE_LAYER_PRIORITIES.contextMenu,
     isOpen: () => deps.contextMenu.isOpen(),
     close: () => deps.contextMenu.close(true)
+  })
+  layers.register({
+    id: 'dataDisclaimer',
+    priority: ESCAPE_LAYER_PRIORITIES.dataDisclaimer,
+    isOpen: () => deps.disclaimer.isOpen(),
+    close: () => deps.disclaimer.close()
   })
   layers.register({
     id: 'shortcutsOverlay',

@@ -2,8 +2,11 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { LyricPreference, LyricSources } from '../shared/lyrics/sources'
 import type {
+  FavoritesSetResult,
+  FavoritesState,
   LibraryApi,
   LibrarySnapshot,
+  LyrixDataStatus,
   MediaKeyAction,
   PlaybackSettingsInput,
   ScanProgress,
@@ -34,6 +37,14 @@ const library: LibraryApi = {
     ipcRenderer.invoke('session:save-queue', state),
   saveSessionPosition: (state: SessionPositionState): Promise<void> =>
     ipcRenderer.invoke('session:save-position', state),
+  getLyrixDataStatus: (): Promise<LyrixDataStatus> =>
+    ipcRenderer.invoke('lyrixdata:get-status'),
+  retryLyrixData: (): Promise<LyrixDataStatus> => ipcRenderer.invoke('lyrixdata:retry'),
+  getFavorites: (): Promise<FavoritesState> => ipcRenderer.invoke('favorites:get'),
+  setFavorite: (trackIds: string[], favorite: boolean): Promise<FavoritesSetResult> =>
+    ipcRenderer.invoke('favorites:set', { trackIds, favorite }),
+  removeMissingFavorites: (): Promise<FavoritesSetResult> =>
+    ipcRenderer.invoke('favorites:remove-missing'),
   saveVolume: (volume: number): Promise<void> =>
     ipcRenderer.invoke('settings:set-volume', volume),
   saveUiState: (state: UiState): Promise<void> =>
@@ -52,7 +63,9 @@ const library: LibraryApi = {
     ipcRenderer.invoke('settings:set-translation', input),
   onScanProgress: (listener) => subscribe<ScanProgress>('library:scan-progress', listener),
   onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener),
-  onMediaKey: (listener) => subscribe<MediaKeyAction>('media:key', listener)
+  onMediaKey: (listener) => subscribe<MediaKeyAction>('media:key', listener),
+  onLyrixDataStatus: (listener) => subscribe<LyrixDataStatus>('lyrixdata:status-changed', listener),
+  onFavoritesChanged: (listener) => subscribe<FavoritesState>('favorites:changed', listener)
 }
 
 contextBridge.exposeInMainWorld('library', library)

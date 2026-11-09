@@ -5,7 +5,11 @@ import { MEDIA_KEY_MODE } from '../shared/mediaKeys'
 import { loadLibraryCache } from './cache'
 import { CoverService } from './covers'
 import { registerIpc } from './ipc'
-import { getLibraryRoot, restoreLibrary } from './library'
+import { getLibraryRoot, getSnapshot, resolveTrackFile, restoreLibrary } from './library'
+import { FavoritesStore } from './lyrixdata/favoritesStore'
+import { nodeFsAdapter } from './lyrixdata/fsAdapter'
+import { LyrixDataStore } from './lyrixdata/lyrixDataStore'
+import { loadOrCreateMachineId } from './lyrixdata/machineId'
 import { LyricChoiceStore } from './lyrics/choices'
 import { registerGlobalMediaKeys, unregisterGlobalMediaKeys } from './mediaKeys'
 import { handleMediaProtocol, registerMediaScheme } from './media-protocol'
@@ -64,6 +68,22 @@ if (!primaryInstance) {
       }
       restoreLibrary(root, store.cache)
 
+      const machineId = await loadOrCreateMachineId(join(userData, 'machine-id.json'))
+      const lyrixData = new LyrixDataStore({
+        fs: nodeFsAdapter,
+        machineId,
+        appVersion: app.getVersion(),
+        onStatusChange: (status) => windows.send('lyrixdata:status-changed', status)
+      })
+      await lyrixData.bind(root)
+
+      const favorites = new FavoritesStore({
+        store: lyrixData,
+        resolveTrackFile,
+        onStateChange: (state) => windows.send('favorites:changed', state)
+      })
+      await favorites.setLibrary(root, getSnapshot().albums)
+
       const savedWindow = await loadWindowState(join(userData, 'window-state.json'))
       const session = new SessionStore(
         join(userData, 'session-queue.json'),
@@ -74,8 +94,12 @@ if (!primaryInstance) {
 
       handleMediaProtocol(new CoverService(join(userData, 'covers')))
 
-      const scan = new ScanCoordinator(store, windows)
-      registerIpc(store, scan, choices, session)
+      const scan = new ScanCoordinator(store, windows, async (snapshot) => {
+        const folder = getLibraryRoot()
+        await lyrixData.bind(folder)
+        await favorites.setLibrary(folder, snapshot.albums)
+      })
+      registerIpc(store, scan, choices, session, lyrixData, favorites)
 
       if (MEDIA_KEY_MODE === 'global-shortcuts') {
         registerGlobalMediaKeys((action) => windows.send('media:key', action))
@@ -88,7 +112,9 @@ if (!primaryInstance) {
         if (flushed) return
         event.preventDefault()
         flushed = true
-        void session.flush().finally(() => app.quit())
+        void Promise.all([session.flush(), lyrixData.flush()])
+          .catch(() => undefined)
+          .finally(() => app.quit())
       })
 
       app.on('will-quit', () => unregisterGlobalMediaKeys())

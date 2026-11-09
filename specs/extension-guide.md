@@ -102,6 +102,17 @@ Queue semantics themselves are owned by [renderer/playback.md](renderer/playback
 them in the panel. The full interaction contract is in
 [renderer/queue-panel.md](renderer/queue-panel.md).
 
+## Add a LyrixData consumer (for example history)
+
+1. Add the file name to `LYRIXDATA_FILE_ALLOWLIST` in `src/main/lyrixdata/paths.ts` and a small
+   store/format beside `favoritesStore.ts` using `VersionedStore` and `writtenBy`.
+2. Add the feature label to `LYRIXDATA_FEATURES` in
+   `src/renderer/favorites/dataDisclaimerModel.ts` so the read-only message lists it.
+3. Expose id-only IPC and a DOM-free renderer controller; never send filesystem paths.
+4. Reuse the status line/disclaimer models and the first-write `ensureCreated` path.
+
+Details: [main/lyrixdata.md](main/lyrixdata.md), [renderer/favorites.md](renderer/favorites.md).
+
 ## Add a global shortcut
 
 1. Add a `ShortcutDefinition` to `src/renderer/shortcuts/defaultShortcuts.ts` with a unique id,
@@ -122,3 +133,5 @@ them in the panel. The full interaction contract is in
 - Preload/IPC surface: [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md).
 - Shortcut registry and Escape layers: [renderer/shortcuts.md](renderer/shortcuts.md).
 - Session files and restore flow: [main/window-and-session.md](main/window-and-session.md).
+- LyrixData files and favorites: [main/lyrixdata.md](main/lyrixdata.md),
+  [renderer/favorites.md](renderer/favorites.md).

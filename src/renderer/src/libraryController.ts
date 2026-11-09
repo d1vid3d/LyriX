@@ -6,7 +6,7 @@ import type {
 } from '../../shared/types'
 import type { LibraryApi } from '../../shared/types'
 import { buildLibraryIndex } from '../library/query'
-import type { LibraryIndex } from '../library/query'
+import type { FavoritesQueryInput, LibraryIndex } from '../library/query'
 import type { AppElements } from './dom'
 import type { DetailRoute } from './routeStack'
 
@@ -38,6 +38,8 @@ export interface LibraryDeps {
   leaveNowPlaying(): void
   applySettings(settings: Settings): void
   refreshLyrics(): void
+  getFavorites(): FavoritesQueryInput
+  refreshFavorites?(): void
 }
 
 /** Owns the library snapshot, status text, scanning state, and startup ordering. */
@@ -85,7 +87,7 @@ export class LibraryController {
 
   applySnapshot(snapshot: LibrarySnapshot): void {
     this.albums = snapshot.albums
-    this.libraryIndex = buildLibraryIndex(this.albums)
+    this.rebuildIndex()
     this.folderName = snapshot.folderName
 
     this.deps.transport.reconcileQueue()
@@ -182,6 +184,16 @@ export class LibraryController {
       this.deps.elements.statusLabel.textContent = 'Could not rescan that folder.'
       this.setScanning(false)
     }
+  }
+
+  /** Rebuilds the index with the latest favorites without touching the library snapshot. */
+  refreshFavorites(): void {
+    this.rebuildIndex()
+    this.deps.refreshFavorites?.()
+  }
+
+  private rebuildIndex(): void {
+    this.libraryIndex = buildLibraryIndex(this.albums, this.deps.getFavorites())
   }
 
   private setScanning(scanning: boolean): void {

@@ -8,9 +8,9 @@ that owns the detailed contract.
 **Last verified:** 2026-11-08 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md),
-[main/window-and-session.md](main/window-and-session.md),
+[main/window-and-session.md](main/window-and-session.md), [main/lyrixdata.md](main/lyrixdata.md),
 [main/library-scanning.md](main/library-scanning.md), [renderer/playback.md](renderer/playback.md),
-[renderer/shortcuts.md](renderer/shortcuts.md),
+[renderer/shortcuts.md](renderer/shortcuts.md), [renderer/favorites.md](renderer/favorites.md),
 [renderer/queue-panel.md](renderer/queue-panel.md),
 [renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md),
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md).
@@ -20,16 +20,19 @@ that owns the detailed contract.
 1. Main registers the privileged `media` scheme and checks the single-instance lock; a second launch
    focuses the existing window and exits.
 2. Main loads settings and the library cache, then restores the cached snapshot for the last folder.
-3. Main loads the saved window bounds, loads the resume session when its folder matches, installs the
-   media handler, IPC, and creates the window.
-4. Preload exposes `window.library`.
-5. Renderer subscribes to library events, loads settings, applies view/sort plus persisted
+3. Main loads the machine id, binds LyrixData for the root, and resolves favorites without creating
+   any files.
+4. Main loads the saved window bounds, loads the resume session when its folder matches, installs the
+   media handler, registers IPC, and creates the window.
+5. Preload exposes `window.library`.
+6. Renderer subscribes to library events, loads settings, applies view/sort plus persisted
    shuffle/repeat, then calls `getState`.
-6. `getState` triggers a one-time background refresh; the cached library is already visible.
-7. When the refresh finishes, `library:updated` replaces the snapshot and the UI re-renders.
-8. The renderer then calls `session:get`. If a session exists, it imports the queue, loads the current
-   track, seeks to the saved position once metadata arrives, and leaves it paused. Session writes
-   start only after this restore.
+7. `getState` triggers a one-time background refresh; the cached library is already visible.
+8. When the refresh finishes, `library:updated` replaces the snapshot; main rebinds LyrixData and
+   re-resolves favorites, then the UI re-renders.
+9. The renderer loads status/favorites and calls `session:get`. If a session exists, it imports the
+   queue, loads the current track, seeks to the saved position once metadata arrives, and leaves it
+   paused. Session writes start only after this restore.
 
 Details: [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md),
 [main/window-and-session.md](main/window-and-session.md),
@@ -104,6 +107,22 @@ Details: [renderer/queue-panel.md](renderer/queue-panel.md),
 Details: [main/lyric-sources.md](main/lyric-sources.md),
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md),
 [renderer/lyric-view.md](renderer/lyric-view.md).
+
+## Favorite toggle and LyrixData
+
+1. A heart, context menu, or `F` calls the renderer `FavoritesController`, which updates state
+   optimistically and sends only track ids over `favorites:set`.
+2. Main validates the ids, converts them to portable refs through the current snapshot, re-reads
+   `favorites.json`, applies the change, heals relinked refs, and writes through the serialized store.
+   The first write creates `LyrixData/` with `README.txt`, `library.json`, and `favorites.json`.
+3. Main emits `favorites:changed`; the renderer replaces its state, updates every visible heart, and
+   re-renders the Favorites view.
+4. Browsing, scanning, and opening a library never create LyrixData. A blocked write (read-only,
+   unavailable, newer-version) rolls the optimistic state back and opens the disclaimer; Retry
+   re-detects the folder, closes on success, and re-runs the pending action once.
+
+Details: [main/lyrixdata.md](main/lyrixdata.md),
+[renderer/favorites.md](renderer/favorites.md).
 
 ## Session save, shortcuts, and media keys
 

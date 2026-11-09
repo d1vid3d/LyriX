@@ -5,8 +5,8 @@ player predictable when inputs are malformed or files disappear.
 
 **Owning source paths:** `src/main/media-protocol.ts`, `src/main/ipc.ts`, `src/main/reveal.ts`,
 `src/main/pathContainment.ts`, `src/main/sessionValidation.ts`, `src/main/sessionStore.ts`,
-`src/main/lyrics/`, `src/main/settings.ts`, `src/main/cache.ts`, `src/main/json-file.ts`,
-`src/preload/index.ts`, `src/renderer/index.html`.
+`src/main/lyrixdata/`, `src/main/lyrics/`, `src/main/settings.ts`, `src/main/cache.ts`,
+`src/main/json-file.ts`, `src/preload/index.ts`, `src/renderer/index.html`.
 
 **Last verified:** 2026-11-08 against LyriX 0.1.0.
 
@@ -22,6 +22,12 @@ player predictable when inputs are malformed or files disappear.
   capped queue state with 40-hex track ids and bounded strings; `session:save-position` requires a
   finite non-negative position and a matching queue entry; the session is discarded when its folder
   no longer matches. Window state is machine-local and independent of the library.
+- **LyrixData writes are contained**: only `<library>/LyrixData` may be written, only the allowlisted
+  file names, never user audio/sidecars. Stored refs are root-relative NFC paths with traversal
+  rejected; a symlinked LyrixData folder is refused; the safe JSON layer caps reads at 10 MB and
+  writes through temp + rename with `.bak`.
+- **Favorites IPC carries ids only**: main resolves ids through the current snapshot; missing-row
+  metadata and refs never come from the renderer. Input arrays are capped at 1000 ids.
 - **Path containment** in `media://` uses `realpath` on both the file and the root, then
   `isPathInside`.
 - **Reveal never trusts a renderer path**: `library:reveal-track` takes only a track id, resolves the

@@ -33,17 +33,22 @@ handling, section choice, and the stateless view renderers.
   media flow after `library.initialize()`, and cleans up on `beforeunload`.
 - `applySettings` restores volume, shuffle/repeat, view/sort, lyric preference, and translation
   settings without writing them back to disk.
+- Wires the DOM-free favorites/status controllers, the Favorites view/list, the disclaimer modal,
+  and every heart surface; favorites state changes sync rendered hearts and refresh the library
+  index/Favorites view without touching the library snapshot.
 
-It owns no routing, playback, search, queue-panel, menu, shortcut, session, or rendering state; those
-live in the controllers below. The queue panel and context-menu behavior are owned by
+It owns no routing, playback, search, queue-panel, menu, shortcut, session, favorites, or rendering
+state; those live in the controllers below. The queue panel and context-menu behavior are owned by
 [renderer/queue-panel.md](queue-panel.md) and
 [renderer/context-menu-and-toasts.md](context-menu-and-toasts.md); the shortcut/Escape/session/media
 wiring by [renderer/shortcuts.md](shortcuts.md) and
-[main/window-and-session.md](../main/window-and-session.md).
+[main/window-and-session.md](../main/window-and-session.md); favorites by
+[renderer/favorites.md](favorites.md).
 
-UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 338 lines. It remains
+UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 443 lines. It remains
 composition/wiring only, but the original “under 180 lines” claim no longer holds; shell feature
-wiring lives in `shellFeatures.ts` and menu building in `contextMenus.ts`.
+wiring lives in `shellFeatures.ts`, menu building in `contextMenus.ts`, and favorites/status models
+in `renderer/favorites/`.
 
 ## Element lookup (`src/renderer/src/dom.ts`)
 
@@ -129,6 +134,7 @@ menus without giving the views menu state.
 | `views/albumGrid.ts` | Albums grid plus empty state; forwards the optional card menu callback. |
 | `views/artistList.ts` | Artist rows with album/track counts plus empty state; optional row menu callback. |
 | `views/tracksList.ts` | Virtualized tracks list; owns the visible track list used for queueing and takes an optional row menu callback. |
+| `views/favoritesView.ts` | Favorites header/status/missing-section renderer; the row list is a second `TracksList`. |
 | `views/albumDetail.ts` | Album header with Play/Shuffle, cover/year, ordered track list, and optional track menu callback. |
 | `views/artistDetail.ts` | Artist header with Play/Shuffle, counts, album grid, and optional card menu callback. |
 

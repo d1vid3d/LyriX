@@ -103,6 +103,9 @@ describe('matchShortcut', () => {
   it('keeps the default table conflict-free on both platforms', () => {
     expect(findShortcutConflicts(DEFAULT_SHORTCUTS, false)).toEqual([])
     expect(findShortcutConflicts(DEFAULT_SHORTCUTS, true)).toEqual([])
+    expect(
+      matchShortcut(DEFAULT_SHORTCUTS, key('f'), context, { isMac: false })?.id
+    ).toBe('toggleCurrentFavorite')
   })
 
   it('detects conflicts within a scope and allows the same chord in another scope', () => {

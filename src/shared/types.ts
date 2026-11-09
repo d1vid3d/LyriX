@@ -52,7 +52,7 @@ export type RepeatMode = 'off' | 'all' | 'one'
 
 /** The library slice a queue was built from (serialized with the session). */
 export interface QueueContext {
-  kind: 'album' | 'artist' | 'tracks' | 'search' | 'other'
+  kind: 'album' | 'artist' | 'tracks' | 'search' | 'favorites' | 'other'
   label: string
 }
 
@@ -88,6 +88,50 @@ export interface RestoredSession {
 }
 
 export type MediaKeyAction = 'playpause' | 'next' | 'previous' | 'stop'
+
+/** Machine-local vs library-resident LyrixData state exposed to the renderer. */
+export type LyrixDataState =
+  | 'unbound'
+  | 'not-created'
+  | 'ready'
+  | 'read-only'
+  | 'unavailable'
+  | 'newer-version'
+
+export interface LyrixDataStatus {
+  state: LyrixDataState
+  writable: boolean
+  libraryId: string | null
+  message: string | null
+}
+
+export interface FavoriteMissing {
+  path: string
+  title: string
+  artist: string
+  album: string
+  addedAt: number
+}
+
+export interface FavoriteItem {
+  trackId: string
+  addedAt: number
+}
+
+export interface FavoritesState {
+  items: FavoriteItem[]
+  missing: FavoriteMissing[]
+}
+
+export type FavoritesWriteFailure =
+  | 'read-only'
+  | 'unavailable'
+  | 'newer-version'
+  | 'invalid'
+
+export type FavoritesSetResult =
+  | { ok: true; state: FavoritesState }
+  | { ok: false; reason: FavoritesWriteFailure }
 
 
 /** Playback preferences persisted between launches. */
@@ -135,6 +179,11 @@ export interface LibraryApi {
   getSession(): Promise<RestoredSession | null>
   saveSessionQueue(state: SessionQueueState): Promise<void>
   saveSessionPosition(state: SessionPositionState): Promise<void>
+  getLyrixDataStatus(): Promise<LyrixDataStatus>
+  retryLyrixData(): Promise<LyrixDataStatus>
+  getFavorites(): Promise<FavoritesState>
+  setFavorite(trackIds: string[], favorite: boolean): Promise<FavoritesSetResult>
+  removeMissingFavorites(): Promise<FavoritesSetResult>
   getLyricSources(trackId: string): Promise<LyricSources | null>
   saveLyricChoice(trackId: string, sourceId: string | null): Promise<void>
   saveLyricPreference(preference: LyricPreference): Promise<void>
@@ -143,4 +192,6 @@ export interface LibraryApi {
   onScanProgress(listener: (progress: ScanProgress) => void): () => void
   onLibraryUpdated(listener: (snapshot: LibrarySnapshot) => void): () => void
   onMediaKey(listener: (action: MediaKeyAction) => void): () => void
+  onLyrixDataStatus(listener: (status: LyrixDataStatus) => void): () => void
+  onFavoritesChanged(listener: (state: FavoritesState) => void): () => void
 }

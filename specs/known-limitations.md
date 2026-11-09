@@ -18,11 +18,12 @@ that is intentionally out of scope.
 Gapless playback, crossfade, queue undo, queue multi-select, saving the queue as a playlist,
 context-menu submenus, dragging tracks from the library into the queue, user-configurable shortcut
 overrides, a settings view, mute, tray/mini-player, system-wide shortcuts other than media keys,
-per-track position memory, autoplay on launch, playback history, favorites, playlists, fuzzy search,
-search history, filters, artist images, multi-artist splitting, genres, grid/artist virtualization,
-online lyric or translation lookup, singer-specific styling, translation editing, swapping
-original/translation, side-by-side translation layout, word-level translation timing, per-language
-fonts, translation keyboard shortcuts, TTML, tag editing, packaging.
+per-track position memory, autoplay on launch, playback history, playlists, album-level favorites,
+LyrixData history/playlists, multi-library switching, shared-drive locking, a portable scan index,
+fuzzy search, search history, filters, artist images, multi-artist splitting, genres, grid/artist
+virtualization, online lyric or translation lookup, singer-specific styling, translation editing,
+swapping original/translation, side-by-side translation layout, word-level translation timing,
+per-language fonts, translation keyboard shortcuts, TTML, tag editing, packaging.
 
 ## Limitations
 
@@ -40,6 +41,9 @@ fonts, translation keyboard shortcuts, TTML, tag editing, packaging.
   names. The size cap, symlink/directory skips, and accepted encodings are owned by
   [main/lyric-sources.md](main/lyric-sources.md).
 - No online lookup, lyric editing, sidecar writing, or tag writing.
+- LyriX writes only inside `<library>/LyrixData`; no tag, lyric, or sidecar editing exists. Favorites
+  are track-level only; missing refs are shown read-only until removed, and relinking requires a
+  unique fingerprint match.
 - No gapless playback, crossfade, media-key customization, or per-track position memory. Shuffle and
   repeat modes are persisted; the resume session restores one paused position for the current entry.
   The queue panel supports remove, clear, move, and jump, but not undo, multi-select, or saving the

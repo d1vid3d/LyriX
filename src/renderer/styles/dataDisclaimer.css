@@ -1,0 +1,109 @@
+:root {
+  --data-disclaimer-z-index: 55;
+  --data-disclaimer-backdrop: rgba(0, 0, 0, 0.58);
+  --data-disclaimer-width: min(520px, 92vw);
+  --data-disclaimer-padding: 20px;
+  --data-disclaimer-radius: 12px;
+  --data-disclaimer-background: var(--panel);
+  --data-disclaimer-border: var(--border);
+  --data-disclaimer-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --data-disclaimer-muted: var(--muted);
+  --data-disclaimer-warning: #e5b567;
+}
+
+.data-disclaimer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--data-disclaimer-z-index);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.data-disclaimer[hidden] {
+  display: none;
+}
+
+.data-disclaimer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--data-disclaimer-backdrop);
+}
+
+.data-disclaimer__dialog {
+  position: relative;
+  width: var(--data-disclaimer-width);
+  padding: var(--data-disclaimer-padding);
+  border: 1px solid var(--data-disclaimer-border);
+  border-radius: var(--data-disclaimer-radius);
+  background: var(--data-disclaimer-background);
+  box-shadow: var(--data-disclaimer-shadow);
+  outline: none;
+}
+
+.data-disclaimer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--data-disclaimer-border);
+}
+
+.data-disclaimer__title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.data-disclaimer__close {
+  width: 30px;
+  padding: 4px 0;
+  border: 1px solid var(--data-disclaimer-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--data-disclaimer-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.data-disclaimer__close:hover {
+  color: var(--text);
+}
+
+.data-disclaimer__message {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.data-disclaimer__features {
+  margin: 8px 0 0;
+  color: var(--data-disclaimer-warning);
+  font-size: 12px;
+}
+
+.data-disclaimer__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.data-disclaimer__retry {
+  padding: 7px 12px;
+}
+
+.data-disclaimer__retry:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.data-disclaimer__dismiss {
+  padding: 7px 12px;
+  border: 1px solid var(--data-disclaimer-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}

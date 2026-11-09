@@ -1,6 +1,6 @@
 import type { Album } from '../../shared/types'
 
-export type LibraryView = 'albums' | 'artists' | 'tracks'
+export type LibraryView = 'albums' | 'artists' | 'tracks' | 'favorites'
 
 export interface AlbumItem {
   kind: 'album'
@@ -24,10 +24,21 @@ export interface TrackItem {
   searchText: string
 }
 
+export interface FavoriteItem extends TrackItem {
+  addedAt: number
+}
+
+/** Plain favorites data the query registry needs; no DOM or controller dependency. */
+export interface FavoritesQueryInput {
+  ids: ReadonlySet<string>
+  addedAt: ReadonlyMap<string, number>
+}
+
 export interface ViewItemMap {
   albums: AlbumItem
   artists: ArtistItem
   tracks: TrackItem
+  favorites: FavoriteItem
 }
 
 export interface SortOption<Item> {
@@ -39,7 +50,7 @@ interface ViewDefinition<Item> {
   label: string
   defaultSort: string
   sorts: Record<string, SortOption<Item>>
-  build(albums: readonly Album[]): Item[]
+  build(albums: readonly Album[], favorites?: FavoritesQueryInput): Item[]
 }
 
 type ViewDefinitions = {
@@ -162,6 +173,29 @@ function buildTrackItems(albums: readonly Album[]): TrackItem[] {
   )
 }
 
+function buildFavoriteItems(
+  albums: readonly Album[],
+  favorites?: FavoritesQueryInput
+): FavoriteItem[] {
+  if (!favorites || favorites.ids.size === 0) return []
+
+  return albums.flatMap((album) =>
+    album.tracks
+      .filter((track) => favorites.ids.has(track.id))
+      .map((track) => ({
+        kind: 'track' as const,
+        track,
+        album,
+        addedAt: favorites.addedAt.get(track.id) ?? 0,
+        searchText: joinSearchText([track.title, track.artist, album.title])
+      }))
+  )
+}
+
+function compareFavoriteRecent(a: FavoriteItem, b: FavoriteItem): number {
+  return b.addedAt - a.addedAt || compareTrackTitle(a, b)
+}
+
 /**
  * All view and sort definitions live here. Adding a sort is one entry; a new view is one
  * registry entry plus its renderer.
@@ -198,6 +232,17 @@ export const VIEWS: ViewDefinitions = {
       album: { label: 'Album', compare: compareTrackAlbum }
     },
     build: buildTrackItems
+  },
+  favorites: {
+    label: 'Favorites',
+    defaultSort: 'recent',
+    sorts: {
+      recent: { label: 'Recently added', compare: compareFavoriteRecent },
+      title: { label: 'Title', compare: compareTrackTitle },
+      artist: { label: 'Artist', compare: compareTrackArtist },
+      album: { label: 'Album', compare: compareTrackAlbum }
+    },
+    build: buildFavoriteItems
   }
 }
 
@@ -209,13 +254,17 @@ export interface LibraryIndex {
 }
 
 /** Build once per library snapshot so every keystroke only filters and sorts. */
-export function buildLibraryIndex(albums: readonly Album[]): LibraryIndex {
+export function buildLibraryIndex(
+  albums: readonly Album[],
+  favorites?: FavoritesQueryInput
+): LibraryIndex {
   return {
     albums,
     items: {
       albums: VIEWS.albums.build(albums),
       artists: VIEWS.artists.build(albums),
-      tracks: VIEWS.tracks.build(albums)
+      tracks: VIEWS.tracks.build(albums),
+      favorites: VIEWS.favorites.build(albums, favorites)
     }
   }
 }

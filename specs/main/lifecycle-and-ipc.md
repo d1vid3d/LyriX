@@ -27,9 +27,11 @@ Startup wiring only:
    immediately without reading audio files.
 6. Load `userData/window-state.json`, load the session against the current library root, create the
    `CoverService` and install the `media://` handler.
-7. Create the `ScanCoordinator`, register IPC (including the session store), create the window with
-   restored bounds, and handle macOS re-activation.
-8. On quit, flush the session; on non-macOS, quit when all windows close.
+7. Load the machine id, bind the `LyrixData` store to the library root, and resolve favorites against
+   the restored snapshot without creating anything on disk.
+8. Create the `ScanCoordinator` (with the library-applied LyrixData rebind hook), register IPC, create
+   the window with restored bounds, and handle macOS re-activation.
+9. On quit, flush the session and queued LyrixData writes; on non-macOS, quit when all windows close.
 
 The scan generation counter, IPC handlers, and window creation are described below and in
 [main/library-scanning.md](library-scanning.md). Window bounds, the single-instance lock, the session
@@ -67,7 +69,8 @@ normalization and file formats by [persistence.md](../persistence.md).
 
 ## IPC handlers (`src/main/ipc.ts`)
 
-`registerIpc(store, scan, choices)` registers the existing channels. `library:get-state` starts the
+`registerIpc(store, scan, choices, session, lyrixData, favorites)` registers the existing channels.
+`library:get-state` starts the
 one-time startup refresh only when a last folder exists, after the renderer has had a chance to
 subscribe.
 
@@ -80,6 +83,11 @@ subscribe.
 | `session:get` | — | `RestoredSession \| null` (null on folder mismatch/corrupt data) |
 | `session:save-queue` | `SessionQueueState` candidate | `void` (validated, capped, folder-stamped) |
 | `session:save-position` | `SessionPositionState` candidate | `void` (validated, throttled write) |
+| `lyrixdata:get-status` | — | `LyrixDataStatus` |
+| `lyrixdata:retry` | — | `LyrixDataStatus` |
+| `favorites:get` | — | `FavoritesState` |
+| `favorites:set` | `{ trackIds: string[], favorite: boolean }` | `{ ok: true, state } \| { ok: false, reason }` |
+| `favorites:remove-missing` | — | same result shape |
 | `lyrics:get-sources` | `trackId: unknown` | `LyricSources \| null` |
 | `lyrics:set-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
 | `lyrics:set-translation-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
@@ -91,7 +99,8 @@ subscribe.
 | `settings:set-translation` | `{ enabled: unknown, language: unknown }` | `void` (validated) |
 
 Events to renderer: `library:scan-progress` (throttled), `library:updated` (after a successful
-background refresh), and `media:key` (only in the global-shortcut fallback mode).
+background refresh), `media:key` (only in the global-shortcut fallback mode),
+`lyrixdata:status-changed`, and `favorites:changed`.
 
 `lyrics:get-sources` rejects non-string/empty ids with `null`, resolves the path through
 `resolveTrackFile(trackId)`, and catches every error. `lyrics:set-choice` and
@@ -126,6 +135,11 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `getSession()` | `session:get` | Returns the validated session for the current folder, or `null`. |
 | `saveSessionQueue(state)` | `session:save-queue` | Main validates/caps the payload and folder-stamps it. |
 | `saveSessionPosition(state)` | `session:save-position` | Main validates the entry/track/position and throttles writes. |
+| `getLyrixDataStatus()` | `lyrixdata:get-status` | Current status without creating anything. |
+| `retryLyrixData()` | `lyrixdata:retry` | Re-detects and retries first-write creation. |
+| `getFavorites()` | `favorites:get` | Id-based favorites plus main-derived missing metadata. |
+| `setFavorite(trackIds, favorite)` | `favorites:set` | Validates ids and returns the full new state or a failure reason. |
+| `removeMissingFavorites()` | `favorites:remove-missing` | Removes all unresolved entries without sending paths. |
 | `getSettings()` | `settings:get` | Returns normalized settings. |
 | `saveVolume(volume)` | `settings:set-volume` | Main clamps the value. |
 | `saveUiState(state)` | `settings:set-ui` | Main normalizes the value. |
@@ -138,6 +152,8 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `onScanProgress(listener)` | `library:scan-progress` | Returns an unsubscribe function. |
 | `onLibraryUpdated(listener)` | `library:updated` | Returns an unsubscribe function. |
 | `onMediaKey(listener)` | `media:key` | Fallback mode only; returns an unsubscribe function. |
+| `onLyrixDataStatus(listener)` | `lyrixdata:status-changed` | Returns an unsubscribe function. |
+| `onFavoritesChanged(listener)` | `favorites:changed` | Returns an unsubscribe function. |
 
 `subscribe()` wraps the IPC listener so the renderer callback never receives the Electron event
 object, and returns a function that removes exactly that listener.

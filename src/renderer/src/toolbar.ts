@@ -27,7 +27,8 @@ export class ToolbarController {
   private readonly sortByView: Record<LibraryView, string> = {
     albums: getDefaultSort('albums'),
     artists: getDefaultSort('artists'),
-    tracks: getDefaultSort('tracks')
+    tracks: getDefaultSort('tracks'),
+    favorites: getDefaultSort('favorites')
   }
   private appliedSearch = ''
   private searchTimer: ReturnType<typeof setTimeout> | null = null

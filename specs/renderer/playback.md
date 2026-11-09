@@ -26,7 +26,8 @@ Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, `activeAttempt`
 - `playArtist` queues `getArtistTracks(artist)` (album year → title, then disc → track → title);
   `shuffleArtist` enables shuffle and starts from a random index.
 - `playVisibleTrack` queues the visible track list with a `tracks` context, or a `search` context
-  carrying the applied search text.
+  carrying the applied search text. The Favorites header uses `shuffleTracks` with a `favorites`
+  context.
 - `startCurrentTrack` loads the track, requests lyrics, resets time UI, optionally plays, and
   updates Now Playing/highlight/controls.
 - `toggleShuffle` flips the queue shuffle flag; `cycleRepeat` moves `off → all → one → off`. Both
@@ -125,8 +126,8 @@ playback, DOM, or persistence concerns. The folder exports `PlaybackQueue`, the 
 the shuffle helpers.
 
 - `QueueEntry` carries `entryId` (stable per insertion), `track`, and `origin`
-  (`context | playNext | added`). `QueueContext` is `{ kind: album | artist | tracks | search | other,
-  label }`.
+  (`context | playNext | added`). `QueueContext` is
+  `{ kind: album | artist | tracks | search | favorites | other, label }`.
 - `getSnapshot()` returns a frozen, memoized `QueueSnapshot` (`entries`, `currentIndex`, `current`,
   `shuffle`, `repeat`, `context`, `version`). The snapshot is rebuilt and `version` increments only
   after a mutation; `subscribe(listener)` returns an unsubscribe function.

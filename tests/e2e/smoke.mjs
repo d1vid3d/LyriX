@@ -171,7 +171,7 @@ async function main(runner, ctx) {
   runner.equal(
     'queue row menu lists every row action',
     queueMenu.labels.join('|'),
-    'Play now|Play next|Move to top of Next up|Move to bottom|Remove|Go to album|Go to artist|Show in file manager'
+    'Play now|Play next|Move to top of Next up|Move to bottom|Remove|Add to Favorites|Go to album|Go to artist|Show in file manager'
   )
   runner.check(
     'current queue row disables move and remove actions',
@@ -341,7 +341,7 @@ async function main(runner, ctx) {
   runner.check(
     'track menu offers playback, navigation, and reveal',
     trackMenuLabels.join('|') ===
-      'Play|Play next|Add to queue|Go to album|Go to artist|Show in file manager',
+      'Play|Play next|Add to queue|Add to Favorites|Go to album|Go to artist|Show in file manager',
     trackMenuLabels.join('|')
   )
   await pressKey(cdp, 'Escape')
@@ -598,6 +598,132 @@ async function main(runner, ctx) {
     Math.abs(now.trackScrollTop - scrollBefore) < 2,
     `before=${scrollBefore} after=${now.trackScrollTop}`
   )
+
+  runner.step('favorites and LyrixData')
+  const musicRoot = join(ctx.tempRoot, 'music')
+  const rootsBefore = await fs.readdir(musicRoot).catch(() => [])
+  runner.check(
+    'browsing never creates LyrixData',
+    !rootsBefore.some((name) => name.toLowerCase() === 'lyrixdata'),
+    rootsBefore.join(',')
+  )
+
+  await clickView(cdp, 'favorites')
+  await cdp.waitFor(
+    'favorites view opens before any write',
+    `document.querySelector('#favorites-view').hidden === false`
+  )
+  const notCreated = await cdp.evaluate(`(() => ({
+    status: document.querySelector('#favorites-status')?.textContent ?? '',
+    emptyHidden: document.querySelector('#favorites-empty')?.hidden ?? true
+  }))()`)
+  runner.equal(
+    'favorites not-created status is exact',
+    notCreated.status,
+    'Not created yet. It will be created when you add your first favorite.'
+  )
+  runner.check('favorites empty state is visible', !notCreated.emptyHidden)
+
+  await clickView(cdp, 'tracks')
+  await cdp.waitFor(
+    'tracks view returns for favoriting',
+    `document.querySelector('#tracks-view').hidden === false &&
+      document.querySelectorAll('#track-scroll .track-row-wrap').length > 0`
+  )
+
+  const favoriteClicked = await cdp.evaluate(`(() => {
+    const button = document.querySelector('#track-scroll .track-row-wrap [data-favorite-track-id]')
+    if (!button) return ''
+    const title = button.closest('.track-row-wrap')?.querySelector('.track-row-title')?.textContent ?? ''
+    button.click()
+    return title
+  })()`)
+  runner.check('track row heart starts a favorite', favoriteClicked !== '', favoriteClicked)
+  await cdp.waitFor(
+    'favorite heart turns on',
+    `document.querySelector('#track-scroll .track-row-wrap [data-favorite-track-id]')?.getAttribute('aria-pressed') === 'true'`
+  )
+  const favoritesFile = join(musicRoot, 'LyrixData', 'favorites.json')
+  const libraryFile = join(musicRoot, 'LyrixData', 'library.json')
+  const readmeFile = join(musicRoot, 'LyrixData', 'README.txt')
+  const createdDeadline = Date.now() + 5000
+  let created = [false, false, false]
+  while (Date.now() < createdDeadline) {
+    created = await Promise.all([
+      fs.stat(favoritesFile).then(() => true).catch(() => false),
+      fs.stat(libraryFile).then(() => true).catch(() => false),
+      fs.stat(readmeFile).then(() => true).catch(() => false)
+    ])
+    if (created.every(Boolean)) break
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  runner.check(
+    'first write creates README, library.json, and favorites.json',
+    created.every(Boolean),
+    JSON.stringify({ favorites: created[0], library: created[1], readme: created[2] })
+  )
+
+  await clickView(cdp, 'favorites')
+  await cdp.waitFor(
+    'favorites view visible',
+    `document.querySelector('#favorites-view').hidden === false`
+  )
+  const favoritesView = await cdp.evaluate(`(() => ({
+    title: document.querySelector('#favorites-scroll .track-row-title')?.textContent ?? '',
+    status: document.querySelector('#favorites-status')?.textContent ?? '',
+    playDisabled: document.querySelector('#favorites-play')?.disabled ?? true,
+    askKeys: document.querySelector('#sort-select')?.options[0]?.value ?? ''
+  }))()`)
+  runner.equal('favorites view lists the added track', favoritesView.title, favoriteClicked)
+  runner.equal(
+    'favorites status reports the LyrixData folder',
+    favoritesView.status,
+    "Saved in this library's LyrixData folder"
+  )
+  runner.equal('favorites Play is enabled', favoritesView.playDisabled, false)
+  runner.equal('favorites default sort is Recently added', favoritesView.askKeys, 'recent')
+
+  const favoriteRemoved = await cdp.evaluate(`(() => {
+    const button = document.querySelector('#favorites-scroll [data-favorite-track-id]')
+    if (!button) return false
+    button.click()
+    return true
+  })()`)
+  runner.check('favorites row heart removes the favorite', favoriteRemoved)
+  await cdp.waitFor(
+    'favorites empty state returns',
+    `document.querySelector('#favorites-empty').hidden === false`
+  )
+  const emptyText = await cdp.evaluate(
+    `document.querySelector('#favorites-empty').textContent`
+  )
+  runner.equal('favorites empty state is exact', emptyText, 'No favorites yet. Press the heart on any track.')
+
+  await pressKey(cdp, 'f')
+  await cdp.waitFor(
+    'F favors the current track from the player bar heart',
+    `document.querySelector('#favorite-current-host [data-favorite-track-id]')?.getAttribute('aria-pressed') === 'true'`
+  )
+  await cdp.waitFor(
+    'favorite toast confirms the add',
+    `document.querySelector('#toast-region')?.textContent === 'Added to Favorites'`
+  )
+  await pressKey(cdp, 'f')
+  await cdp.waitFor(
+    'F removes the current favorite again',
+    `document.querySelector('#favorite-current-host [data-favorite-track-id]')?.getAttribute('aria-pressed') === 'false'`
+  )
+
+  await pressKey(cdp, 'q')
+  await cdp.waitFor(
+    'queue panel opens for favorite check',
+    `document.querySelector('#queue-panel').hidden === false`
+  )
+  const queueHearts = await cdp.evaluate(
+    `document.querySelectorAll('#queue-scroll .queue-entry [data-favorite-track-id]').length`
+  )
+  runner.check('queue rows expose favorite hearts', queueHearts > 0, String(queueHearts))
+  await pressKey(cdp, 'Escape')
 
   runner.step('keyboard shortcut registry, overlay, and Escape layers')
   const shuffleBefore = await cdp.evaluate(

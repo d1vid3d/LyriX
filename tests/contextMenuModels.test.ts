@@ -61,6 +61,7 @@ describe('track menu', () => {
       'Play',
       'Play next',
       'Add to queue',
+      'Add to Favorites',
       'Go to album',
       'Go to artist',
       'Show in file manager'
@@ -143,6 +144,28 @@ describe('album and artist menus', () => {
     expect(item?.disabled).toBe(true)
     expect(item?.payload?.track).toBeNull()
   })
+  it('uses the favorite state for the label', () => {
+    const value = track('a')
+    const favorite = buildTrackMenu({
+      track: value,
+      album: album([value]),
+      play: () => undefined,
+      isFavorite: true
+    })
+    const notFavorite = buildTrackMenu({
+      track: value,
+      album: album([value]),
+      play: () => undefined,
+      isFavorite: false
+    })
+
+    expect(favorite.find((item) => item.action === 'track.toggleFavorite')?.label).toBe(
+      'Remove from Favorites'
+    )
+    expect(
+      notFavorite.find((item) => item.action === 'track.toggleFavorite')?.label
+    ).toBe('Add to Favorites')
+  })
 })
 
 describe('queue row menu', () => {
@@ -174,6 +197,7 @@ describe('queue row menu', () => {
       'Move to top of Next up',
       'Move to bottom',
       'Remove',
+      'Add to Favorites',
       'Go to album',
       'Go to artist',
       'Show in file manager'
@@ -204,11 +228,13 @@ describe('current track menu', () => {
     })
 
     expect(labels(items)).toEqual([
+      'Add to Favorites',
       'Go to album',
       'Go to artist',
       'Show in file manager'
     ])
-    expect(items[0].action).toBe('currentTrack.goToAlbum')
+    expect(items[0].action).toBe('currentTrack.toggleFavorite')
+    expect(items[2].action).toBe('currentTrack.goToAlbum')
     expect(
       items.find((item) => item.action === 'currentTrack.reveal')?.action
     ).toBe('currentTrack.reveal')

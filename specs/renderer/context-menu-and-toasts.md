@@ -49,11 +49,11 @@ Builders are pure and return `ContextMenuItem` values with a typed `action` and 
 
 | Builder | Labels |
 | --- | --- |
-| `buildTrackMenu({ track, album, play })` | `Play`, `Play next`, `Add to queue`, `Go to album`, `Go to artist`, `Show in file manager` |
+| `buildTrackMenu({ track, album, play, isFavorite })` | `Play`, `Play next`, `Add to queue`, `Add to Favorites`/`Remove from Favorites`, `Go to album`, `Go to artist`, `Show in file manager` |
 | `buildAlbumMenu({ album })` | `Play`, `Shuffle`, `Play next`, `Add to queue`, `Go to artist`, `Show in file manager` |
 | `buildArtistMenu({ artist })` | `Play`, `Shuffle`, `Play next`, `Add to queue` |
-| `buildQueueRowMenu(row)` | `Play now`, `Play next`, `Move to top of Next up`, `Move to bottom`, `Remove`, `Go to album`, `Go to artist`, `Show in file manager` |
-| `buildCurrentTrackMenu({ track, albumId, artistName })` | `Go to album`, `Go to artist`, `Show in file manager` |
+| `buildQueueRowMenu(row)` | `Play now`, `Play next`, `Move to top of Next up`, `Move to bottom`, `Remove`, favorite toggle, `Go to album`, `Go to artist`, `Show in file manager` |
+| `buildCurrentTrackMenu({ track, albumId, artistName, isFavorite })` | Favorite toggle, `Go to album`, `Go to artist`, `Show in file manager` |
 
 Album queue labels append `(N tracks)` when the count is greater than one. Track menus use
 the exact row play closure and an album context (or an `other`/`Tracks` context when the track has no
@@ -76,7 +76,9 @@ injected queue, transport, navigation, library-lookup, toast, and reveal depende
   `playNext` alone only fills a queue with no current entry. Otherwise it calls `queue.playNext` or
   `queue.addToQueue`.
 - Queue-row actions use `jumpTo` + start, `move` to the top of Next up / bottom, or `remove`, and
-  toast the result.
+  toast the result. Favorite toggles on track/queue/current menus call the injected favorites action.
+- The favorites action is throttled only by the optimistic controller; success toasts `Added to
+  Favorites`/`Removed from Favorites`, while failures open the disclaimer instead.
 - Go to album/artist validates the target through the injected library lookup, opens it through
   navigation (which closes Now Playing via the existing navigation hook), and toasts
   `Couldn't open that album` / `Couldn't open that artist` when the target is missing. This applies to

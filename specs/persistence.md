@@ -4,7 +4,8 @@
 atomic-write helpers shared by all stores.
 
 **Owning source paths:** `src/main/cache.ts`, `src/main/settings.ts`, `src/main/lyrics/choices.ts`,
-`src/main/json-file.ts`, `src/main/windowState.ts`, `src/main/sessionStore.ts`.
+`src/main/json-file.ts`, `src/main/windowState.ts`, `src/main/sessionStore.ts`,
+`src/main/lyrixdata/`.
 
 **Last verified:** 2026-11-08 against LyriX 0.1.0.
 
@@ -24,6 +25,10 @@ All paths are under Electron `userData`.
 | `window-state.json` | Version 1, normal bounds `{ x, y, width, height }`, maximized flag. | Debounced 500 ms, atomic, flushed on close. |
 | `session-queue.json` | Version 1, library folder, and the exported queue state (entries by track id, natural order, current entry, context). | Validated, atomic, change-driven. |
 | `session-position.json` | Version 1, library folder, and `{ entryId, trackId, position }` for the current entry. | Validated, atomic, throttled to 1 s. |
+| `machine-id.json` | `{ machineId }`, a random UUID created once for `writtenBy` stamps. | Atomic. |
+| `<library>/LyrixData/README.txt` | Portable user note. | Created on first write only. |
+| `<library>/LyrixData/library.json` | Version 1, stable `libraryId`, `createdAt`, `writtenBy`. | Atomic, `.bak`, unknown fields kept. |
+| `<library>/LyrixData/favorites.json` | Version 1, `items: [{ ref, addedAt }]`, `writtenBy`. | Atomic, `.bak`, unknown fields kept. |
 | `covers/<albumId>.jpg` | Full cover JPEG. Dimensions and quality are owned by [main/covers-and-media.md](main/covers-and-media.md). | Atomic. |
 | `covers/<albumId>-small.jpg` | Small cover JPEG, generated from the full cover. Dimensions are owned by [main/covers-and-media.md](main/covers-and-media.md). | Atomic. |
 
@@ -34,6 +39,17 @@ the entry map from the current directory walk.
 Sidecar `.lrc` files are user-owned inputs and are never written by LyriX. Per-track source and
 translation choices are independent of the library cache, so they survive rescans and
 path-preserving tag updates. A missing `translations` map is equivalent to an empty one.
+
+## Machine-local vs library-resident data
+
+| Machine-local (`userData`) | Library-resident (`<library>/LyrixData`) |
+| --- | --- |
+| settings, window state, resume session, lyric/translation choices, tag cache, covers, `machine-id.json` | `README.txt`, `library.json`, `favorites.json` (later: history and playlists) |
+
+Only LyrixData follows the library across disks and mounts, and LyriX writes there only during an
+explicit write (favorites today). Opening, scanning, and browsing a library never creates it. The
+write invariant and file formats are owned by [main/lyrixdata.md](main/lyrixdata.md); invariant 13 in
+[TechnicalSpecs.md](TechnicalSpecs.md) states the rule.
 
 Window state and both session files are machine-local: they are never stored in the music library,
 and the session only contains track ids (never paths). Their validation and restore rules are owned

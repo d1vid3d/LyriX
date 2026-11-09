@@ -14,6 +14,7 @@ intent without duplicating volatile values.
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md),
 [renderer/lyric-view.md](renderer/lyric-view.md),
 [renderer/queue-panel.md](renderer/queue-panel.md),
+[renderer/favorites.md](renderer/favorites.md),
 [testing-and-verification.md](testing-and-verification.md).
 
 - **Tag reads:** bounded concurrency, owned by
@@ -44,6 +45,10 @@ intent without duplicating volatile values.
 - **Shortcuts and Media Session:** matching is a small table scan per keydown; the overlay is built
   once. Media Session position updates happen on events (track change, metadata, play/pause, seek),
   not every frame. See [renderer/shortcuts.md](renderer/shortcuts.md).
+- **LyrixData:** browsing reads no files until the Favorites view asks for state; the first write
+  creates the folder. Favorites mutations are read-modify-write on a small file, ref resolution is
+  built once per library snapshot, and the Favorites view uses the same fixed-row virtual list. See
+  [main/lyrixdata.md](main/lyrixdata.md).
 - **Lyric DOM:** built once per document; each frame reads the position once, runs the binary
   searches, and does one O(lines) flag pass whose DOM writes happen only for changed state. See
   [renderer/lyric-view.md](renderer/lyric-view.md).

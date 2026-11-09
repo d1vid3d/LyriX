@@ -15,9 +15,9 @@ This is the **only** file where volatile verification numbers (test counts, file
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 554 tests pass across 39 files. |
+| `npm test` | 602 tests pass across 49 files. |
 | `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
-| `npm run test:e2e` | Passes; 101 checks (Tier 1 smoke). |
+| `npm run test:e2e` | Passes; 113 checks (Tier 1 smoke). |
 | `npm run test:e2e:full` | Passes; 158 checks (Tier 2 regression). |
 | `npm run test:e2e:visual` | Passes; 29 checks (Tier 3 visual). |
 | `npm run dev` | Starts electron-vite and Electron. |
@@ -68,6 +68,16 @@ filesystem scanning, audio playback, and DOM behavior. The E2E tiers are not par
 | `tests/layerStack.test.ts` | Priority ordering, exactly-one close, closed-layer skipping, ties, and unregister. |
 | `tests/overlayModel.test.ts` | Category grouping and platform-aware chord labels. |
 | `tests/mediaSessionModel.test.ts` | Metadata/artwork URLs and Media Session action mapping including default seeks. |
+| `tests/lyrixDataPaths.test.ts` | Portable path normalization, containment, exact/fingerprint resolution, relinking, duration tolerance, ambiguity and duplicates. |
+| `tests/versionedStore.test.ts` | Versioned round trips, `.bak`, unknown-field preservation, newer versions, size cap, cleanup and write classification. |
+| `tests/lyrixDataStore.test.ts` | No-create bind/read, first-write files, stable library id, error classes, retry, generation guard, ordering and symlink refusal. |
+| `tests/favoritesStore.test.ts` | Idempotent add/remove, concurrent mutation ordering, external RMW, healing only on write, re-resolution, missing reporting and removal. |
+| `tests/favoritesCap.test.ts` | 100,000-item cap without a write. |
+| `tests/favoritesIpc.test.ts` | `favorites:set` shape/id/cap validation. |
+| `tests/favoritesController.test.ts` | Optimistic add/remove, rollback, retry closure, external events, missing removal and toast strings. |
+| `tests/favoritesQuery.test.ts` | Favorites view registry, Recently added default, sorts and search. |
+| `tests/dataDisclaimerModel.test.ts` | Disclaimer messages/features and status-line Why variants. |
+| `tests/scannerLyrixData.test.ts` | Root-level LyrixData is never scanned as music. |
 | `tests/transportDecisions.test.ts` | Ended (stop/play/restart), previous (>3 s restart), failure cap, and repeat-mode cycling. |
 | `tests/artistTracks.test.ts` | Artist playback order: album year then title (unknown last), disc then track then title, missing disc as one, input not reordered. |
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
@@ -106,7 +116,7 @@ Three tiers drive the built app through raw Chrome DevTools Protocol (CDP). They
 
 | Tier | Command | Scope | When to run |
 | --- | --- | --- | --- |
-| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel/drag/context menus + Escape priority, album-card menu Go to artist, shortcut toggles, shortcuts overlay + Escape layering, Media Session metadata/state, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
+| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel/drag/context menus + Escape priority, album-card menu Go to artist, favorites not-created/ready states, first-write LyrixData files, Favorites view/empty state, heart removal, F shortcut, queue hearts, shortcuts overlay + Escape layering, Media Session metadata/state, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
 | 2 — full | `npm run test:e2e:full` | Startup and cached settings, library metadata, transport wiring, volume persistence, rescan, relaunch, views/search/sort, virtualization with 600 tracks, renderer health. | Opt-in for risky refactors and broad regression coverage. |
 | 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting plus player-bar button colors, sizes, icons, shuffle/repeat active states, and active/upcoming lyric states. | Optional after CSS/UI changes. |
 
@@ -195,6 +205,9 @@ Expected:
   `src/shared/mediaKeys.ts` to `global-shortcuts` and repeat (only one route is active at a time).
 - Window state resumes bounds/maximized state between launches; a second launch focuses the existing
   window instead of starting another process.
+- Favorites: opening/scanning/browsing a library creates nothing; the first heart creates
+  `LyrixData` with README/library/favorites; favorites survive a relaunch; missing refs appear under
+  the Favorites view after moving a file; a read-only/unavailable library shows the disclaimer.
 - Shuffle and repeat toggle their labels/active states and survive a relaunch.
 - The Queue button and `Q` toggle the panel; opening a context menu then pressing Escape closes the
   menu before the queue panel.

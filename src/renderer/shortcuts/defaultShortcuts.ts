@@ -89,6 +89,12 @@ export const DEFAULT_SHORTCUTS: readonly ShortcutDefinition[] = [
     when: (context) => context.isNowPlayingOpen && context.translationAvailable
   },
   {
+    id: 'toggleCurrentFavorite',
+    label: 'Toggle current track favorite',
+    category: 'Favorites',
+    keys: [{ key: 'f' }]
+  },
+  {
     id: 'showShortcuts',
     label: 'Show keyboard shortcuts',
     category: 'Help',

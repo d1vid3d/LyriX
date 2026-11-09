@@ -14,7 +14,7 @@ stack, the generated shortcuts dialog, and the renderer's Media Session integrat
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariant 12),
 [renderer/ui-map.md](ui-map.md), [renderer/playback.md](playback.md),
-[renderer/queue-panel.md](queue-panel.md),
+[renderer/queue-panel.md](queue-panel.md), [renderer/favorites.md](favorites.md),
 [renderer/context-menu-and-toasts.md](context-menu-and-toasts.md),
 [main/window-and-session.md](../main/window-and-session.md).
 
@@ -71,6 +71,7 @@ shortcuts keep working while typing.
 | Focus search | Ctrl/Cmd+F, `/` | Search |
 | Toggle Now Playing | Ctrl/Cmd+L | View |
 | Toggle translation | T (Now Playing open and translation available) | View |
+| Toggle current track favorite | F | Favorites |
 | Show keyboard shortcuts | ? | Help |
 
 The table is declared once and can later be layered with user overrides; no customization UI exists.
@@ -107,10 +108,10 @@ class EscapeLayerStack {
 }
 ```
 
-Priorities, highest first: `contextMenu` 60, `shortcutsOverlay` 50, `lyricSourceMenu` 40,
-`queuePanel` 30, `nowPlaying` 20, `searchClear` 10. Later registrations win ties. `shellFeatures.ts`
-registers the six owners; the context menu and source menu no longer close on Escape themselves, so
-behavior (including focus restore) matches the previous chain exactly.
+Priorities, highest first: `contextMenu` 60, `dataDisclaimer` 55, `shortcutsOverlay` 50,
+`lyricSourceMenu` 40, `queuePanel` 30, `nowPlaying` 20, `searchClear` 10. Later registrations win
+ties. `shellFeatures.ts` registers the owners; the context menu and source menu no longer close on
+Escape themselves, so behavior (including focus restore) matches the previous chain exactly.
 
 ## Help overlay (`ui/shortcutOverlay.ts`, `overlayModel.ts`)
 

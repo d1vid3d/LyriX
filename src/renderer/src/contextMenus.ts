@@ -15,6 +15,7 @@ export interface ContextMenuOpenersDeps {
   menu: ContextMenu<ContextMenuItem>
   getCurrentTrack(): Track | null
   findAlbumForTrack(track: Track): Album | null
+  isFavorite(trackId: string): boolean
 }
 
 export interface ContextMenuOpeners {
@@ -37,10 +38,26 @@ export function createContextMenuOpeners(
 ): ContextMenuOpeners {
   return {
     openTrackMenu(item, play, position) {
-      deps.menu.show(buildTrackMenu({ track: item.track, album: item.album, play }), position)
+      deps.menu.show(
+        buildTrackMenu({
+          track: item.track,
+          album: item.album,
+          play,
+          isFavorite: deps.isFavorite(item.track.id)
+        }),
+        position
+      )
     },
     openAlbumTrackMenu(album, track, play, position) {
-      deps.menu.show(buildTrackMenu({ track, album, play }), position)
+      deps.menu.show(
+        buildTrackMenu({
+          track,
+          album,
+          play,
+          isFavorite: deps.isFavorite(track.id)
+        }),
+        position
+      )
     },
     openAlbumMenu(album, position) {
       deps.menu.show(buildAlbumMenu({ album }), position)
@@ -49,7 +66,10 @@ export function createContextMenuOpeners(
       deps.menu.show(buildArtistMenu({ artist }), position)
     },
     openQueueRowMenu(row, position) {
-      deps.menu.show(buildQueueRowMenu(row), position)
+      deps.menu.show(
+        buildQueueRowMenu({ ...row, isFavorite: deps.isFavorite(row.track.id) }),
+        position
+      )
     },
     openCurrentTrackMenu(position) {
       const track = deps.getCurrentTrack()
@@ -60,7 +80,8 @@ export function createContextMenuOpeners(
         buildCurrentTrackMenu({
           track,
           albumId: album?.id ?? null,
-          artistName: album?.artist ?? track.artist
+          artistName: album?.artist ?? track.artist,
+          isFavorite: deps.isFavorite(track.id)
         }),
         position
       )
