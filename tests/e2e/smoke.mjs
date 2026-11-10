@@ -796,6 +796,141 @@ async function main(runner, ctx) {
   runner.check('queue rows expose favorite hearts', queueHearts > 0, String(queueHearts))
   await pressKey(cdp, 'Escape')
 
+  runner.step('play history and Recently played')
+  await clickView(cdp, 'recent')
+  await cdp.waitFor(
+    'recent view opens with history off',
+    `document.querySelector('#recent-view').hidden === false &&
+      document.querySelector('#recent-record').getAttribute('aria-pressed') === 'false'`
+  )
+  const historyOff = await cdp.evaluate(`(() => ({
+    status: document.querySelector('#recent-status')?.textContent ?? '',
+    empty: document.querySelector('#recent-empty')?.textContent ?? '',
+    startHidden: document.querySelector('#recent-start')?.hidden ?? true
+  }))()`)
+  runner.equal(
+    'history not-created status is exact',
+    historyOff.status,
+    "History isn't being recorded yet. Turn on Record history to create this library's LyrixData folder."
+  )
+  runner.equal(
+    'history off empty state is exact',
+    historyOff.empty,
+    "History isn't being recorded for this library. Start recording"
+  )
+  runner.equal('history off shows the start action', historyOff.startHidden, false)
+  const historyFile = join(musicRoot, 'LyrixData', 'history.jsonl')
+  runner.check(
+    'history file does not exist before opt-in',
+    !(await fs
+      .stat(historyFile)
+      .then(() => true)
+      .catch(() => false))
+  )
+
+  await clickSelector(cdp, '#recent-record')
+  await cdp.waitFor(
+    'record history turns on',
+    `document.querySelector('#recent-record').getAttribute('aria-pressed') === 'true'`
+  )
+  const historyOn = await cdp.evaluate(
+    `document.querySelector('#recent-status')?.textContent ?? ''`
+  )
+  runner.equal(
+    'history recording status is exact',
+    historyOn,
+    "Recording to this library's LyrixData folder"
+  )
+
+  await clickView(cdp, 'albums')
+  const historyAlbumOpened = await clickAlbum(cdp, 'Lyric Album', 'Lyric Artist')
+  runner.check('history album opens', historyAlbumOpened)
+  const historyTrackTitle = 'Lyric Test'
+  const historyTrackStarted = await clickTrack(cdp, historyTrackTitle)
+  runner.check('history play track starts', historyTrackStarted)
+  await cdp.waitFor(
+    'history play starts',
+    `document.querySelector('#play-pause').dataset.playing === 'true'`
+  )
+  await new Promise((resolve) => setTimeout(resolve, 4300))
+  await cdp.evaluate(`document.querySelector('#play-pause')?.click()`)
+  await cdp.waitFor(
+    'history play paused',
+    `document.querySelector('#play-pause').dataset.playing === 'false'`
+  )
+
+  const historyDeadline = Date.now() + 5000
+  let historyLines = []
+  while (Date.now() < historyDeadline) {
+    try {
+      historyLines = (await fs.readFile(historyFile, 'utf8')).split('\n').filter(Boolean)
+    } catch {
+      historyLines = []
+    }
+    if (historyLines.length > 0) break
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  runner.check(
+    'counted play appends one history line',
+    historyLines.length === 1,
+    String(historyLines.length)
+  )
+  const historyRecord = historyLines.length > 0 ? JSON.parse(historyLines[0]) : null
+  runner.equal('history line is version 1', historyRecord?.v, 1)
+  runner.check(
+    'history line carries a main timestamp',
+    Number.isFinite(historyRecord?.at),
+    String(historyRecord?.at)
+  )
+
+  await clickView(cdp, 'recent')
+  await cdp.waitFor(
+    'recent view lists the played track',
+    `document.querySelector('#recent-scroll .track-row-title')?.textContent === ${JSON.stringify(historyTrackTitle)}`
+  )
+  const recentMeta = await cdp.evaluate(
+    `document.querySelector('#recent-scroll .track-row-meta')?.textContent ?? ''`
+  )
+  runner.check(
+    'recent row shows plays and relative time',
+    /^1 play · /.test(recentMeta),
+    recentMeta
+  )
+
+  await clickSelector(cdp, '#recent-play')
+  await pressKey(cdp, 'q')
+  await cdp.waitFor(
+    'recent queue context label',
+    `document.querySelector('#queue-context')?.textContent === 'Recently played'`
+  )
+  await pressKey(cdp, 'Escape')
+
+  await clickSelector(cdp, '#recent-clear')
+  await cdp.waitFor(
+    'clear history asks for confirmation',
+    `document.querySelector('#confirm-dialog').hidden === false`
+  )
+  await clickSelector(cdp, '.confirm-dialog__confirm')
+  await cdp.waitFor(
+    'history clears to the recorded-empty state',
+    `document.querySelector('#recent-empty')?.textContent === 'Nothing played yet.'`
+  )
+  const historyAfterClear = await fs.readFile(historyFile, 'utf8').catch(() => 'missing')
+  runner.equal('clear history empties the file', historyAfterClear, '')
+  runner.check(
+    'clear history keeps library.json',
+    await fs
+      .stat(join(musicRoot, 'LyrixData', 'library.json'))
+      .then(() => true)
+      .catch(() => false)
+  )
+
+  await clickSelector(cdp, '#recent-record')
+  await cdp.waitFor(
+    'record history turns off again',
+    `document.querySelector('#recent-record').getAttribute('aria-pressed') === 'false'`
+  )
+
   runner.step('keyboard shortcut registry, overlay, and Escape layers')
   const shuffleBefore = await cdp.evaluate(
     `document.querySelector('#shuffle').getAttribute('aria-pressed')`

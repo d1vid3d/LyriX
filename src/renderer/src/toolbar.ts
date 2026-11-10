@@ -28,7 +28,8 @@ export class ToolbarController {
     albums: getDefaultSort('albums'),
     artists: getDefaultSort('artists'),
     tracks: getDefaultSort('tracks'),
-    favorites: getDefaultSort('favorites')
+    favorites: getDefaultSort('favorites'),
+    recent: getDefaultSort('recent')
   }
   private appliedSearch = ''
   private searchTimer: ReturnType<typeof setTimeout> | null = null

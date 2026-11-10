@@ -22,6 +22,7 @@
           <button type="button" data-view="artists" aria-pressed="false">Artists</button>
           <button type="button" data-view="tracks" aria-pressed="false">Tracks</button>
           <button type="button" data-view="favorites" aria-pressed="false">Favorites</button>
+          <button type="button" data-view="recent" aria-pressed="false">Recent</button>
         </div>
         <select id="sort-select" aria-label="Sort by"></select>
         <input
@@ -105,6 +106,43 @@
             </button>
           </div>
         </section>
+      </section>
+
+      <section id="recent-view" class="view recent-view" hidden>
+        <header class="recent-header">
+          <div class="recent-heading">
+            <h1 class="recent-title">Recently played</h1>
+            <p id="recent-status" class="recent-status"></p>
+          </div>
+          <div class="recent-actions">
+            <button id="recent-why" class="recent-why" type="button" hidden>Why?</button>
+            <button id="recent-record" class="recent-record" type="button" aria-pressed="false">
+              Record history
+            </button>
+            <button id="recent-clear" class="recent-clear" type="button" disabled>
+              Clear history
+            </button>
+            <button
+              id="recent-play"
+              class="action-primary"
+              type="button"
+              aria-label="Play recently played"
+            >
+              Play
+            </button>
+            <button
+              id="recent-shuffle"
+              type="button"
+              aria-label="Shuffle recently played"
+              title="Shuffle recently played"
+            >
+              Shuffle
+            </button>
+          </div>
+        </header>
+        <div id="recent-scroll" class="track-scroll"></div>
+        <p id="recent-empty" class="empty-state" hidden></p>
+        <button id="recent-start" class="recent-start" type="button" hidden>Start recording</button>
       </section>
 
       <section id="detail-view" class="view detail-view" hidden>

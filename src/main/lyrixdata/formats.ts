@@ -3,6 +3,18 @@ import type { TrackRef } from './trackRef'
 export const LIBRARY_FILE_VERSION = 1
 export const FAVORITES_FILE_VERSION = 1
 
+/** Flip this to opt new/legacy libraries into history recording by default. */
+export const DEFAULT_HISTORY_RECORDING = false
+
+export interface LibraryFile {
+  version: number
+  libraryId: string
+  createdAt: number
+  writtenBy: WrittenBy
+  /** Missing means DEFAULT_HISTORY_RECORDING. */
+  historyRecording?: boolean
+}
+
 export interface WrittenBy {
   app: string
   appVersion: string
@@ -46,6 +58,14 @@ export function isWrittenBy(value: unknown): value is WrittenBy {
 
 export function makeWrittenBy(appVersion: string, machineId: string): WrittenBy {
   return { app: 'LyriX', appVersion, machineId, at: Date.now() }
+}
+
+/** A missing flag uses the single named default; only `true` enables recording. */
+export function historyRecordingFromLibrary(library: LibraryFile | null): boolean {
+  if (!library || typeof library.historyRecording !== 'boolean') {
+    return DEFAULT_HISTORY_RECORDING
+  }
+  return library.historyRecording === true
 }
 
 export function isValidLibraryId(value: unknown): value is string {

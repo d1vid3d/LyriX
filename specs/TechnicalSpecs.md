@@ -69,6 +69,7 @@ them.
 | App startup, window, `AppStore`, IPC handlers, preload bridge | [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md) |
 | Window bounds, single instance, resume session files/flow, media-key route | [main/window-and-session.md](main/window-and-session.md) |
 | Portable `<library>/LyrixData` files, refs, status, favorites storage, IPC | [main/lyrixdata.md](main/lyrixdata.md) |
+| Play-history log, opt-in recording, aggregation, history IPC | [main/history.md](main/history.md) |
 | Folder walking, tag reads, album grouping, scan generation/progress | [main/library-scanning.md](main/library-scanning.md) |
 | Cover extraction/resizing/cache, `media://` and byte ranges | [main/covers-and-media.md](main/covers-and-media.md) |
 | Embedded lyric tags, sidecar discovery/decoding, provider order | [main/lyric-sources.md](main/lyric-sources.md) |
@@ -83,6 +84,7 @@ them.
 | Lyric, Now Playing, and source-menu styling | [renderer/styles.md](renderer/styles.md) |
 | Keyboard shortcut registry, Escape layers, help overlay, Media Session | [renderer/shortcuts.md](renderer/shortcuts.md) |
 | Favorites view, heart hooks, status/disclaimer UI | [renderer/favorites.md](renderer/favorites.md) |
+| Recently played view, history controller, play tracker, relative time | [renderer/history.md](renderer/history.md) |
 | Markup, keyboard map, element ids, accessibility | [renderer/ui-map.md](renderer/ui-map.md) |
 | Lyric parsing, timestamps, alignment, sync helpers | [shared-lyric-core.md](shared-lyric-core.md) |
 | Startup, scan, playback, lyric-load, Now Playing flows | [flows.md](flows.md) |
@@ -122,6 +124,7 @@ contracts that the graph cannot.
 | [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md) | App startup, window, shared store, IPC channels, preload `window.library`. |
 | [main/window-and-session.md](main/window-and-session.md) | Window bounds/state, single instance, resume session files and flow, media-key route. |
 | [main/lyrixdata.md](main/lyrixdata.md) | LyrixData folder, portable refs, safe store, status states, favorites storage, IPC. |
+| [main/history.md](main/history.md) | Play-history format, opt-in flag, aggregation, tracker rules, history IPC. |
 | [main/library-scanning.md](main/library-scanning.md) | Folder walk, tag fallbacks, album grouping, scan coordinator. |
 | [main/covers-and-media.md](main/covers-and-media.md) | Cover extraction/resizing/cache, `media://` track/cover serving, ranges. |
 | [main/lyric-sources.md](main/lyric-sources.md) | Embedded tags, sidecar discovery/decoding, canonical provider list. |
@@ -136,6 +139,7 @@ contracts that the graph cannot.
 | [renderer/styles.md](renderer/styles.md) | Theme, lyric, and source-menu CSS variables and visual rules. |
 | [renderer/shortcuts.md](renderer/shortcuts.md) | Shortcut registry/table, typing guard, Escape layers, help overlay, Media Session. |
 | [renderer/favorites.md](renderer/favorites.md) | Favorites controllers/status, heart hooks, Favorites view, disclaimer modal. |
+| [renderer/history.md](renderer/history.md) | History controller/models, Recently played view, tracker, Clear confirmation. |
 | [renderer/ui-map.md](renderer/ui-map.md) | Markup sections, keyboard map, accessibility details. |
 | [shared-lyric-core.md](shared-lyric-core.md) | Pure lyric types, parsers, timing, translation alignment, sync helpers. |
 | [flows.md](flows.md) | End-to-end startup, scan, playback, lyric-load, and Now Playing flows. |

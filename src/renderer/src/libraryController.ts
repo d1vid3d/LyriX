@@ -1,7 +1,7 @@
 import type { LibrarySnapshot, ScanProgress, Settings, Track } from '../../shared/types'
 import type { LibraryApi } from '../../shared/types'
 import { buildLibraryIndex } from '../library/query'
-import type { FavoritesQueryInput, LibraryIndex } from '../library/query'
+import type { FavoritesQueryInput, HistoryQueryInput, LibraryIndex } from '../library/query'
 import type { AppElements } from './dom'
 import type { DetailRoute } from './routeStack'
 
@@ -34,7 +34,10 @@ export interface LibraryDeps {
   applySettings(settings: Settings): void
   refreshLyrics(): void
   getFavorites(): FavoritesQueryInput
+  getHistory(): HistoryQueryInput
   refreshFavorites?(): void
+  refreshHistory?(): void
+  onSnapshotApplied?(): void
 }
 
 /** Owns the library snapshot, status text, scanning state, and startup ordering. */
@@ -98,6 +101,7 @@ export class LibraryController {
     this.deps.updateTrackHighlight()
     this.deps.updateControls()
     this.setScanning(false)
+    this.deps.onSnapshotApplied?.()
   }
 
   handleLibraryUpdated(snapshot: LibrarySnapshot): void {
@@ -187,8 +191,18 @@ export class LibraryController {
     this.deps.refreshFavorites?.()
   }
 
+  /** Rebuilds the index with the latest play history without touching the library snapshot. */
+  refreshHistory(): void {
+    this.rebuildIndex()
+    this.deps.refreshHistory?.()
+  }
+
   private rebuildIndex(): void {
-    this.libraryIndex = buildLibraryIndex(this.albums, this.deps.getFavorites())
+    this.libraryIndex = buildLibraryIndex(
+      this.albums,
+      this.deps.getFavorites(),
+      this.deps.getHistory()
+    )
   }
 
   private setScanning(scanning: boolean): void {

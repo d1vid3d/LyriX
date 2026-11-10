@@ -50,6 +50,7 @@ export class NavigationController {
       this.deps.elements.artistsView,
       this.deps.elements.tracksView,
       this.deps.elements.favoritesView,
+      this.deps.elements.recentView,
       this.deps.elements.detailView,
       this.deps.elements.artistDetailView,
       this.deps.elements.nowPlayingSection
@@ -69,6 +70,7 @@ export class NavigationController {
     if (this.activeView === 'albums') return this.deps.elements.gridView
     if (this.activeView === 'artists') return this.deps.elements.artistsView
     if (this.activeView === 'favorites') return this.deps.elements.favoritesView
+    if (this.activeView === 'recent') return this.deps.elements.recentView
     return this.deps.elements.tracksView
   }
 

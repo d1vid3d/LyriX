@@ -9,9 +9,12 @@ import { renderAlbumGrid } from './views/albumGrid'
 import { renderArtistDetail } from './views/artistDetail'
 import { renderArtistList } from './views/artistList'
 import type { FavoritesView } from './views/favoritesView'
+import type { RecentView } from './views/recentView'
 import type { TracksList } from './views/tracksList'
 import type { FavoritesControllerState } from '../favorites/favoritesController'
 import type { FavoritesStatusModel } from '../favorites/favoritesStatusModel'
+import type { HistoryControllerState } from '../history/historyController'
+import type { HistoryEmptyModel, HistoryStatusModel } from '../history/historyStatusModel'
 
 export interface NavigationReader {
   getActiveView(): LibraryView
@@ -28,8 +31,13 @@ export interface ScreenDeps {
   tracksList: TracksList
   favoritesList: TracksList
   favoritesView: FavoritesView
+  recentList: TracksList
+  recentView: RecentView
   getFavoritesState(): FavoritesControllerState
   getFavoritesStatus(): FavoritesStatusModel
+  getHistoryState(): HistoryControllerState
+  getHistoryStatus(): HistoryStatusModel
+  getHistoryEmpty(): HistoryEmptyModel | null
   isNowPlayingOpen(): boolean
   getLibraryIndex(): LibraryIndex
   getAlbums(): readonly Album[]
@@ -98,6 +106,12 @@ export class ScreenController {
     this.renderView('favorites', true)
   }
 
+  /** Re-renders only the Recently played view after a history change, keeping scroll. */
+  refreshRecentView(): void {
+    if (this.deps.navigation.getActiveView() !== 'recent') return
+    this.renderView('recent', true)
+  }
+
   private renderView(view: LibraryView, preserveFavoritesScroll: boolean): void {
     const index = this.deps.getLibraryIndex()
     const search = this.deps.getAppliedSearch()
@@ -143,6 +157,23 @@ export class ScreenController {
         items.length > 0
       )
       this.deps.favoritesList.render(items, { preserveScroll: preserveFavoritesScroll })
+      return
+    }
+
+    if (view === 'recent') {
+      const items = queryLibrary(index, {
+        view: 'recent',
+        search,
+        sort: this.deps.getSort('recent')
+      })
+      const history = this.deps.getHistoryState()
+      this.deps.recentView.render(
+        this.deps.getHistoryStatus(),
+        this.deps.getHistoryEmpty(),
+        history.recording,
+        items.length > 0
+      )
+      this.deps.recentList.render(items, { preserveScroll: preserveFavoritesScroll })
       return
     }
 

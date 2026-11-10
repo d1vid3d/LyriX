@@ -7,7 +7,7 @@ Now Playing lifecycle, and the bottom bar.
 `src/renderer/src/playerBar.ts`, `src/renderer/player/engine.ts`,
 `src/renderer/player/transportDecisions.ts`, `src/renderer/player/queue/`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 9 and 10),
 [renderer/shell-and-navigation.md](shell-and-navigation.md),
@@ -41,6 +41,8 @@ Owns the `PlaybackQueue`, the engine subscriptions, `isSeeking`, `activeAttempt`
 - `resetPlayback` clears the queue, pauses the engine, clears lyrics, and resets the UI.
 - `restoreSession(state, position)` imports the queue by track id, loads the current track, applies
   the saved position once metadata arrives, and never autoplays.
+- Engine events also feed the pure `PlayTracker` (`play`, `pause`, `timeupdate`, `ended`, `error`);
+  restore stays paused so it never counts. Rules live in [main/history.md](../main/history.md).
 - Public shortcut/media entry points: `playPause`, `play`, `pause`, `nextTrack`, `previousTrack`,
   `seekBy`, `seekTo`, and `adjustVolume` (which saves exactly like the volume slider).
 - Seek bar, volume, and engine event wiring live here. Finishing a seek calls the injected

@@ -1,0 +1,104 @@
+:root {
+  --recent-header-padding: 18px 16px 12px;
+  --recent-muted: var(--muted);
+  --recent-warning: #e5b567;
+  --recent-error: #ff8a80;
+  --recent-meta-size: 11px;
+}
+
+.recent-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.recent-header {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: var(--recent-header-padding);
+}
+
+.recent-heading {
+  min-width: 0;
+}
+
+.recent-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.recent-status {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.recent-status--ok {
+  color: var(--recent-muted);
+}
+
+.recent-status--muted {
+  color: var(--recent-muted);
+}
+
+.recent-status--warning {
+  color: var(--recent-warning);
+}
+
+.recent-status--error {
+  color: var(--recent-error);
+}
+
+.recent-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.recent-why,
+.recent-record,
+.recent-clear,
+.recent-start {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--recent-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.recent-why:hover,
+.recent-record:hover,
+.recent-clear:hover:not(:disabled),
+.recent-start:hover {
+  color: var(--text);
+}
+
+.recent-record[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.recent-clear:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.recent-start {
+  align-self: center;
+  margin: 12px auto 24px;
+}
+
+.track-row-meta {
+  color: var(--recent-muted);
+  font-size: var(--recent-meta-size);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

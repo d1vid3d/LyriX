@@ -8,7 +8,7 @@ status states, favorites storage, and the main-process IPC that keeps renderer p
 `machineId.ts`), `src/main/library.ts`, `src/main/scanCoordinator.ts`, `src/main/index.ts`,
 `src/main/ipc.ts`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 1, 2, 6, 8, and 13),
 [persistence.md](../persistence.md), [data-model.md](../data-model.md),
@@ -25,6 +25,7 @@ Everything lives in `<library>/LyrixData/` (case-insensitive directory name):
 | `README.txt` | One paragraph: created by LyriX, safe to back up or delete, deleting resets favorites/history/playlists. |
 | `library.json` | `{ version, libraryId, createdAt, writtenBy }`; `libraryId` is a random UUID kept stable. |
 | `favorites.json` | `{ version, items: [{ ref, addedAt }], writtenBy }`. |
+| `history.jsonl` | Append-only play log; see [main/history.md](history.md). |
 
 Every file has a numeric schema version and a `writtenBy` stamp
 `{ app: 'LyriX', appVersion, machineId, at }`. `machineId` is a random UUID created once in
@@ -71,6 +72,9 @@ creating anything. `LyrixDataStatus` is
 writable, libraryId, message }`. A symlinked `LyrixData` folder is refused as `read-only`.
 
 - `ensureCreated()` creates the folder, `README.txt`, and `library.json` on the first write only.
+- `appendLine(file, line)` appends one complete line without creating the folder; `readTail` reads a
+  bounded suffix; `clearLineFile` atomically replaces a line file with empty content. The library
+  flag helpers read/write `historyRecording` while preserving unknown fields.
 - All writes share one serialized promise chain; each operation captures its root/generation, and a
   slow operation from library A is dropped after rebinding to library B.
 - `retry()` re-detects and re-attempts the first-write creation, clearing a cached failure.

@@ -52,7 +52,7 @@ export type RepeatMode = 'off' | 'all' | 'one'
 
 /** The library slice a queue was built from (serialized with the session). */
 export interface QueueContext {
-  kind: 'album' | 'artist' | 'tracks' | 'search' | 'favorites' | 'other'
+  kind: 'album' | 'artist' | 'tracks' | 'search' | 'favorites' | 'recent' | 'other'
   label: string
 }
 
@@ -123,6 +123,30 @@ export type FavoritesWriteFailure = 'read-only' | 'unavailable' | 'newer-version
 export type FavoritesSetResult =
   { ok: true; state: FavoritesState } | { ok: false; reason: FavoritesWriteFailure }
 
+export type HistoryBlockedReason = 'read-only' | 'unavailable' | 'newer-version'
+
+export type HistoryRecordingStatus = 'off' | 'recording' | 'not-created' | 'blocked'
+
+export interface HistoryRecordingState {
+  enabled: boolean
+  status: HistoryRecordingStatus
+  reason: HistoryBlockedReason | null
+}
+
+export interface HistoryItem {
+  trackId: string
+  lastPlayedAt: number
+  playCount: number
+}
+
+export interface HistoryState {
+  recent: HistoryItem[]
+  recording: HistoryRecordingState
+}
+
+export type HistorySetResult =
+  { ok: true; state: HistoryState } | { ok: false; reason: HistoryBlockedReason | 'invalid' }
+
 /** Playback preferences persisted between launches. */
 export interface PlaybackSettingsInput {
   shuffle: boolean
@@ -173,6 +197,10 @@ export interface LibraryApi {
   getFavorites(): Promise<FavoritesState>
   setFavorite(trackIds: string[], favorite: boolean): Promise<FavoritesSetResult>
   removeMissingFavorites(): Promise<FavoritesSetResult>
+  getHistory(options?: { limit?: number }): Promise<HistoryState>
+  recordPlay(trackId: string): Promise<{ ok: boolean }>
+  setHistoryRecording(enabled: boolean): Promise<HistorySetResult>
+  clearHistory(): Promise<HistorySetResult>
   getLyricSources(trackId: string): Promise<LyricSources | null>
   saveLyricChoice(trackId: string, sourceId: string | null): Promise<void>
   saveLyricPreference(preference: LyricPreference): Promise<void>
@@ -183,4 +211,5 @@ export interface LibraryApi {
   onMediaKey(listener: (action: MediaKeyAction) => void): () => void
   onLyrixDataStatus(listener: (status: LyrixDataStatus) => void): () => void
   onFavoritesChanged(listener: (state: FavoritesState) => void): () => void
+  onHistoryChanged(listener: (state: HistoryState) => void): () => void
 }

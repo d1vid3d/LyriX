@@ -257,13 +257,15 @@ describe('artist grouping', () => {
 
 describe('view and sort helpers', () => {
   it('lists the view ids', () => {
-    expect(getViewIds()).toEqual(['albums', 'artists', 'tracks', 'favorites'])
+    expect(getViewIds()).toEqual(['albums', 'artists', 'tracks', 'favorites', 'recent'])
   })
 
   it.each([
     ['albums', 'title'],
     ['artists', 'name'],
-    ['tracks', 'title']
+    ['tracks', 'title'],
+    ['favorites', 'recent'],
+    ['recent', 'last']
   ] as const)('returns the default sort for %s', (view, expected) => {
     expect(getDefaultSort(view)).toBe(expected)
   })
@@ -291,14 +293,27 @@ describe('view and sort helpers', () => {
         { key: 'artist', label: 'Artist' },
         { key: 'album', label: 'Album' }
       ]
+    },
+    {
+      view: 'recent',
+      options: [
+        { key: 'last', label: 'Last played' },
+        { key: 'plays', label: 'Most played' },
+        { key: 'title', label: 'Title' },
+        { key: 'artist', label: 'Artist' },
+        { key: 'album', label: 'Album' }
+      ]
     }
   ] as const)('lists the sort options for $view', ({ view, options }) => {
     expect(getSortOptions(view)).toEqual(options)
   })
 
-  it.each(['albums', 'artists', 'tracks'] as const)('accepts the %s view', (view) => {
-    expect(isLibraryView(view)).toBe(true)
-  })
+  it.each(['albums', 'artists', 'tracks', 'favorites', 'recent'] as const)(
+    'accepts the %s view',
+    (view) => {
+      expect(isLibraryView(view)).toBe(true)
+    }
+  )
 
   it.each([null, undefined, '', 'genres', 1, {}, []])('rejects the view %j', (value) => {
     expect(isLibraryView(value)).toBe(false)

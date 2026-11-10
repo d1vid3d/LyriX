@@ -4,6 +4,8 @@ import type { LyricPreference, LyricSources } from '../shared/lyrics/sources'
 import type {
   FavoritesSetResult,
   FavoritesState,
+  HistorySetResult,
+  HistoryState,
   LibraryApi,
   LibrarySnapshot,
   LyrixDataStatus,
@@ -44,6 +46,13 @@ const library: LibraryApi = {
     ipcRenderer.invoke('favorites:set', { trackIds, favorite }),
   removeMissingFavorites: (): Promise<FavoritesSetResult> =>
     ipcRenderer.invoke('favorites:remove-missing'),
+  getHistory: (options?: { limit?: number }): Promise<HistoryState> =>
+    ipcRenderer.invoke('history:get', options),
+  recordPlay: (trackId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('history:record', trackId),
+  setHistoryRecording: (enabled: boolean): Promise<HistorySetResult> =>
+    ipcRenderer.invoke('history:set-recording', enabled),
+  clearHistory: (): Promise<HistorySetResult> => ipcRenderer.invoke('history:clear'),
   saveVolume: (volume: number): Promise<void> => ipcRenderer.invoke('settings:set-volume', volume),
   saveUiState: (state: UiState): Promise<void> => ipcRenderer.invoke('settings:set-ui', state),
   savePlaybackSettings: (settings: PlaybackSettingsInput): Promise<void> =>
@@ -62,7 +71,8 @@ const library: LibraryApi = {
   onLibraryUpdated: (listener) => subscribe<LibrarySnapshot>('library:updated', listener),
   onMediaKey: (listener) => subscribe<MediaKeyAction>('media:key', listener),
   onLyrixDataStatus: (listener) => subscribe<LyrixDataStatus>('lyrixdata:status-changed', listener),
-  onFavoritesChanged: (listener) => subscribe<FavoritesState>('favorites:changed', listener)
+  onFavoritesChanged: (listener) => subscribe<FavoritesState>('favorites:changed', listener),
+  onHistoryChanged: (listener) => subscribe<HistoryState>('history:changed', listener)
 }
 
 contextBridge.exposeInMainWorld('library', library)

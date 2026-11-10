@@ -7,6 +7,7 @@ import type {
 } from '../../shared/types'
 import { getArtistTracks } from '../library/artistTracks'
 import type { ArtistItem } from '../library/query'
+import type { PlayTracker, PlayTrackerEntry } from '../history/playTracker'
 import type { PlaybackEngine } from '../player/engine'
 import type { PlaybackQueue, QueueContext } from '../player/queue'
 import {
@@ -37,6 +38,8 @@ export interface TransportDeps {
   updateDuration(duration: number): void
   /** Called when a slider drag finishes so session/media position can be saved immediately. */
   onSeekEnd(): void
+  /** Pure play-instance tracker; absent in tests that do not exercise history. */
+  playTracker?: PlayTracker
 }
 
 interface PlaybackAttempt {
@@ -166,6 +169,8 @@ export class TransportController {
     this.deps.updateControls()
 
     if (autoplay) {
+      const trackerEntry = this.trackerEntry()
+      if (trackerEntry) this.deps.playTracker?.play(trackerEntry, Date.now())
       void this.deps.engine.play().catch((error) => this.handlePlaybackFailure(attempt, error))
     }
   }
@@ -174,6 +179,7 @@ export class TransportController {
     this.activeAttempt = null
     this.pendingRestorePosition = null
     this.consecutiveFailures = 0
+    this.deps.playTracker?.finish()
     this.deps.queue.clear()
     this.deps.engine.pause()
     this.deps.setLyricsTrack(null)
@@ -244,9 +250,18 @@ export class TransportController {
       engine.on('play', () => {
         this.consecutiveFailures = 0
         this.deps.updateControls()
+        const trackerEntry = this.trackerEntry()
+        if (trackerEntry) this.deps.playTracker?.play(trackerEntry, Date.now())
       }),
-      engine.on('pause', () => this.deps.updateControls()),
-      engine.on('ended', () => this.handleEnded()),
+      engine.on('pause', () => {
+        this.deps.updateControls()
+        const entryId = this.deps.queue.getSnapshot().current?.entryId
+        if (entryId) this.deps.playTracker?.tick(Date.now(), false, entryId)
+      }),
+      engine.on('ended', () => {
+        this.deps.playTracker?.finish()
+        this.handleEnded()
+      }),
       engine.on('loadedmetadata', (duration) => {
         this.deps.updateDuration(duration)
         if (this.pendingRestorePosition === null) return
@@ -266,6 +281,10 @@ export class TransportController {
       }),
       engine.on('timeupdate', (position) => {
         if (!this.isSeeking) this.deps.syncTime(position)
+        const entryId = this.deps.queue.getSnapshot().current?.entryId
+        if (entryId) {
+          this.deps.playTracker?.tick(Date.now(), engine.isPlaying(), entryId)
+        }
       }),
       engine.on('error', (error) => {
         if (this.activeAttempt) this.handlePlaybackFailure(this.activeAttempt, error)
@@ -425,6 +444,8 @@ export class TransportController {
   }
 
   private restartCurrentForRepeat(): void {
+    const trackerEntry = this.trackerEntry()
+    if (trackerEntry) this.deps.playTracker?.restart(trackerEntry, Date.now())
     const attempt: PlaybackAttempt = { failed: false }
     this.activeAttempt = attempt
     this.deps.engine.seek(0)
@@ -439,6 +460,7 @@ export class TransportController {
     if (error instanceof Error && error.name === 'AbortError') return
 
     attempt.failed = true
+    this.deps.playTracker?.fail()
 
     const snapshot = this.deps.queue.getSnapshot()
     const track = snapshot.current?.track ?? null
@@ -478,6 +500,16 @@ export class TransportController {
     this.deps.engine.pause()
     this.deps.syncTime(this.deps.engine.getPosition())
     this.deps.updateControls()
+  }
+
+  private trackerEntry(): PlayTrackerEntry | null {
+    const entry = this.deps.queue.getSnapshot().current
+    if (!entry) return null
+    return {
+      trackId: entry.track.id,
+      entryId: entry.entryId,
+      durationSec: entry.track.duration > 0 ? entry.track.duration : null
+    }
   }
 
   private findTrackById(trackId: string): Track | null {

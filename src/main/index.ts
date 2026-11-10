@@ -8,6 +8,7 @@ import { registerIpc } from './ipc'
 import { getLibraryRoot, getSnapshot, resolveTrackFile, restoreLibrary } from './library'
 import { FavoritesStore } from './lyrixdata/favoritesStore'
 import { nodeFsAdapter } from './lyrixdata/fsAdapter'
+import { HistoryStore } from './lyrixdata/historyStore'
 import { LyrixDataStore } from './lyrixdata/lyrixDataStore'
 import { loadOrCreateMachineId } from './lyrixdata/machineId'
 import { LyricChoiceStore } from './lyrics/choices'
@@ -20,6 +21,13 @@ import { createAppStore } from './store'
 import { WindowManager } from './window'
 import { loadWindowState } from './windowState'
 
+// Keep development's profile (settings, cache, session, single-instance lock) separate from an
+// installed build and inside the writable project folder. E2E launches the built app without this
+// env var, so its explicit userData isolation is untouched.
+if (process.env['ELECTRON_RENDERER_URL']) {
+  app.setPath('userData', join(app.getAppPath(), '.lyrix-dev'))
+}
+
 // Privileged schemes must be registered before the app is ready.
 registerMediaScheme()
 
@@ -30,6 +38,7 @@ const store = createAppStore()
 const windows = new WindowManager(join(app.getPath('userData'), 'window-state.json'))
 
 if (!primaryInstance) {
+  console.warn('[app] Another LyriX instance is already running; focusing it and exiting.')
   app.quit()
 } else {
   app.on('second-instance', () => windows.focusOrCreate())
@@ -81,6 +90,13 @@ if (!primaryInstance) {
       })
       await favorites.setLibrary(root, getSnapshot().albums)
 
+      const history = new HistoryStore({
+        store: lyrixData,
+        resolveTrackFile,
+        onStateChange: (state) => windows.send('history:changed', state)
+      })
+      await history.setLibrary(root, getSnapshot().albums)
+
       const savedWindow = await loadWindowState(join(userData, 'window-state.json'))
       const session = new SessionStore(
         join(userData, 'session-queue.json'),
@@ -95,8 +111,9 @@ if (!primaryInstance) {
         const folder = getLibraryRoot()
         await lyrixData.bind(folder)
         await favorites.setLibrary(folder, snapshot.albums)
+        await history.setLibrary(folder, snapshot.albums)
       })
-      registerIpc(store, scan, choices, session, lyrixData, favorites)
+      registerIpc(store, scan, choices, session, lyrixData, favorites, history)
 
       if (MEDIA_KEY_MODE === 'global-shortcuts') {
         registerGlobalMediaKeys((action) => windows.send('media:key', action))

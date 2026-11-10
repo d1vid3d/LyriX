@@ -7,16 +7,17 @@ source menu, and translation controls.
 `src/renderer/styles/lyricSourceMenu.css`, `src/renderer/styles/contextMenu.css`,
 `src/renderer/styles/queuePanel.css`, `src/renderer/styles/toast.css`,
 `src/renderer/styles/shortcutOverlay.css`, `src/renderer/styles/favorites.css`,
-`src/renderer/styles/dataDisclaimer.css`.
+`src/renderer/styles/dataDisclaimer.css`, `src/renderer/styles/history.css`,
+`src/renderer/styles/confirmDialog.css`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md),
 [renderer/lyric-view.md](lyric-view.md), [renderer/lyric-source-menu.md](lyric-source-menu.md),
 [renderer/queue-panel.md](queue-panel.md),
 [renderer/context-menu-and-toasts.md](context-menu-and-toasts.md),
 [renderer/shortcuts.md](shortcuts.md), [renderer/favorites.md](favorites.md),
-[renderer/ui-map.md](ui-map.md).
+[renderer/history.md](history.md), [renderer/ui-map.md](ui-map.md).
 
 ## App shell and layout (`src/renderer/src/style.css`)
 
@@ -147,6 +148,17 @@ Variables: `--data-disclaimer-z-index`, `--data-disclaimer-backdrop`, `--data-di
 `--data-disclaimer-border`, `--data-disclaimer-shadow`, `--data-disclaimer-muted`, and
 `--data-disclaimer-warning`. The modal mirrors the shortcuts overlay: dim backdrop, centered dialog,
 header/close, message, warning-toned feature list, and right-aligned Retry/Close actions.
+
+## Recently played and confirmation (`history.css`, `confirmDialog.css`)
+
+`history.css` variables: `--recent-header-padding`, `--recent-muted`, `--recent-warning`,
+`--recent-error`, `--recent-meta-size`. It styles the Recent header/status/actions, the Record-history
+pressed state, the Clear button, the Start-recording action, and the optional `.track-row-meta` slot.
+
+`confirmDialog.css` variables: `--confirm-dialog-z-index`, `--confirm-dialog-backdrop`,
+`--confirm-dialog-width`, `--confirm-dialog-padding`, `--confirm-dialog-radius`,
+`--confirm-dialog-background`, `--confirm-dialog-border`, `--confirm-dialog-shadow`. It mirrors the
+disclaimer modal with a danger-toned Confirm button.
 
 ## Lyric visual rules
 

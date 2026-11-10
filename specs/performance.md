@@ -6,7 +6,7 @@ intent without duplicating volatile values.
 
 **Owning source paths:** cross-cutting; see linked specs.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/library-scanning.md](main/library-scanning.md),
 [main/covers-and-media.md](main/covers-and-media.md),
@@ -49,6 +49,9 @@ intent without duplicating volatile values.
   creates the folder. Favorites mutations are read-modify-write on a small file, ref resolution is
   built once per library snapshot, and the Favorites view uses the same fixed-row virtual list. See
   [main/lyrixdata.md](main/lyrixdata.md).
+- **Play history:** appends are single-line writes, reads parse at most the last 10 MB, aggregation
+  is capped (default 500), and change pushes are debounced ~300 ms. Growth is ~200 bytes/play;
+  compaction is out of scope. See [main/history.md](main/history.md).
 - **Lyric DOM:** built once per document; each frame reads the position once, runs the binary
   searches, and does one O(lines) flag pass whose DOM writes happen only for changed state. See
   [renderer/lyric-view.md](renderer/lyric-view.md).

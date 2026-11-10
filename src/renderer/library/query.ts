@@ -1,6 +1,6 @@
 import type { Album } from '../../shared/types'
 
-export type LibraryView = 'albums' | 'artists' | 'tracks' | 'favorites'
+export type LibraryView = 'albums' | 'artists' | 'tracks' | 'favorites' | 'recent'
 
 export interface AlbumItem {
   kind: 'album'
@@ -28,10 +28,25 @@ export interface FavoriteItem extends TrackItem {
   addedAt: number
 }
 
+export interface RecentItem extends TrackItem {
+  lastPlayedAt: number
+  playCount: number
+}
+
 /** Plain favorites data the query registry needs; no DOM or controller dependency. */
 export interface FavoritesQueryInput {
   ids: ReadonlySet<string>
   addedAt: ReadonlyMap<string, number>
+}
+
+export interface HistoryQueryItem {
+  trackId: string
+  lastPlayedAt: number
+  playCount: number
+}
+
+export interface HistoryQueryInput {
+  items: readonly HistoryQueryItem[]
 }
 
 export interface ViewItemMap {
@@ -39,6 +54,7 @@ export interface ViewItemMap {
   artists: ArtistItem
   tracks: TrackItem
   favorites: FavoriteItem
+  recent: RecentItem
 }
 
 export interface SortOption<Item> {
@@ -50,7 +66,11 @@ interface ViewDefinition<Item> {
   label: string
   defaultSort: string
   sorts: Record<string, SortOption<Item>>
-  build(albums: readonly Album[], favorites?: FavoritesQueryInput): Item[]
+  build(
+    albums: readonly Album[],
+    favorites?: FavoritesQueryInput,
+    history?: HistoryQueryInput
+  ): Item[]
 }
 
 type ViewDefinitions = {
@@ -196,6 +216,42 @@ function compareFavoriteRecent(a: FavoriteItem, b: FavoriteItem): number {
   return b.addedAt - a.addedAt || compareTrackTitle(a, b)
 }
 
+function buildRecentItems(
+  albums: readonly Album[],
+  _favorites?: FavoritesQueryInput,
+  history?: HistoryQueryInput
+): RecentItem[] {
+  if (!history || history.items.length === 0) return []
+
+  const tracks = new Map<string, { track: Album['tracks'][number]; album: Album }>()
+  for (const album of albums) {
+    for (const track of album.tracks) tracks.set(track.id, { track, album })
+  }
+
+  const items: RecentItem[] = []
+  for (const entry of history.items) {
+    const found = tracks.get(entry.trackId)
+    if (!found) continue
+    items.push({
+      kind: 'track',
+      track: found.track,
+      album: found.album,
+      lastPlayedAt: entry.lastPlayedAt,
+      playCount: entry.playCount,
+      searchText: joinSearchText([found.track.title, found.track.artist, found.album.title])
+    })
+  }
+  return items
+}
+
+function compareRecentLastPlayed(a: RecentItem, b: RecentItem): number {
+  return b.lastPlayedAt - a.lastPlayedAt || compareTrackTitle(a, b)
+}
+
+function compareRecentMostPlayed(a: RecentItem, b: RecentItem): number {
+  return b.playCount - a.playCount || compareRecentLastPlayed(a, b)
+}
+
 /**
  * All view and sort definitions live here. Adding a sort is one entry; a new view is one
  * registry entry plus its renderer.
@@ -243,6 +299,18 @@ export const VIEWS: ViewDefinitions = {
       album: { label: 'Album', compare: compareTrackAlbum }
     },
     build: buildFavoriteItems
+  },
+  recent: {
+    label: 'Recent',
+    defaultSort: 'last',
+    sorts: {
+      last: { label: 'Last played', compare: compareRecentLastPlayed },
+      plays: { label: 'Most played', compare: compareRecentMostPlayed },
+      title: { label: 'Title', compare: compareTrackTitle },
+      artist: { label: 'Artist', compare: compareTrackArtist },
+      album: { label: 'Album', compare: compareTrackAlbum }
+    },
+    build: buildRecentItems
   }
 }
 
@@ -256,7 +324,8 @@ export interface LibraryIndex {
 /** Build once per library snapshot so every keystroke only filters and sorts. */
 export function buildLibraryIndex(
   albums: readonly Album[],
-  favorites?: FavoritesQueryInput
+  favorites?: FavoritesQueryInput,
+  history?: HistoryQueryInput
 ): LibraryIndex {
   return {
     albums,
@@ -264,7 +333,8 @@ export function buildLibraryIndex(
       albums: VIEWS.albums.build(albums),
       artists: VIEWS.artists.build(albums),
       tracks: VIEWS.tracks.build(albums),
-      favorites: VIEWS.favorites.build(albums, favorites)
+      favorites: VIEWS.favorites.build(albums, favorites),
+      recent: VIEWS.recent.build(albums, favorites, history)
     }
   }
 }

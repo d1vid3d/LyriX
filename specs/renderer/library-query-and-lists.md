@@ -5,7 +5,7 @@ the tracks view.
 
 **Owning source paths:** `src/renderer/library/query.ts`, `src/renderer/ui/virtualList.ts`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 8 and 10),
 [renderer/shell-and-navigation.md](shell-and-navigation.md),
@@ -22,8 +22,11 @@ the tracks view.
   - Tracks: title, artist, album.
   - Favorites: Recently added (default), title, artist, album; items are built from the current
     albums filtered by the favorites ids and carry `addedAt`.
-- `buildLibraryIndex(albums, favorites?)` precomputes items for all views once per snapshot. The
-  favorites input is plain `{ ids, addedAt }`; the registry never depends on the DOM or controllers.
+  - Recent: Last played (default), Most played, title, artist, album; items are built from the
+    resolved history list and carry `lastPlayedAt`/`playCount`.
+- `buildLibraryIndex(albums, favorites?, history?)` precomputes items for all views once per
+  snapshot. Favorites and history inputs are plain `{ ids, addedAt }` / `{ items }`; the registry
+  never depends on the DOM or controllers.
 - `queryLibrary(index, { view, search, sort })` filters and sorts without touching the DOM.
 - `getViewIds`, `getSortOptions`, `getDefaultSort`, `isLibraryView`, `isSortKey` support the UI and
   validate persisted values.
@@ -42,8 +45,8 @@ grouping is listed in [testing-and-verification.md](../testing-and-verification.
 - `setItems(items, { preserveScroll })` resets scroll and invalidates by default, or keeps the current
   scroll offset when `preserveScroll` is `true`; `refresh` re-renders the current window (used when the
   playing highlight changes); `destroy` removes listeners and DOM.
-- Used by the tracks view with 52 px rows, the favorites list with 52 px rows, and the queue panel
-  with 56 px rows.
+- Used by the tracks view with 52 px rows, the favorites/recent lists with 52 px rows, and the queue
+  panel with 56 px rows.
 
 The tracks view renderer that supplies rows is owned by
 [renderer/shell-and-navigation.md](shell-and-navigation.md). The scrolling/animation budget is

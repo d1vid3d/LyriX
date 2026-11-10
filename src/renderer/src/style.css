@@ -491,7 +491,7 @@ input:focus-visible {
 
 .track-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  grid-template-columns: 44px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) auto auto;
   align-items: center;
   gap: 12px;
   width: 100%;

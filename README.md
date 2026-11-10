@@ -72,7 +72,7 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/main/sessionValidation.ts` | Pure session queue/position validation and caps. |
 | `src/main/sessionWritePolicy.ts` | Pure session write-throttle decision. |
 | `src/main/sessionStore.ts` | Two-file resume session (queue + position) with folder check and flush. |
-| `src/main/lyrixdata/` | Portable refs, safe versioned JSON, LyrixData status/writes, favorites storage and IPC validation. |
+| `src/main/lyrixdata/` | Portable refs, safe versioned JSON, LyrixData status/writes, favorites storage, history log/store and IPC validation. |
 | `src/main/mediaKeys.ts` | Opt-in globalShortcut media-key fallback. |
 | `src/main/range.ts` | Parses `Range` headers for partial-content responses. |
 | `src/preload/index.ts` | Exposes the typed `window.library` API via `contextBridge`. |
@@ -91,6 +91,11 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `src/renderer/session/` | Pure session send timing and the debounced queue/position tracker. |
 | `src/renderer/media/` | Pure Media Session metadata/action mapping and the feature-detected wiring. |
 | `src/renderer/favorites/` | DOM-free status/favorites controllers and the pure status/disclaimer models. |
+| `src/renderer/history/` | Pure play tracker, history controller, status/empty/quiet-notifier models, relative time formatter. |
+| `src/renderer/ui/confirmDialog.ts` | Focus-trapped clear-history confirmation. |
+| `src/renderer/src/views/recentView.ts` | Recently played header/status/empty-state rendering. |
+| `src/renderer/styles/history.css` | Recently played and row-meta styling. |
+| `src/renderer/styles/confirmDialog.css` | Confirmation modal styling. |
 | `src/renderer/ui/favoriteButton.ts` | Inline-SVG heart toggle with ARIA state. |
 | `src/renderer/ui/dataDisclaimer.ts` | Focus-trapped LyrixData disclaimer with Retry. |
 | `src/renderer/src/views/favoritesView.ts` | Favorites header/status/missing-section rendering. |
@@ -169,6 +174,14 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `tests/favoritesQuery.test.ts` | Vitest coverage for the Favorites view registry, Recently added order, sorts and search. |
 | `tests/dataDisclaimerModel.test.ts` | Vitest coverage for disclaimer/status-line text and Why reasons. |
 | `tests/scannerLyrixData.test.ts` | Vitest coverage that the scanner never treats LyrixData as music. |
+| `tests/playTracker.test.ts` | Vitest coverage for thresholds, pause/seek behavior, delta caps, once-per-instance, restarts, failures and restore. |
+| `tests/historyLog.test.ts` | Vitest coverage for JSONL round trips, partial/unknown lines, relink aggregation, ordering and limits. |
+| `tests/historyStore.test.ts` | Vitest coverage for opt-in creation, appends, the 5 s guard, clear, flags and blocked appends. |
+| `tests/historyIpc.test.ts` | Vitest coverage for history input limits/ids/booleans and the flag default. |
+| `tests/historyController.test.ts` | Vitest coverage for passive recording, quiet once-only toasts, explicit disclaimer routing and state application. |
+| `tests/historyModels.test.ts` | Vitest coverage for relative time, status/empty text and quiet messages. |
+| `tests/recentQuery.test.ts` | Vitest coverage for the Recent view sorts/search and missing tracks. |
+| `tests/queueContext.test.ts` | Vitest coverage for favorites/recent queue context labels. |
 | `tests/lyrics.test.ts` | Vitest coverage for both fixtures, inline edge cases and sync helpers. |
 | `tests/lyricsController.test.ts` | Vitest coverage for source selection, manual switching, preference changes, translation enable/selection, stable derived-document identity, reload, stale responses, caching and eviction. |
 | `tests/segmentGroups.test.ts` | Vitest coverage for word-container grouping and trailing whitespace. |
@@ -395,6 +408,21 @@ read-only under a collapsed section so you can inspect and remove them. If the l
 unavailable, or was written by a newer LyriX version, the Favorites header explains why and the
 disclaimer dialog offers Retry; nothing is silently changed.
 
+## Recently played and play history
+
+Play history is **opt-in per library** and stored as an append-only `history.jsonl` in the same
+`LyrixData` folder. Recording is off by default: browsing, scanning, and playback create nothing until
+you turn on **Record history** in the Recently played view. A play counts once per play instance after
+`min(30 s, 50% of the track)` of actual listening (30 s when the duration is unknown); pausing stops
+the clock, seeking adds nothing, sleep/stall gaps are capped, repeat-one loops count again, and a
+restored paused session never counts until playback actually starts.
+
+The **Recent** view lists resolved plays with play count and relative time, sortable by Last played,
+Most played, Title, Artist, or Album, with normal search and Play/Shuffle. **Clear history** asks for
+confirmation and only empties the log; other LyrixData is untouched. Passive recording failures show
+one quiet toast per library per session, while the Record/Clear actions use the normal disclaimer and
+Retry flow.
+
 ## Out of scope (for now)
 
 Gapless playback, crossfade, queue-contents export/save as a playlist,
@@ -406,5 +434,6 @@ timing, per-language fonts, TTML, tag editing and packaging are intentionally no
 The queue panel intentionally omits undo, multi-select and saving the queue as a playlist; context
 menus do not implement submenus; tracks cannot be dragged from the library into the queue; shortcut
 overrides are not user-configurable; and the resume session stores only the current entry's position.
-LyrixData currently stores favorites only; history, playlists, album-level favorites, multi-library
-switching, and any tag/lyric/sidecar editing are not implemented.
+LyrixData currently stores favorites and opt-in play history; playlists, album-level favorites,
+multi-library switching, tag/lyric/sidecar editing, history compaction/rotation, per-entry history
+removal, statistics pages, and cross-device history merging are not implemented.

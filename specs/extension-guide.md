@@ -127,6 +127,8 @@ Details: [main/lyrixdata.md](main/lyrixdata.md), [renderer/favorites.md](rendere
 
 - New provider shape and canonical option order: [main/lyric-sources.md](main/lyric-sources.md).
 - Choice validation and entry caps: [persistence.md](persistence.md).
+- History format/counting/IPC: [main/history.md](main/history.md),
+  [renderer/history.md](renderer/history.md).
 - View/sort registry behavior: [renderer/library-query-and-lists.md](renderer/library-query-and-lists.md).
 - `PlaybackEngine` interface: [renderer/playback.md](renderer/playback.md).
 - Settings defaults and normalization: [persistence.md](persistence.md).

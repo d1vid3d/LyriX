@@ -5,13 +5,19 @@ import type { FsAdapter, FsFailureReason } from './fsAdapter'
 import { classifyFsError, isNotFound } from './fsAdapter'
 import {
   FAVORITES_FILE_VERSION,
+  historyRecordingFromLibrary,
   LIBRARY_FILE_VERSION,
   makeWrittenBy,
   validateFavoritesFile,
   validateLibraryFile
 } from './formats'
 import type { FavoritesFile, FavoritesFileItem, LibraryFile } from './formats'
-import { findLyrixDataDirName, LYRIXDATA_DIR_NAME, README_CONTENT } from './paths'
+import {
+  findLyrixDataDirName,
+  isAllowedLyrixDataFile,
+  LYRIXDATA_DIR_NAME,
+  README_CONTENT
+} from './paths'
 import { VersionedStore } from './versionedStore'
 
 export interface LyrixDataStoreOptions {
@@ -23,6 +29,15 @@ export interface LyrixDataStoreOptions {
 
 export type FavoritesFileWriteResult =
   { ok: true } | { ok: false; reason: FsFailureReason | 'newer-version' }
+
+export type LineWriteResult =
+  | { ok: true }
+  | { ok: false; reason: FsFailureReason | 'newer-version' | 'not-created' | 'invalid' }
+
+export interface HistoryRecordingRead {
+  enabled: boolean
+  newerVersion: boolean
+}
 
 const README_NAME = 'README.txt'
 const LIBRARY_NAME = 'library.json'
@@ -196,6 +211,143 @@ export class LyrixDataStore {
     }
   }
 
+  getMachineId(): string {
+    return this.options.machineId
+  }
+
+  /** Reads the optional library.json flag; a missing flag uses DEFAULT_HISTORY_RECORDING. */
+  async getHistoryRecording(): Promise<HistoryRecordingRead> {
+    const store = this.libraryStore
+    if (!store) return { enabled: historyRecordingFromLibrary(null), newerVersion: false }
+
+    const read = await store.read()
+    return {
+      enabled: historyRecordingFromLibrary(read.value),
+      newerVersion: read.newerVersion
+    }
+  }
+
+  /**
+   * The only history operation allowed to create LyrixData. Disabling on a not-created library is a
+   * no-op because there is nothing to turn off.
+   */
+  async setHistoryRecording(enabled: boolean): Promise<FavoritesFileWriteResult> {
+    if (!enabled && this.status.state === 'not-created') return { ok: true }
+
+    if (enabled) {
+      const created = await this.ensureCreated()
+      if (!created) return this.failureFromStatus()
+    }
+
+    const generation = this.generation
+    return this.enqueue(async () => {
+      if (generation !== this.generation) return { ok: false, reason: 'unavailable' }
+
+      const store = this.libraryStore
+      if (!store) return { ok: false, reason: 'unavailable' }
+
+      const read = await store.read()
+      if (generation !== this.generation) return { ok: false, reason: 'unavailable' }
+      if (read.newerVersion) return { ok: false, reason: 'newer-version' }
+
+      if (!read.value) {
+        if (!enabled) return { ok: true }
+        return { ok: false, reason: 'unavailable' }
+      }
+
+      const payload: LibraryFile = {
+        ...read.value,
+        historyRecording: enabled,
+        writtenBy: makeWrittenBy(this.options.appVersion, this.options.machineId)
+      }
+      const result = await store.write(payload)
+      if (generation !== this.generation) return { ok: false, reason: 'unavailable' }
+      if (!result.ok) {
+        this.failWrite(result.reason, result.message)
+        return { ok: false, reason: result.reason }
+      }
+
+      this.libraryId = payload.libraryId
+      this.setStatus({
+        state: 'ready',
+        writable: true,
+        libraryId: payload.libraryId,
+        message: null
+      })
+      return { ok: true }
+    })
+  }
+
+  /** Appends one complete JSONL line without ever creating the folder. */
+  async appendLine(fileName: string, line: string): Promise<LineWriteResult> {
+    if (!isAllowedLyrixDataFile(fileName) || /[\r\n]/.test(line)) {
+      return { ok: false, reason: 'invalid' }
+    }
+    if (this.status.state === 'not-created') return { ok: false, reason: 'not-created' }
+    if (this.status.state === 'read-only') return { ok: false, reason: 'read-only' }
+    if (this.status.state === 'unavailable') return { ok: false, reason: 'unavailable' }
+    if (this.status.state === 'newer-version') return { ok: false, reason: 'newer-version' }
+
+    const generation = this.generation
+    const dirPath = this.dirPath
+    if (!dirPath) return { ok: false, reason: 'not-created' }
+
+    return this.enqueue(async () => {
+      if (generation !== this.generation) return { ok: false, reason: 'unavailable' }
+      try {
+        await this.options.fs.appendFile(join(dirPath, fileName), `${line}\n`)
+        return { ok: true }
+      } catch (error) {
+        if (generation !== this.generation) return { ok: false, reason: 'unavailable' }
+        const reason = classifyFsError(error)
+        this.failWrite(reason, error instanceof Error ? error.message : String(error))
+        return { ok: false, reason }
+      }
+    })
+  }
+
+  /** Reads at most `maxBytes` from the end; missing/unreadable files read as empty. */
+  async readTail(fileName: string, maxBytes: number): Promise<string> {
+    const dirPath = this.dirPath
+    if (!dirPath || !isAllowedLyrixDataFile(fileName)) return ''
+    try {
+      return await this.options.fs.readTail(join(dirPath, fileName), maxBytes)
+    } catch {
+      return ''
+    }
+  }
+
+  /** Atomically replaces a line file with empty content (used by Clear history). */
+  async clearLineFile(fileName: string): Promise<FavoritesFileWriteResult> {
+    if (!isAllowedLyrixDataFile(fileName)) return { ok: false, reason: 'unavailable' }
+    if (this.status.state === 'not-created') return { ok: true }
+    if (this.status.state === 'newer-version') return { ok: false, reason: 'newer-version' }
+    if (this.status.state === 'read-only') return { ok: false, reason: 'read-only' }
+    if (this.status.state === 'unavailable') return { ok: false, reason: 'unavailable' }
+
+    const generation = this.generation
+    const dirPath = this.dirPath
+    if (!dirPath) return { ok: false, reason: 'unavailable' }
+
+    return this.enqueue(async () => {
+      if (generation !== this.generation) return { ok: false, reason: 'unavailable' }
+
+      const target = join(dirPath, fileName)
+      const temp = `${target}.${process.pid}.${Date.now()}.tmp`
+      try {
+        await this.options.fs.writeFile(temp, '')
+        await this.options.fs.rename(temp, target)
+        return { ok: true }
+      } catch (error) {
+        await this.options.fs.rm(temp, { force: true }).catch(() => undefined)
+        if (generation !== this.generation) return { ok: false, reason: 'unavailable' }
+        const reason = classifyFsError(error)
+        this.failWrite(reason, error instanceof Error ? error.message : String(error))
+        return { ok: false, reason }
+      }
+    })
+  }
+
   async writeFavorites(items: FavoritesFileItem[]): Promise<FavoritesFileWriteResult> {
     const created = await this.ensureCreated()
     if (!created) {
@@ -350,6 +502,13 @@ export class LyrixDataStore {
       if (isNotFound(error)) return false
       throw error
     }
+  }
+
+  private failureFromStatus():
+    { ok: true } | { ok: false; reason: FsFailureReason | 'newer-version' } {
+    if (this.status.state === 'read-only') return { ok: false, reason: 'read-only' }
+    if (this.status.state === 'newer-version') return { ok: false, reason: 'newer-version' }
+    return { ok: false, reason: 'unavailable' }
   }
 
   private failWrite(reason: FsFailureReason | 'newer-version', message?: string): void {

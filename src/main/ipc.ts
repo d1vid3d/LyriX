@@ -2,6 +2,12 @@ import { ipcMain } from 'electron'
 import { getSnapshot, resolveTrackFile } from './library'
 import { parseFavoriteSetInput } from './lyrixdata/favoritesIpc'
 import type { FavoritesStore } from './lyrixdata/favoritesStore'
+import type { HistoryStore } from './lyrixdata/historyStore'
+import {
+  parseHistoryGetInput,
+  parseHistoryRecordInput,
+  parseHistoryRecordingInput
+} from './lyrixdata/historyIpc'
 import type { LyrixDataStore } from './lyrixdata/lyrixDataStore'
 import { isValidLyricSourceId, isValidTrackId } from './lyrics/choices'
 import type { LyricChoiceStore } from './lyrics/choices'
@@ -27,7 +33,8 @@ export function registerIpc(
   choices: LyricChoiceStore,
   session: SessionStore,
   lyrixData: LyrixDataStore,
-  favorites: FavoritesStore
+  favorites: FavoritesStore,
+  history: HistoryStore
 ): void {
   let startupRefreshStarted = false
 
@@ -94,6 +101,48 @@ export function registerIpc(
       return await favorites.removeAllMissing()
     } catch (error) {
       console.error('[favorites] Could not remove missing favorites', error)
+      return { ok: false, reason: 'unavailable' }
+    }
+  })
+
+  ipcMain.handle('history:get', async (_event, value: unknown) => {
+    try {
+      return await history.read(parseHistoryGetInput(value).limit)
+    } catch (error) {
+      console.error('[history] Could not read play history', error)
+      return history.getState()
+    }
+  })
+
+  ipcMain.handle('history:record', async (_event, value: unknown) => {
+    const trackId = parseHistoryRecordInput(value)
+    if (!trackId) return { ok: false }
+
+    try {
+      return await history.record(trackId)
+    } catch (error) {
+      console.error('[history] Could not record a play', error)
+      return { ok: false }
+    }
+  })
+
+  ipcMain.handle('history:set-recording', async (_event, value: unknown) => {
+    const enabled = parseHistoryRecordingInput(value)
+    if (enabled === null) return { ok: false, reason: 'invalid' }
+
+    try {
+      return await history.setRecording(enabled)
+    } catch (error) {
+      console.error('[history] Could not change history recording', error)
+      return { ok: false, reason: 'unavailable' }
+    }
+  })
+
+  ipcMain.handle('history:clear', async () => {
+    try {
+      return await history.clear()
+    } catch (error) {
+      console.error('[history] Could not clear play history', error)
       return { ok: false, reason: 'unavailable' }
     }
   })

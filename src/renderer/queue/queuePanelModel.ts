@@ -86,6 +86,8 @@ export function queueContextLabel(context: QueueContext | null): string {
       return 'Tracks'
     case 'favorites':
       return 'Favorites'
+    case 'recent':
+      return 'Recently played'
     default:
       return context.label || 'Queue'
   }

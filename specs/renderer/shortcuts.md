@@ -10,7 +10,7 @@ stack, the generated shortcuts dialog, and the renderer's Media Session integrat
 `src/renderer/ui/shortcutOverlay.ts`, `src/renderer/styles/shortcutOverlay.css`,
 `src/renderer/src/shellFeatures.ts`, `src/renderer/session/`, `src/renderer/media/`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariant 12),
 [renderer/ui-map.md](ui-map.md), [renderer/playback.md](playback.md),
@@ -108,9 +108,9 @@ class EscapeLayerStack {
 }
 ```
 
-Priorities, highest first: `contextMenu` 60, `dataDisclaimer` 55, `shortcutsOverlay` 50,
-`lyricSourceMenu` 40, `queuePanel` 30, `nowPlaying` 20, `searchClear` 10. Later registrations win
-ties. `shellFeatures.ts` registers the owners; the context menu and source menu no longer close on
+Priorities, highest first: `contextMenu` 60, `dataDisclaimer` 55, `confirmDialog` 53,
+`shortcutsOverlay` 50, `lyricSourceMenu` 40, `queuePanel` 30, `nowPlaying` 20, `searchClear` 10.
+Later registrations win ties. `shellFeatures.ts` registers the owners; the context menu and source menu no longer close on
 Escape themselves, so behavior (including focus restore) matches the previous chain exactly.
 
 ## Help overlay (`ui/shortcutOverlay.ts`, `overlayModel.ts`)

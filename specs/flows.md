@@ -5,12 +5,14 @@ that owns the detailed contract.
 
 **Owning source paths:** cross-cutting; see the linked specs.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md),
 [main/window-and-session.md](main/window-and-session.md), [main/lyrixdata.md](main/lyrixdata.md),
+[main/history.md](main/history.md),
 [main/library-scanning.md](main/library-scanning.md), [renderer/playback.md](renderer/playback.md),
 [renderer/shortcuts.md](renderer/shortcuts.md), [renderer/favorites.md](renderer/favorites.md),
+[renderer/history.md](renderer/history.md),
 [renderer/queue-panel.md](renderer/queue-panel.md),
 [renderer/context-menu-and-toasts.md](renderer/context-menu-and-toasts.md),
 [renderer/lyrics-controller.md](renderer/lyrics-controller.md).
@@ -123,6 +125,24 @@ Details: [main/lyric-sources.md](main/lyric-sources.md),
 
 Details: [main/lyrixdata.md](main/lyrixdata.md),
 [renderer/favorites.md](renderer/favorites.md).
+
+## Play counting and history recording
+
+1. The transport feeds engine events into `PlayTracker` (times injected). It accumulates only
+   playing ticks with a 2 s delta cap and emits one counted event per instance at
+   `min(30 s, 50% duration)`.
+2. The counted event calls `historyController.record(trackId)` (fire-and-forget). Main ignores it
+   unless `library.json` opted in, applies the 5 s double-count guard, stamps `at`/`m`, and appends
+   one complete JSONL line through the serialized LyrixData queue.
+3. `history:changed` is debounced ~300 ms; the Recently played view re-resolves/aggregates by track
+   id and keeps its scroll position.
+4. Enabling recording is the only history action that may create LyrixData. Clear history atomically
+   empties the line file and leaves `library.json` untouched; the confirmation modal can be cancelled
+   with Escape or the backdrop.
+5. Passive recording failures show at most one quiet toast per library per session. Explicit
+   Record/Clear failures open the disclaimer and can retry once.
+
+Details: [main/history.md](main/history.md), [renderer/history.md](renderer/history.md).
 
 ## Session save, shortcuts, and media keys
 

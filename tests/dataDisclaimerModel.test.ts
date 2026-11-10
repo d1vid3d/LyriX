@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { LyrixDataStatus } from '../src/shared/types'
 import {
   buildDataDisclaimerModel,
-  disclaimerReasonFromFailure
+  disclaimerReasonFromFailure,
+  LYRIXDATA_FEATURES
 } from '../src/renderer/favorites/dataDisclaimerModel'
 import { buildFavoritesStatusModel } from '../src/renderer/favorites/favoritesStatusModel'
 
@@ -18,6 +19,11 @@ describe('dataDisclaimerModel', () => {
     )
     expect(model.featureList).toEqual(['Favorites'])
     expect(model.canRetry).toBe(true)
+  })
+
+  it('lists both current LyrixData features by default', () => {
+    expect(LYRIXDATA_FEATURES).toEqual(['Favorites', 'Play history'])
+    expect(buildDataDisclaimerModel('read-only').message).toContain('Favorites, Play history')
   })
 
   it('builds the unavailable and newer-version messages', () => {

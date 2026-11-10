@@ -11,6 +11,7 @@ export interface EscapeLayer {
 export const ESCAPE_LAYER_PRIORITIES = {
   contextMenu: 60,
   dataDisclaimer: 55,
+  confirmDialog: 53,
   shortcutsOverlay: 50,
   lyricSourceMenu: 40,
   queuePanel: 30,

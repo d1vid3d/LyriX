@@ -5,7 +5,7 @@
 **Owning source paths:** `src/renderer/index.html`, `src/renderer/src/dom.ts`, plus the controllers
 and components named below.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md),
 [renderer/shell-and-navigation.md](shell-and-navigation.md),
@@ -14,13 +14,17 @@ and components named below.
 
 ## Markup regions (`src/renderer/index.html`)
 
-- **Toolbar** — Open Folder, Rescan, status, scan progress, Albums/Artists/Tracks/Favorites view
-  switcher, sort select, search, and a `?` keyboard-shortcuts button.
+- **Toolbar** — Open Folder, Rescan, status, scan progress,
+  Albums/Artists/Tracks/Favorites/Recent view switcher, sort select, search, and a `?`
+  keyboard-shortcuts button.
 - **Albums view** — album grid + empty state.
 - **Artists view** — artist list + empty state.
 - **Tracks view** — virtualized track list + empty state.
 - **Favorites view** — header with title, status line, optional Why, Play/Shuffle, a virtualized
   favorites list, an exact empty state, and a collapsed missing-favorites section.
+- **Recently played view** — header with title, status line, optional Why, Record-history toggle,
+  Clear history, Play/Shuffle, a virtualized history list with play-count/relative-time meta, and
+  off/empty states with a Start-recording action.
 - **Album detail** — back button, cover, title/artist/year, Play and Shuffle, ordered track list.
 - **Artist detail** — back button, artist name/counts, Play and Shuffle, album grid.
 - **Now Playing** — close button, large cover, title/artist/album, translation quick toggle, lyric
@@ -34,6 +38,8 @@ and components named below.
   `<body>` with a backdrop, category groups, focus trap, and a close button.
 - **Data disclaimer** — modal `role="dialog"` with the LyrixData reason, feature list, Retry (busy
   state), and Close; focus-trapped and layer-closed.
+- **Clear-history confirmation** — modal `role="dialog"` with Cancel/Confirm; Escape or the backdrop
+  cancels.
 - **Audio element** — hidden `<audio id="audio">`.
 
 Element ids are looked up once by `getAppElements()`; see
@@ -61,7 +67,7 @@ listener; component-local keys are listed separately. The full table and matchin
 | `T` | Toggle translation when Now Playing is open and the toggle is available. |
 | `F` | Toggle the current track's favorite (plain key, typing-guarded). |
 | `?` (Shift+/) | Open the keyboard-shortcuts overlay. |
-| `Escape` | Close the highest-priority open layer: context menu, data disclaimer, shortcuts overlay, lyric source menu, queue panel, Now Playing, then clear search if focused/non-empty. |
+| `Escape` | Close the highest-priority open layer: context menu, data disclaimer, clear-history confirmation, shortcuts overlay, lyric source menu, queue panel, Now Playing, then clear search if focused/non-empty. |
 | `Tab` in the shortcuts overlay | Cycle focus inside the dialog; Escape or the backdrop closes it. |
 | `Shift+F10` / Menu key | Open the context menu for the focused track row, album card, artist row, queue row, or current-track target. |
 | `Enter`/`Space` | Activate the bottom-bar target or a focused lyric line. |
@@ -93,7 +99,9 @@ listener; component-local keys are listed separately. The full table and matchin
   `aria-modal="true"`, a labelled title, `kbd` chord labels, a Tab focus trap, and returns focus to
   its opener.
 - Favorite hearts use `aria-pressed` with state-driven `aria-label`/title; the Favorites missing
-  disclosure uses `aria-expanded`; the data disclaimer uses the same modal/focus contract.
+  disclosure uses `aria-expanded`; the data disclaimer and clear-history confirmation use the same
+  modal/focus contract.
+- The Record-history toggle uses `aria-pressed` and a state-driven label.
 - The queue panel is a `role="list"`; entry rows are list items, `aria-current="true"` marks the
   playing entry, the History header is a disclosure button with `aria-expanded`, and the insertion
   indicator is decorative.

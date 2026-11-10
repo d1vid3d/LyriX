@@ -19,6 +19,7 @@ const CONTEXT_KINDS: ReadonlySet<string> = new Set([
   'tracks',
   'search',
   'favorites',
+  'recent',
   'other'
 ])
 

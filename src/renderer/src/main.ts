@@ -7,17 +7,25 @@ import '../styles/toast.css'
 import '../styles/shortcutOverlay.css'
 import '../styles/favorites.css'
 import '../styles/dataDisclaimer.css'
+import '../styles/history.css'
+import '../styles/confirmDialog.css'
 import { buildDataDisclaimerModel } from '../favorites/dataDisclaimerModel'
 import { FavoritesController } from '../favorites/favoritesController'
 import { buildFavoritesStatusModel } from '../favorites/favoritesStatusModel'
 import { LyrixDataStatusController } from '../favorites/lyrixDataStatusController'
+import { HistoryController } from '../history/historyController'
+import { buildHistoryEmptyModel, buildHistoryStatusModel } from '../history/historyStatusModel'
+import { PlayTracker } from '../history/playTracker'
+import { formatHistoryMeta } from '../history/relativeTime'
 import { LyricsController } from '../lyrics/lyricsController'
+import type { RecentItem } from '../library/query'
 import { ContextActions } from '../menus/contextActions'
 import type { ContextMenuItem } from '../menus/contextMenuModels'
 import { HtmlAudioEngine } from '../player/engine'
 import { PlaybackQueue } from '../player/queue'
 import { DEFAULT_SHORTCUTS } from '../shortcuts/defaultShortcuts'
 import { ContextMenu } from '../ui/contextMenu'
+import { ConfirmDialog } from '../ui/confirmDialog'
 import { DataDisclaimer } from '../ui/dataDisclaimer'
 import { syncFavoriteButtons } from '../ui/favoriteButton'
 import { LyricView } from '../ui/lyricView'
@@ -40,6 +48,7 @@ import type { ShellFeatures } from './shellFeatures'
 import { ToolbarController } from './toolbar'
 import { TransportController } from './transport'
 import { FavoritesView } from './views/favoritesView'
+import { RecentView } from './views/recentView'
 import { TracksList } from './views/tracksList'
 
 const TRACK_ROW_HEIGHT = 52
@@ -70,16 +79,22 @@ const contextMenu = new ContextMenu<ContextMenuItem>({
 
 const statusController = new LyrixDataStatusController({
   api: window.library,
-  onStatusChange: () => screen.refreshFavoritesView()
+  onStatusChange: () => {
+    screen.refreshFavoritesView()
+    screen.refreshRecentView()
+  }
 })
 
 const disclaimer = new DataDisclaimer({
   onRetry: async () => {
     const status = await statusController.retry()
     await favoritesController.reload()
+    await historyController.reload()
     return status.writable
   }
 })
+
+const confirmDialog = new ConfirmDialog()
 
 const favoritesController: FavoritesController = new FavoritesController({
   api: window.library,
@@ -94,6 +109,22 @@ const favoritesController: FavoritesController = new FavoritesController({
     nowPlaying.updateContent()
     queuePanel.refresh()
   }
+})
+
+const historyController: HistoryController = new HistoryController({
+  api: window.library,
+  toast: (message) => toast.show(message),
+  onWriteBlocked: (reason, retryAction) => {
+    disclaimer.show(buildDataDisclaimerModel(reason), retryAction)
+  },
+  onStateChange: () => {
+    library.refreshHistory()
+    screen.refreshRecentView()
+  }
+})
+
+const playTracker = new PlayTracker({
+  onCounted: (trackId) => historyController.record(trackId)
 })
 
 attachCoverFallbacks([
@@ -196,6 +227,59 @@ const favoritesView = new FavoritesView({
   onRemoveMissing: () => void favoritesController.removeMissing()
 })
 
+const recentList = new TracksList({
+  scroll: elements.recentScroll,
+  empty: elements.recentEmpty,
+  rowHeight: TRACK_ROW_HEIGHT,
+  emptyMessage: () =>
+    buildHistoryEmptyModel(historyController.getState().recording, false)?.text ??
+    'Nothing played yet.',
+  getCurrentTrackId: () => transport.getCurrentTrack()?.id ?? null,
+  onPlayTrack: (index) =>
+    transport.playQueue(recentList.getVisibleTracks(), index, {
+      kind: 'recent',
+      label: 'Recently played'
+    }),
+  isFavorite: (trackId) => favoritesController.isFavorite(trackId),
+  onToggleFavorite: (trackId) => void favoritesController.toggle(trackId),
+  metaFor: (item) => formatHistoryMeta(item as RecentItem, Date.now()),
+  onOpenTrackMenu: (item, _index, play, position) => openers.openTrackMenu(item, play, position)
+})
+
+const recentView = new RecentView({
+  elements,
+  onWhy: () => {
+    const status = buildHistoryStatusModel(historyController.getState().recording)
+    if (status.whyReason) {
+      disclaimer.show(buildDataDisclaimerModel(status.whyReason), () => undefined)
+    }
+  },
+  onPlay: () => {
+    void transport.playQueue(recentList.getVisibleTracks(), 0, {
+      kind: 'recent',
+      label: 'Recently played'
+    })
+  },
+  onShuffle: () =>
+    transport.shuffleTracks(recentList.getVisibleTracks(), {
+      kind: 'recent',
+      label: 'Recently played'
+    }),
+  onToggleRecording: () =>
+    void historyController.setRecording(!historyController.getState().recording.enabled),
+  onStartRecording: () => void historyController.setRecording(true),
+  onClear: () =>
+    confirmDialog.show(
+      {
+        title: 'Clear play history?',
+        message:
+          'This removes every recorded play from this library. Favorites and other LyrixData are kept.',
+        confirmLabel: 'Clear history'
+      },
+      () => void historyController.clear()
+    )
+})
+
 const playerBar = new PlayerBar({
   elements,
   getCurrentTrack: () => transport.getCurrentTrack(),
@@ -245,7 +329,8 @@ transport = new TransportController({
   onSeekEnd: () => {
     shellFeatures?.sessionController.noteSeek()
     shellFeatures?.mediaSession.syncPosition()
-  }
+  },
+  playTracker
 })
 
 navigation = new NavigationController({
@@ -298,8 +383,17 @@ screen = new ScreenController({
   tracksList,
   favoritesList,
   favoritesView,
+  recentList,
+  recentView,
   getFavoritesState: () => favoritesController.getState(),
   getFavoritesStatus: () => buildFavoritesStatusModel(statusController.getStatus()),
+  getHistoryState: () => historyController.getState(),
+  getHistoryStatus: () => buildHistoryStatusModel(historyController.getState().recording),
+  getHistoryEmpty: () =>
+    buildHistoryEmptyModel(
+      historyController.getState().recording,
+      historyController.getState().items.length > 0
+    ),
   isNowPlayingOpen: () => nowPlaying.isOpen(),
   getLibraryIndex: () => library.getLibraryIndex(),
   getAlbums: () => library.getAlbums(),
@@ -354,7 +448,10 @@ library = new LibraryController({
     ids: favoritesController.getState().ids,
     addedAt: favoritesController.getState().addedAt
   }),
-  refreshFavorites: () => screen.refreshFavoritesView()
+  refreshFavorites: () => screen.refreshFavoritesView(),
+  getHistory: () => ({ items: historyController.getState().items }),
+  refreshHistory: () => screen.refreshRecentView(),
+  onSnapshotApplied: () => historyController.noteLibraryChanged()
 })
 
 contextActions = new ContextActions({
@@ -404,6 +501,7 @@ shellFeatures = createShellFeatures({
   queuePanel: queuePanelController,
   overlay: shortcutOverlay,
   disclaimer,
+  confirmDialog,
   toggleCurrentFavorite: () => {
     const track = transport.getCurrentTrack()
     if (track) void favoritesController.toggle(track.id)
@@ -425,7 +523,8 @@ const disposers = [
   queue.subscribe(() => playerBar.updateControls()),
   shellFeatures.shortcutController.start(),
   statusController.start(),
-  favoritesController.start()
+  favoritesController.start(),
+  historyController.start()
 ]
 
 toolbar.syncViewControls()
@@ -434,6 +533,7 @@ async function initializeApp(): Promise<void> {
   await library.initialize()
   await statusController.reload()
   await favoritesController.reload()
+  await historyController.reload()
   try {
     const restored = await window.library.getSession()
     if (restored) transport.restoreSession(restored.queue, restored.position)
@@ -459,9 +559,12 @@ window.addEventListener('beforeunload', () => {
   tracksList.destroy()
   favoritesList.destroy()
   favoritesView.destroy()
+  recentList.destroy()
+  recentView.destroy()
   queuePanel.destroy()
   contextMenu.destroy()
   shortcutOverlay.destroy()
   disclaimer.destroy()
+  confirmDialog.destroy()
   toast.destroy()
 })

@@ -22,15 +22,17 @@ Startup wiring only:
    focuses/restores the existing window on `second-instance`.
 3. In media-session mode, the Chromium media-key features are enabled before ready.
 4. On ready: set the app user model id, resolve `userData` settings/cache/lyric-choice/session/window
-   files, and load settings and cache into the shared `AppStore`.
+   files, and load settings and cache into the shared `AppStore`. Dev launches use
+   `<project>/.lyrix-dev` as `userData` so they never collide with an installed build's single-instance
+   lock or data; E2E sets its own temp `userData`.
 5. `realpath` the last folder when possible, then `restoreLibrary(root, cache)` to show cached data
    immediately without reading audio files.
 6. Load `userData/window-state.json`, load the session against the current library root, create the
    `CoverService` and install the `media://` handler.
-7. Load the machine id, bind the `LyrixData` store to the library root, and resolve favorites against
-   the restored snapshot without creating anything on disk.
-8. Create the `ScanCoordinator` (with the library-applied LyrixData rebind hook), register IPC, create
-   the window with restored bounds, and handle macOS re-activation.
+7. Load the machine id, bind the `LyrixData` store to the library root, and resolve favorites and
+   play history against the restored snapshot without creating anything on disk.
+8. Create the `ScanCoordinator` (with the library-applied LyrixData/favorites/history rebind hook),
+   register IPC, create the window with restored bounds, and handle macOS re-activation.
 9. On quit, flush the session and queued LyrixData writes; on non-macOS, quit when all windows close.
 
 The scan generation counter, IPC handlers, and window creation are described below and in
@@ -88,6 +90,10 @@ subscribe.
 | `favorites:get` | — | `FavoritesState` |
 | `favorites:set` | `{ trackIds: string[], favorite: boolean }` | `{ ok: true, state } \| { ok: false, reason }` |
 | `favorites:remove-missing` | — | same result shape |
+| `history:get` | `{ limit?: unknown }` | `HistoryState` (limit clamped) |
+| `history:record` | `trackId: unknown` | `{ ok: boolean }` |
+| `history:set-recording` | `enabled: unknown` | `{ ok: true, state } \| { ok: false, reason }` |
+| `history:clear` | — | same result shape |
 | `lyrics:get-sources` | `trackId: unknown` | `LyricSources \| null` |
 | `lyrics:set-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
 | `lyrics:set-translation-choice` | `trackId: unknown`, `sourceId: string \| null` | `void` |
@@ -100,7 +106,8 @@ subscribe.
 
 Events to renderer: `library:scan-progress` (throttled), `library:updated` (after a successful
 background refresh), `media:key` (only in the global-shortcut fallback mode),
-`lyrixdata:status-changed`, and `favorites:changed`.
+`lyrixdata:status-changed`, `favorites:changed`, and `history:changed` (debounced in the history
+store).
 
 `lyrics:get-sources` rejects non-string/empty ids with `null`, resolves the path through
 `resolveTrackFile(trackId)`, and catches every error. `lyrics:set-choice` and
@@ -140,6 +147,10 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `getFavorites()` | `favorites:get` | Id-based favorites plus main-derived missing metadata. |
 | `setFavorite(trackIds, favorite)` | `favorites:set` | Validates ids and returns the full new state or a failure reason. |
 | `removeMissingFavorites()` | `favorites:remove-missing` | Removes all unresolved entries without sending paths. |
+| `getHistory({ limit? })` | `history:get` | Aggregated resolved history with recording state. |
+| `recordPlay(trackId)` | `history:record` | Main stamps the time and appends only when opted in. |
+| `setHistoryRecording(enabled)` | `history:set-recording` | The only history call that may create LyrixData. |
+| `clearHistory()` | `history:clear` | Atomically empties history.jsonl. |
 | `getSettings()` | `settings:get` | Returns normalized settings. |
 | `saveVolume(volume)` | `settings:set-volume` | Main clamps the value. |
 | `saveUiState(state)` | `settings:set-ui` | Main normalizes the value. |
@@ -154,6 +165,7 @@ The preload exposes exactly one global, `window.library`, typed by `LibraryApi`:
 | `onMediaKey(listener)` | `media:key` | Fallback mode only; returns an unsubscribe function. |
 | `onLyrixDataStatus(listener)` | `lyrixdata:status-changed` | Returns an unsubscribe function. |
 | `onFavoritesChanged(listener)` | `favorites:changed` | Returns an unsubscribe function. |
+| `onHistoryChanged(listener)` | `history:changed` | Returns an unsubscribe function. |
 
 `subscribe()` wraps the IPC listener so the renderer callback never receives the Electron event
 object, and returns a function that removes exactly that listener.

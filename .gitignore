@@ -6,7 +6,10 @@ dist/
 *.log
 .DS_Store
 graphify-out/
+analysis/
+
 # Keep CI workflows tracked; other .github content stays machine-local.
 .github/*
 !.github/workflows/
 .opencode/
+.lyrix-dev/

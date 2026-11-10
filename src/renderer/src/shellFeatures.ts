@@ -61,6 +61,7 @@ export interface ShellFeatureDeps {
   queuePanel: ShellQueuePanel
   overlay: ShortcutOverlay
   disclaimer: { isOpen(): boolean; close(): void }
+  confirmDialog: { isOpen(): boolean; close(): void }
   toggleCurrentFavorite(): void
   getAlbumForTrack(track: Track): Album | null
   subscribeMediaKey(listener: (action: MediaKeyAction) => void): () => void
@@ -125,6 +126,12 @@ export function createShellFeatures(deps: ShellFeatureDeps): ShellFeatures {
     priority: ESCAPE_LAYER_PRIORITIES.dataDisclaimer,
     isOpen: () => deps.disclaimer.isOpen(),
     close: () => deps.disclaimer.close()
+  })
+  layers.register({
+    id: 'confirmDialog',
+    priority: ESCAPE_LAYER_PRIORITIES.confirmDialog,
+    isOpen: () => deps.confirmDialog.isOpen(),
+    close: () => deps.confirmDialog.close()
   })
   layers.register({
     id: 'shortcutsOverlay',

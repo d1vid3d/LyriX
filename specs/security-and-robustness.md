@@ -8,7 +8,7 @@ player predictable when inputs are malformed or files disappear.
 `src/main/lyrixdata/`, `src/main/lyrics/`, `src/main/settings.ts`, `src/main/cache.ts`,
 `src/main/json-file.ts`, `src/preload/index.ts`, `src/renderer/index.html`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md) (invariants),
 [main/covers-and-media.md](main/covers-and-media.md), [main/library-scanning.md](main/library-scanning.md),
@@ -28,6 +28,10 @@ player predictable when inputs are malformed or files disappear.
   writes through temp + rename with `.bak`.
 - **Favorites IPC carries ids only**: main resolves ids through the current snapshot; missing-row
   metadata and refs never come from the renderer. Input arrays are capped at 1000 ids.
+- **History is opt-in and id-only**: `history:record` accepts only a valid track id; main stamps the
+  timestamp and machine id, applies the 5 s guard, and appends only when `library.json` opted in.
+  Limits are clamped, malformed/unknown-version lines are skipped on read, and a partial crash line
+  cannot break reads. Reading parses at most the last 10 MB.
 - **Path containment** in `media://` uses `realpath` on both the file and the root, then
   `isPathInside`.
 - **Reveal never trusts a renderer path**: `library:reveal-track` takes only a track id, resolves the

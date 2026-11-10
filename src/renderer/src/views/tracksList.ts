@@ -15,6 +15,8 @@ export interface TracksListOptions {
   onPlayTrack(index: number): void
   isFavorite?(trackId: string): boolean
   onToggleFavorite?(trackId: string): void
+  /** Optional extra line/slot used by Recently played. */
+  metaFor?(item: TrackItem): string | null
   onOpenTrackMenu?(item: TrackItem, index: number, play: () => void, position: MenuPosition): void
 }
 
@@ -96,7 +98,15 @@ export class TracksList {
     duration.className = 'track-row-duration'
     duration.textContent = formatTime(item.track.duration)
 
-    button.append(thumb, title, artist, album, duration)
+    button.append(thumb, title, artist, album)
+    const meta = this.options.metaFor?.(item) ?? null
+    if (meta) {
+      const metaElement = document.createElement('span')
+      metaElement.className = 'track-row-meta'
+      metaElement.textContent = meta
+      button.append(metaElement)
+    }
+    button.append(duration)
     const play = (): void => this.options.onPlayTrack(index)
     button.addEventListener('click', play)
     const onMenu = this.options.onOpenTrackMenu

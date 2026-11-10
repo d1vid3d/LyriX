@@ -36,6 +36,17 @@ export interface AppElements {
   favoritesMissingList: HTMLUListElement
   favoritesRemoveMissingButton: HTMLButtonElement
 
+  recentView: HTMLElement
+  recentScroll: HTMLDivElement
+  recentEmpty: HTMLParagraphElement
+  recentStatus: HTMLParagraphElement
+  recentWhyButton: HTMLButtonElement
+  recentPlayButton: HTMLButtonElement
+  recentShuffleButton: HTMLButtonElement
+  recentRecordButton: HTMLButtonElement
+  recentClearButton: HTMLButtonElement
+  recentStartButton: HTMLButtonElement
+
   backButton: HTMLButtonElement
   detailCoverImage: HTMLImageElement
   detailTitle: HTMLHeadingElement
@@ -137,6 +148,17 @@ export function getAppElements(): AppElements {
     favoritesMissingBody: getElement<HTMLElement>('favorites-missing-body'),
     favoritesMissingList: getElement<HTMLUListElement>('favorites-missing-list'),
     favoritesRemoveMissingButton: getElement<HTMLButtonElement>('favorites-remove-missing'),
+
+    recentView: getElement<HTMLElement>('recent-view'),
+    recentScroll: getElement<HTMLDivElement>('recent-scroll'),
+    recentEmpty: getElement<HTMLParagraphElement>('recent-empty'),
+    recentStatus: getElement<HTMLParagraphElement>('recent-status'),
+    recentWhyButton: getElement<HTMLButtonElement>('recent-why'),
+    recentPlayButton: getElement<HTMLButtonElement>('recent-play'),
+    recentShuffleButton: getElement<HTMLButtonElement>('recent-shuffle'),
+    recentRecordButton: getElement<HTMLButtonElement>('recent-record'),
+    recentClearButton: getElement<HTMLButtonElement>('recent-clear'),
+    recentStartButton: getElement<HTMLButtonElement>('recent-start'),
 
     backButton: getElement<HTMLButtonElement>('back'),
     detailCoverImage: getElement<HTMLImageElement>('detail-cover'),

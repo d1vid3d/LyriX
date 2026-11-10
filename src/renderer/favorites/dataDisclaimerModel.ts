@@ -2,8 +2,8 @@ import type { FavoritesWriteFailure } from '../../shared/types'
 
 export type DisclaimerReason = Exclude<FavoritesWriteFailure, 'invalid'>
 
-/** Features that need LyrixData writes; history and playlists append here later. */
-export const LYRIXDATA_FEATURES: readonly string[] = ['Favorites']
+/** Features that need LyrixData writes; future features append here. */
+export const LYRIXDATA_FEATURES: readonly string[] = ['Favorites', 'Play history']
 
 export interface DataDisclaimerModel {
   reason: DisclaimerReason

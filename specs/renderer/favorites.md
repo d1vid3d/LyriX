@@ -10,7 +10,7 @@ heart hooks, disclaimer modal, and the F shortcut.
 `src/renderer/styles/favorites.css`, `src/renderer/styles/dataDisclaimer.css`,
 `src/renderer/library/query.ts`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariant 13),
 [main/lyrixdata.md](../main/lyrixdata.md), [renderer/playback.md](playback.md),
@@ -44,7 +44,8 @@ shown:
 - unavailable / newer-version: matching blocked variants with a `Why?` action.
 
 `buildDataDisclaimerModel(reason)` owns the exact dialog messages. The read-only message includes the
-feature registry (`LYRIXDATA_FEATURES`, currently `["Favorites"]`; history and playlists append later).
+feature registry (`LYRIXDATA_FEATURES`, currently `["Favorites", "Play history"]`; playlists append
+later).
 The disclaimer is a modal `role="dialog"` with `aria-modal="true"`, a Retry button that shows
 `Retrying…` and is disabled while in flight, and Close. It traps focus, closes on the backdrop or
 Escape (via the layer stack at priority 55), returns focus to the opener, and on a successful retry

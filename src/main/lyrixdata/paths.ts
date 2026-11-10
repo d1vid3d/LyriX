@@ -6,7 +6,8 @@ export const LYRIXDATA_DIR_NAME = 'LyrixData'
 export const LYRIXDATA_FILE_ALLOWLIST: ReadonlySet<string> = new Set([
   'README.txt',
   'library.json',
-  'favorites.json'
+  'favorites.json',
+  'history.jsonl'
 ])
 
 export const README_CONTENT =

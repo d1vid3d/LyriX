@@ -5,7 +5,7 @@ albums.
 
 **Owning source paths:** `src/shared/types.ts`, `src/main/ids.ts`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [persistence.md](persistence.md),
 [shared-lyric-core.md](shared-lyric-core.md), [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md).
@@ -31,6 +31,10 @@ albums.
 | `LyrixDataStatus` | `state`, `writable`, `libraryId`, `message`; the renderer-facing LyrixData state. |
 | `FavoritesState` | `items: [{ trackId, addedAt }]` and `missing: [{ path, title, artist, album, addedAt }]`. |
 | `FavoritesSetResult` | `{ ok: true, state }` or `{ ok: false, reason }` with `read-only`, `unavailable`, `newer-version`, or `invalid`. |
+| `HistoryItem` | `trackId`, `lastPlayedAt`, `playCount` after aggregation. |
+| `HistoryRecordingState` | `enabled`, `status` (`off`/`recording`/`not-created`/`blocked`), and blocked `reason`. |
+| `HistoryState` | `recent: HistoryItem[]` plus the recording state. |
+| `HistorySetResult` | `{ ok: true, state }` or `{ ok: false, reason }`. |
 | `PlaybackSettingsInput` | `shuffle: boolean`, `repeat: RepeatMode` for the playback-settings IPC. |
 | `TranslationSettingsInput` | `enabled: boolean`, `language: string \| null` for the translation IPC. |
 | `ScanProgress` | `scanned`, `total`. |
@@ -47,8 +51,9 @@ Queue implementation types (`QueueEntry`, `QueueSnapshot`) live in
 item/action types are renderer-local (`src/renderer/queue/queuePanelModel.ts`,
 `src/renderer/menus/contextMenuModels.ts`). The reveal shape that crosses IPC is `trackId: string` in
 and `boolean` out (`LibraryApi.revealTrack`); session IPC carries only id-based queue/position shapes,
-and favorites IPC carries only track ids plus main-derived missing metadata. `TrackRef` and the
-LyrixData file shapes live in `src/main/lyrixdata/` and never cross the bridge.
+and favorites IPC carries only track ids plus main-derived missing metadata. History IPC carries
+track ids and bounded limits; timestamps are stamped in main. `TrackRef` and the LyrixData file
+shapes live in `src/main/lyrixdata/` and never cross the bridge.
 
 The lyric document types (`LyricFormat`, `LyricDocument`, `LyricLine`, `LyricSegment`, and parse
 options) live in [shared-lyric-core.md](shared-lyric-core.md); they are not duplicated here.

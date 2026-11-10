@@ -9,7 +9,7 @@ handling, section choice, and the stateless view renderers.
 `src/renderer/src/screen.ts`, `src/renderer/src/views/`, `src/renderer/src/format.ts`,
 `src/renderer/library/artistTracks.ts`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](../TechnicalSpecs.md) (invariants 8 and 10),
 [renderer/library-query-and-lists.md](library-query-and-lists.md),
@@ -36,16 +36,19 @@ handling, section choice, and the stateless view renderers.
 - Wires the DOM-free favorites/status controllers, the Favorites view/list, the disclaimer modal,
   and every heart surface; favorites state changes sync rendered hearts and refresh the library
   index/Favorites view without touching the library snapshot.
+- Wires the DOM-free history controller, the Recently played view/list, the play tracker into the
+  transport, the Record/Clear actions, and the clear-history confirmation; history changes refresh
+  the library index/Recent view without touching the snapshot.
 
-It owns no routing, playback, search, queue-panel, menu, shortcut, session, favorites, or rendering
-state; those live in the controllers below. The queue panel and context-menu behavior are owned by
-[renderer/queue-panel.md](queue-panel.md) and
+It owns no routing, playback, search, queue-panel, menu, shortcut, session, favorites, history, or
+rendering state; those live in the controllers below. The queue panel and context-menu behavior are
+owned by [renderer/queue-panel.md](queue-panel.md) and
 [renderer/context-menu-and-toasts.md](context-menu-and-toasts.md); the shortcut/Escape/session/media
 wiring by [renderer/shortcuts.md](shortcuts.md) and
 [main/window-and-session.md](../main/window-and-session.md); favorites by
-[renderer/favorites.md](favorites.md).
+[renderer/favorites.md](favorites.md); history by [renderer/history.md](history.md).
 
-UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 443 lines. It remains
+UNVERIFIED/POSSIBLY STALE: the current `src/renderer/src/main.ts` is 529 lines. It remains
 composition/wiring only, but the original “under 180 lines” claim no longer holds; shell feature
 wiring lives in `shellFeatures.ts`, menu building in `contextMenus.ts`, and favorites/status models
 in `renderer/favorites/`.
@@ -135,6 +138,7 @@ menus without giving the views menu state.
 | `views/artistList.ts` | Artist rows with album/track counts plus empty state; optional row menu callback. |
 | `views/tracksList.ts` | Virtualized tracks list; owns the visible track list used for queueing and takes an optional row menu callback. |
 | `views/favoritesView.ts` | Favorites header/status/missing-section renderer; the row list is a second `TracksList`. |
+| `views/recentView.ts` | Recently played header/status/empty-state renderer; the row list is a third `TracksList` with a meta slot. |
 | `views/albumDetail.ts` | Album header with Play/Shuffle, cover/year, ordered track list, and optional track menu callback. |
 | `views/artistDetail.ts` | Artist header with Play/Shuffle, counts, album grid, and optional card menu callback. |
 

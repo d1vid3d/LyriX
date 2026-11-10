@@ -17,9 +17,9 @@ This is the **only** file where volatile verification numbers (test counts, file
 | `npm run format:check` | Passes (Prettier, code and configuration only). |
 | `npm run lint` | Passes (ESLint flat config, including type-aware TypeScript rules). |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
-| `npm test` | 602 tests pass across 49 files. |
+| `npm test` | 648 tests pass across 57 files. |
 | `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
-| `npm run test:e2e` | Passes; 113 checks (Tier 1 smoke). |
+| `npm run test:e2e` | Passes; 126 checks (Tier 1 smoke). |
 | `npm run test:e2e:full` | Passes; 158 checks (Tier 2 regression). |
 | `npm run test:e2e:visual` | Passes; 29 checks (Tier 3 visual). |
 | `npm run dev` | Starts electron-vite and Electron. |
@@ -83,6 +83,14 @@ workflow scope is owned by [build-and-config.md](build-and-config.md).
 | `tests/favoritesQuery.test.ts` | Favorites view registry, Recently added default, sorts and search. |
 | `tests/dataDisclaimerModel.test.ts` | Disclaimer messages/features and status-line Why variants. |
 | `tests/scannerLyrixData.test.ts` | Root-level LyrixData is never scanned as music. |
+| `tests/playTracker.test.ts` | Thresholds, pause/seek behavior, delta caps, once-per-instance counting, duplicate-entry identity, repeat restarts, changes/failures and restored sessions. |
+| `tests/historyLog.test.ts` | JSONL round trips, partial/unknown/malformed lines, relink aggregation, ordering and limits. |
+| `tests/historyStore.test.ts` | Off means no create/write, opt-in creation, appends and the 5 s guard, clear, unknown-field flag preservation, blocked append and tail cap. |
+| `tests/historyIpc.test.ts` | History get/record/recording validation and the default flag helper. |
+| `tests/historyController.test.ts` | Passive recording, quiet once-only blocked toasts, explicit action disclaimer routing and state application. |
+| `tests/historyModels.test.ts` | Relative time/play meta, status/empty text and quiet blocked messages. |
+| `tests/recentQuery.test.ts` | Recent view registry, Last played/Most played ordering, search and missing tracks. |
+| `tests/queueContext.test.ts` | Favorites/recent queue context labels. |
 | `tests/transportDecisions.test.ts` | Ended (stop/play/restart), previous (>3 s restart), failure cap, and repeat-mode cycling. |
 | `tests/artistTracks.test.ts` | Artist playback order: album year then title (unknown last), disc then track then title, missing disc as one, input not reordered. |
 | `tests/range.test.ts` | `start-end`, open-ended, and suffix ranges; end beyond file size; suffix larger than the file; start beyond file size; malformed and multiple ranges; zero-size files; non-safe integers. |
@@ -121,7 +129,7 @@ Three tiers drive the built app through raw Chrome DevTools Protocol (CDP). They
 
 | Tier | Command | Scope | When to run |
 | --- | --- | --- | --- |
-| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel/drag/context menus + Escape priority, album-card menu Go to artist, favorites not-created/ready states, first-write LyrixData files, Favorites view/empty state, heart removal, F shortcut, queue hearts, shortcuts overlay + Escape layering, Media Session metadata/state, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
+| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel/drag/context menus + Escape priority, album-card menu Go to artist, favorites not-created/ready states, first-write LyrixData files, Favorites view/empty state, heart removal, F shortcut, queue hearts, history off/opt-in, counted play append, Recent view/meta, recent queue context, Clear confirmation, shortcuts overlay + Escape layering, Media Session metadata/state, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
 | 2 — full | `npm run test:e2e:full` | Startup and cached settings, library metadata, transport wiring, volume persistence, rescan, relaunch, views/search/sort, virtualization with 600 tracks, renderer health. | Opt-in for risky refactors and broad regression coverage. |
 | 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting plus player-bar button colors, sizes, icons, shuffle/repeat active states, and active/upcoming lyric states. | Optional after CSS/UI changes. |
 
@@ -235,6 +243,9 @@ Expected:
 - Favorites: opening/scanning/browsing a library creates nothing; the first heart creates
   `LyrixData` with README/library/favorites; favorites survive a relaunch; missing refs appear under
   the Favorites view after moving a file; a read-only/unavailable library shows the disclaimer.
+- History: recording is off by default and creates nothing; enabling it writes the library flag;
+  a counted play appends one line; Recent shows counts/relative time; Clear empties only
+  `history.jsonl`; blocking recording shows one quiet toast or the explicit disclaimer.
 - Shuffle and repeat toggle their labels/active states and survive a relaunch.
 - The Queue button and `Q` toggle the panel; opening a context menu then pressing Escape closes the
   menu before the queue panel.

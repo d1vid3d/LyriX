@@ -29,6 +29,7 @@ All paths are under Electron `userData`.
 | `<library>/LyrixData/README.txt` | Portable user note. | Created on first write only. |
 | `<library>/LyrixData/library.json` | Version 1, stable `libraryId`, `createdAt`, `writtenBy`. | Atomic, `.bak`, unknown fields kept. |
 | `<library>/LyrixData/favorites.json` | Version 1, `items: [{ ref, addedAt }]`, `writtenBy`. | Atomic, `.bak`, unknown fields kept. |
+| `<library>/LyrixData/history.jsonl` | One `{ v, ref, at, m }` JSON object per line, append-only; `library.json` carries `historyRecording`. | Append-only; atomically replaced only by Clear history. |
 | `covers/<albumId>.jpg` | Full cover JPEG. Dimensions and quality are owned by [main/covers-and-media.md](main/covers-and-media.md). | Atomic. |
 | `covers/<albumId>-small.jpg` | Small cover JPEG, generated from the full cover. Dimensions are owned by [main/covers-and-media.md](main/covers-and-media.md). | Atomic. |
 
@@ -44,12 +45,14 @@ path-preserving tag updates. A missing `translations` map is equivalent to an em
 
 | Machine-local (`userData`) | Library-resident (`<library>/LyrixData`) |
 | --- | --- |
-| settings, window state, resume session, lyric/translation choices, tag cache, covers, `machine-id.json` | `README.txt`, `library.json`, `favorites.json` (later: history and playlists) |
+| settings, window state, resume session, lyric/translation choices, tag cache, covers, `machine-id.json` | `README.txt`, `library.json`, `favorites.json`, `history.jsonl` (later: playlists) |
 
 Only LyrixData follows the library across disks and mounts, and LyriX writes there only during an
-explicit write (favorites today). Opening, scanning, and browsing a library never creates it. The
-write invariant and file formats are owned by [main/lyrixdata.md](main/lyrixdata.md); invariant 13 in
-[TechnicalSpecs.md](TechnicalSpecs.md) states the rule.
+explicit write (favorites today, or history after opt-in). Opening, scanning, and browsing a library
+never creates it. The write invariant and file formats are owned by
+[main/lyrixdata.md](main/lyrixdata.md) and [main/history.md](main/history.md); invariant 13 in
+[TechnicalSpecs.md](TechnicalSpecs.md) states the rule. History grows by about 200 bytes per play and
+is read from its last 10 MB; compaction/rotation is out of scope.
 
 Window state and both session files are machine-local: they are never stored in the music library,
 and the session only contains track ids (never paths). Their validation and restore rules are owned

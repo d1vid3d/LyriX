@@ -15,6 +15,9 @@ export interface FsDirEntry {
 export interface FsAdapter {
   readFile(path: string): Promise<string>
   writeFile(path: string, data: string): Promise<void>
+  appendFile(path: string, data: string): Promise<void>
+  /** Reads at most the last `maxBytes` of a file as UTF-8. */
+  readTail(path: string, maxBytes: number): Promise<string>
   rename(from: string, to: string): Promise<void>
   rm(path: string, options?: { force?: boolean }): Promise<void>
   mkdir(path: string): Promise<void>
@@ -27,6 +30,22 @@ export interface FsAdapter {
 export const nodeFsAdapter: FsAdapter = {
   readFile: (path) => fs.readFile(path, 'utf8'),
   writeFile: (path, data) => fs.writeFile(path, data),
+  appendFile: (path, data) => fs.appendFile(path, data),
+  readTail: async (path, maxBytes) => {
+    const stats = await fs.stat(path)
+    const start = Math.max(0, stats.size - Math.max(0, maxBytes))
+    const length = stats.size - start
+    if (length === 0) return ''
+
+    const handle = await fs.open(path, 'r')
+    try {
+      const buffer = Buffer.alloc(length)
+      await handle.read(buffer, 0, length, start)
+      return buffer.toString('utf8')
+    } finally {
+      await handle.close()
+    }
+  },
   rename: (from, to) => fs.rename(from, to),
   rm: (path, options) => fs.rm(path, { force: options?.force ?? false }),
   mkdir: (path) => fs.mkdir(path, { recursive: true }).then(() => undefined),

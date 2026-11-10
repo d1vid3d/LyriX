@@ -5,7 +5,7 @@
   "description": "A minimal desktop FLAC player built with Electron and TypeScript",
   "main": "./build/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "node scripts/dev.mjs",
     "start": "electron-vite preview",
     "build": "electron-vite build",
     "package": "npm run build && electron-forge package",
@@ -29,7 +29,7 @@
     "@electron-forge/plugin-vite": "^8.0.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.2",
-    "electron": "^45.2.1",
+    "electron": "^45.2.3",
     "electron-vite": "^6.0.0",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",

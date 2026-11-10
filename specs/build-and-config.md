@@ -17,7 +17,7 @@ level.
 
 | Script | Purpose |
 | --- | --- |
-| `npm run dev` | electron-vite dev server + Electron. |
+| `npm run dev` | Dev wrapper (`scripts/dev.mjs`) sets the dev-only sandbox workaround, then starts the electron-vite dev server + Electron. |
 | `npm run build` | Production bundle into `build/`. |
 | `npm start` | Preview the production bundle. |
 | `npm run format` | Prettier over code and configuration files. |
@@ -99,6 +99,14 @@ The `typecheck:*` scripts pass `--composite false` and `--noEmit`; the project r
 source of truth for which files belong to which runtime.
 
 ## electron-vite
+
+`npm run dev` runs `scripts/dev.mjs`. On Windows it sets `ELECTRON_DISABLE_SANDBOX=1` only for the
+dev session (unless already set), because Electron 45.x cannot initialize its Chromium sandbox when
+launched from this development terminal and exits before a window appears; `electron --version` alone
+also crashes without the flag there, while an Explorer-launched packaged build and E2E launches work.
+Packaged builds and the E2E launch do not use the wrapper and keep their normal sandbox settings.
+Dev also uses `<project>/.lyrix-dev` as `userData` so it cannot collide with an installed build.
+Set `LYRIX_KEEP_SANDBOX=1` when running from a terminal where Electron's sandbox starts normally.
 
 `electron.vite.config.ts` excludes `music-metadata` from dependency externalization so the ESM-only
 package is bundled into the CJS main process.

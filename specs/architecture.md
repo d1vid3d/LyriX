@@ -5,7 +5,7 @@ of every module. Exact imports and call graphs belong to graphify, not to this f
 
 **Owning source paths:** `src/main/`, `src/preload/`, `src/renderer/`, `src/shared/`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md) (invariants), [build-and-config.md](build-and-config.md),
 [data-model.md](data-model.md), [flows.md](flows.md).
@@ -35,6 +35,8 @@ of every module. Exact imports and call graphs belong to graphify, not to this f
 - Keep portable Favorites inside `<library>/LyrixData` (created only on first write), with a Favorites
   view, hearts on every track surface, missing-ref repair, and a read-only/newer/unavailable
   disclaimer dialog.
+- Record an opt-in play history in LyrixData and expose it as a Recently played view with play
+  counts, relative times, a Record-history toggle, and Clear confirmation.
 - Drive playback from a declarative global shortcut table, a generated help overlay, OS media keys,
   and the Windows Media Session overlay.
 - Right-click (or `Shift+F10`) tracks, albums, artists, queue rows, and the current track for
@@ -109,6 +111,7 @@ state, and lyric presentation.**
 │    ├─ session/ ── resume-session tracking (debounced)                │
 │    ├─ media/ ── Media Session metadata/actions + API wiring          │
 │    ├─ favorites/ ── status/favorites controllers + pure models       │
+│    ├─ history/ ── play tracker, history controller + pure models     │
 │    ├─ ui/favoriteButton.ts + dataDisclaimer.ts ── hearts/modal       │
 │    ├─ library/artistTracks.ts ── pure artist playback ordering       │
 │    ├─ ui/virtualList.ts ── fixed-row virtual scroller                │
@@ -139,6 +142,7 @@ state, and lyric presentation.**
 | Reveal a scanned file in the OS file manager | Main | `revealTrack(trackId)` → boolean |
 | Window state + resume session | Main | `getSession`, `saveSessionQueue`, `saveSessionPosition` |
 | Portable Favorites in `<library>/LyrixData` | Main | `getFavorites`, `setFavorite`, status/event subscriptions |
+| Play history in `<library>/LyrixData` | Main | `getHistory`, `recordPlay`, recording/clear, event subscriptions |
 | Media keys/overlay | Main (mode) + renderer (Media Session) | `onMediaKey` in fallback mode |
 | Translation alignment/attachment | Renderer (pure shared module) | Direct |
 | Playback position/transport | Renderer | Direct |
@@ -181,6 +185,9 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `lyrixdata/favoritesStore.ts` | Read-modify-write favorites, healing, missing reporting, cap. |
 | `lyrixdata/formats.ts` | File shapes, `writtenBy`, validators, allowlisted ref checks. |
 | `lyrixdata/favoritesIpc.ts` | Pure `favorites:set` input validation. |
+| `lyrixdata/historyLog.ts` | Pure JSONL serialize/parse, tolerant aggregation, limits. |
+| `lyrixdata/historyStore.ts` | Opt-in history state, append guard, clear, debounced events. |
+| `lyrixdata/historyIpc.ts` | Pure `history:get`/record/recording input validation. |
 | `lyrixdata/machineId.ts` | Machine-local stable `machineId` for `writtenBy`. |
 | `ipc.ts` | IPC channel registration + validation. |
 | `scanCoordinator.ts` | Scan generation, progress, folder persistence. |
@@ -258,6 +265,15 @@ who-depends-on-whom, run `graphify query "<question>"`, `graphify path "<A>" "<B
 | `favorites/lyrixDataStatusController.ts` | Mirrors status + retry. |
 | `favorites/dataDisclaimerModel.ts` | Pure disclaimer content + feature registry. |
 | `favorites/favoritesStatusModel.ts` | Pure Favorites header status line model. |
+| `history/playTracker.ts` | Pure play-instance/threshold state machine. |
+| `history/historyController.ts` | Passive recording + explicit recording/clear actions. |
+| `history/historyStatusModel.ts` | Pure status/empty-state/quiet-toast models. |
+| `history/relativeTime.ts` | Pure relative time + play-meta formatter. |
+| `history/onceNotifier.ts` | Pure per-library one-shot notifier. |
+| `views/recentView.ts` | Recently played header/status/empty rendering. |
+| `ui/confirmDialog.ts` | Focus-trapped clear-history confirmation. |
+| `styles/history.css` | Recent view/meta styling. |
+| `styles/confirmDialog.css` | Confirmation modal styling. |
 | `ui/favoriteButton.ts` | Inline-SVG heart with ARIA state + bulk sync. |
 | `ui/dataDisclaimer.ts` | Modal disclaimer with focus trap and retry progress. |
 | `views/favoritesView.ts` | Favorites header/status/missing section rendering. |
