@@ -59,8 +59,9 @@ the registry stays DOM-free.
 `RecentView` renders the header (`Play`, `Shuffle`, Record-history toggle, Clear history, optional
 `Why?`, status line), a virtualized `TracksList` with its optional meta slot (`N plays · relative`),
 the empty state, and a Start-recording button. Play/Shuffle queue the visible list with the new
-`{ kind: 'recent', label: 'Recently played' }` context. Clear history opens the confirmation modal;
-Escape/backdrop cancel.
+`{ kind: 'recent', label: 'Recently played' }` context. The playing-row highlight refreshes on every
+track change, including when playback starts from the Recent view itself. Clear history opens the
+confirmation modal; Escape/backdrop cancel.
 
 The confirmation modal (`ui/confirmDialog.ts`) is a focus-trapped `role="dialog"` registered in the
 Escape layer stack at priority 53, above the shortcuts overlay and below the data disclaimer.

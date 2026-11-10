@@ -199,6 +199,7 @@ export class ScreenController {
 
     this.deps.tracksList.refreshHighlight()
     this.deps.favoritesList.refreshHighlight()
+    this.deps.recentList.refreshHighlight()
   }
 
   private renderAlbumDetail(albumId: string): void {

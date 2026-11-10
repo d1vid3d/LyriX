@@ -19,7 +19,7 @@ This is the **only** file where volatile verification numbers (test counts, file
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
 | `npm test` | 648 tests pass across 57 files. |
 | `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
-| `npm run test:e2e` | Passes; 126 checks (Tier 1 smoke). |
+| `npm run test:e2e` | Passes; 127 checks (Tier 1 smoke). |
 | `npm run test:e2e:full` | Passes; 158 checks (Tier 2 regression). |
 | `npm run test:e2e:visual` | Passes; 29 checks (Tier 3 visual). |
 | `npm run dev` | Starts electron-vite and Electron. |
@@ -129,7 +129,7 @@ Three tiers drive the built app through raw Chrome DevTools Protocol (CDP). They
 
 | Tier | Command | Scope | When to run |
 | --- | --- | --- | --- |
-| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel/drag/context menus + Escape priority, album-card menu Go to artist, favorites not-created/ready states, first-write LyrixData files, Favorites view/empty state, heart removal, F shortcut, queue hearts, history off/opt-in, counted play append, Recent view/meta, recent queue context, Clear confirmation, shortcuts overlay + Escape layering, Media Session metadata/state, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
+| 1 — smoke | `npm run test:e2e` | Scan, album open, playback, shuffle/repeat controls, queue panel/drag/context menus + Escape priority, album-card menu Go to artist, favorites not-created/ready states, first-write LyrixData files, Favorites view/empty state, heart removal, F shortcut, queue hearts, history off/opt-in, counted play append, Recent view/meta, immediate Recent highlight on playback, recent queue context, Clear confirmation, shortcuts overlay + Escape layering, Media Session metadata/state, line/word/plain lyrics, missing lyrics, line seek, live track changes, Now Playing open/close, search/view/scroll preservation, console cleanliness. | Required on every change. |
 | 2 — full | `npm run test:e2e:full` | Startup and cached settings, library metadata, transport wiring, volume persistence, rescan, relaunch, views/search/sort, virtualization with 600 tracks, renderer health. | Opt-in for risky refactors and broad regression coverage. |
 | 3 — visual | `npm run test:e2e:visual` | Word-flash highlighting plus player-bar button colors, sizes, icons, shuffle/repeat active states, and active/upcoming lyric states. | Optional after CSS/UI changes. |
 

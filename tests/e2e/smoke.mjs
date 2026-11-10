@@ -883,6 +883,19 @@ async function main(runner, ctx) {
     String(historyRecord?.at)
   )
 
+  // Move playback to a different track so the recent-row highlight must update on play.
+  const otherTrackStarted = await clickTrack(cdp, 'Word Test')
+  runner.check('other track starts before recent playback', otherTrackStarted)
+  await cdp.waitFor(
+    'other track is playing',
+    `document.querySelector('#play-pause').dataset.playing === 'true'`
+  )
+  await clickSelector(cdp, '#play-pause')
+  await cdp.waitFor(
+    'other track is paused',
+    `document.querySelector('#play-pause').dataset.playing === 'false'`
+  )
+
   await clickView(cdp, 'recent')
   await cdp.waitFor(
     'recent view lists the played track',
@@ -898,6 +911,10 @@ async function main(runner, ctx) {
   )
 
   await clickSelector(cdp, '#recent-play')
+  await cdp.waitFor(
+    'recent row highlight updates immediately',
+    `document.querySelector('#recent-scroll .track-row.playing .track-row-title')?.textContent === ${JSON.stringify(historyTrackTitle)}`
+  )
   await pressKey(cdp, 'q')
   await cdp.waitFor(
     'recent queue context label',
