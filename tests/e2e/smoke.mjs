@@ -845,11 +845,10 @@ async function run() {
   const musicDir = join(tempRoot, 'music')
   const userDataDir = join(tempRoot, 'userData')
   let ctx = { app: null, cdp: null, tempRoot }
-  let app = null
 
   try {
     await copyFixtureTree('lyrics', musicDir)
-    app = await launchApp({
+    const app = await launchApp({
       userDataDir,
       settings: { lastFolder: musicDir, volume: 0.5 }
     })

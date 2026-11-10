@@ -25,10 +25,6 @@ export interface FavoritesStoreOptions {
   onStateChange(state: FavoritesState): void
 }
 
-interface MutationResult {
-  changed: boolean
-}
-
 /**
  * Favorites are keyed by normalized portable path. Every mutation re-reads the file first, applies
  * the change, heals relinked refs, and writes through the serialized LyrixData store.

@@ -8,7 +8,7 @@ import type {
 import { getArtistTracks } from '../library/artistTracks'
 import type { ArtistItem } from '../library/query'
 import type { PlaybackEngine } from '../player/engine'
-import type { PlaybackQueue, QueueContext, QueueEntry } from '../player/queue'
+import type { PlaybackQueue, QueueContext } from '../player/queue'
 import {
   decideEndedAction,
   decideFailureAction,

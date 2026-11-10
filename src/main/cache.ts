@@ -48,7 +48,7 @@ export async function loadLibraryCache(filePath: string): Promise<LibraryCache> 
     if (isCachedTrack(entry)) tracks[filePath] = entry
   }
 
-  return { version: LIBRARY_CACHE_VERSION, folder: cache.folder as string | null, tracks }
+  return { version: LIBRARY_CACHE_VERSION, folder: cache.folder, tracks }
 }
 
 export async function saveLibraryCache(filePath: string, cache: LibraryCache): Promise<void> {

@@ -47,7 +47,10 @@ export function alignTranslation(
   const minRatio = resolveRatio(options.minTimeMatchRatio)
   const total = primary.lines.filter((line) => !isBlankLyricText(line.text)).length
 
-  const timeLines: Array<string | null> = new Array(primary.lines.length).fill(null)
+  const timeLines: Array<string | null> = Array.from(
+    { length: primary.lines.length },
+    () => null
+  )
   const usedTranslation = new Set<number>()
   let timeMatched = 0
 

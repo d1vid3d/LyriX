@@ -128,7 +128,7 @@ export class DataDisclaimer {
     this.busy = true
     this.setBusy(true)
 
-    let ok = false
+    let ok: boolean
     try {
       ok = await this.options.onRetry()
     } finally {

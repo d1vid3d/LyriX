@@ -1,4 +1,4 @@
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { FsAdapter } from '../src/main/lyrixdata/fsAdapter'
 import { VersionedStore } from '../src/main/lyrixdata/versionedStore'

@@ -64,9 +64,9 @@ export class WindowManager {
     })
 
     if (process.env['ELECTRON_RENDERER_URL']) {
-      window.loadURL(process.env['ELECTRON_RENDERER_URL'])
+      void window.loadURL(process.env['ELECTRON_RENDERER_URL'])
     } else {
-      window.loadFile(join(__dirname, '../renderer/index.html'))
+      void window.loadFile(join(__dirname, '../renderer/index.html'))
     }
   }
 

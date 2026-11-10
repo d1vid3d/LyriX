@@ -290,7 +290,8 @@ export function getViewIds(): LibraryView[] {
 }
 
 export function getSortOptions(view: LibraryView): Array<{ key: string; label: string }> {
-  return Object.entries(VIEWS[view].sorts).map(([key, sort]) => ({ key, label: sort.label }))
+  const definition = VIEWS[view] as ViewDefinition<ViewItemMap[LibraryView]>
+  return Object.entries(definition.sorts).map(([key, sort]) => ({ key, label: sort.label }))
 }
 
 export function getDefaultSort(view: LibraryView): string {

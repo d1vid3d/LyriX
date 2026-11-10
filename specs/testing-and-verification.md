@@ -5,7 +5,7 @@ This is the **only** file where volatile verification numbers (test counts, file
 
 **Owning source paths:** `tests/`, `package.json`.
 
-**Last verified:** 2026-11-08 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [build-and-config.md](build-and-config.md),
 [shared-lyric-core.md](shared-lyric-core.md), [persistence.md](persistence.md).
@@ -14,6 +14,7 @@ This is the **only** file where volatile verification numbers (test counts, file
 
 | Command | Result |
 | --- | --- |
+| `npm run lint` | Passes (ESLint flat config, including type-aware TypeScript rules). |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
 | `npm test` | 602 tests pass across 49 files. |
 | `npm run build` | Passes; emits `build/main`, `build/preload`, `build/renderer`. |
@@ -151,6 +152,12 @@ Run the unit/integration suite with:
 npm test
 ```
 
+Lint the repository with:
+
+```bash
+npm run lint
+```
+
 Type-check both projects with:
 
 ```bash
@@ -176,6 +183,7 @@ npm run fixtures:e2e
 Before merging a change:
 
 ```bash
+npm run lint
 npm run typecheck
 npm test
 npm run build
@@ -189,6 +197,7 @@ npm run dev        # manual smoke: open a folder, play tracks, open Now Playing
 
 Expected:
 
+- ESLint passes with no errors or warnings.
 - Type-check passes for both projects.
 - All Vitest files pass (current count in the verification-status table above).
 - Production bundles build into `build/`.

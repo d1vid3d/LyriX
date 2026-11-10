@@ -218,7 +218,7 @@ describe('PlaybackQueue', () => {
   it('moves entries, clamps the target index, and keeps the current entry current', () => {
     const queue = new PlaybackQueue()
     queue.setQueue(tracks, 1)
-    const [a, b, c] = snapshot(queue).entries
+    const [a, , c] = snapshot(queue).entries
 
     expect(queue.move(c.entryId, 0)).toBe(true)
     expect(ids(queue)).toEqual(['c', 'a', 'b'])

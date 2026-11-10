@@ -106,7 +106,7 @@ export class FavoritesController {
     }
 
     this.emit(previous)
-    this.block(result.reason, () => this.setMany(ids, favorite))
+    this.block(result.reason, () => void this.setMany(ids, favorite))
   }
 
   async removeMissing(): Promise<void> {
@@ -130,7 +130,7 @@ export class FavoritesController {
     }
 
     this.emit(previous)
-    this.block(result.reason, () => this.removeMissing())
+    this.block(result.reason, () => void this.removeMissing())
   }
 
   /** Subscribes to main-side changes (external edits and library re-resolution). */

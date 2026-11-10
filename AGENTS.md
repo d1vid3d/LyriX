@@ -28,21 +28,22 @@ Rules:
 - Pure logic stays DOM-free and gets unit tests.
 
 ## Definition of done (all required, in this order)
-1. npm run typecheck passes (both projects).
-2. npm test passes. New or changed behavior has tests.
-3. npm run build passes.
-4. npm run test:e2e passes. This is the required Tier 1 CDP smoke suite and
+1. npm run lint passes.
+2. npm run typecheck passes (both projects).
+3. npm test passes. New or changed behavior has tests.
+4. npm run build passes.
+5. npm run test:e2e passes. This is the required Tier 1 CDP smoke suite and
    covers the main user path end to end. Add or update a smoke assertion for
    user-visible behavior you change. For risky refactors or broad regression
    coverage, also run `npm run test:e2e:full`. After CSS/UI changes, also run
    `npm run test:e2e:visual`.
-5. npm run dev starts with no console errors, and you manually smoke-test the
+6. npm run dev starts with no console errors, and you manually smoke-test the
    area you changed.
-6. Update the ONE spec file that owns the changed behavior, in the same
+7. Update the ONE spec file that owns the changed behavior, in the same
    change. If you added, moved or removed a module, update the index routing
    table too. Do not touch volatile numbers (test counts etc.) anywhere except
    specs/testing-and-verification.md.
-7. Re-run graphify so the graph reflects the change.
+8. Re-run graphify so the graph reflects the change.
 
 ## Handing work back
 Report: what changed, which spec files you updated, the results of each

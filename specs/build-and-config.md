@@ -2,11 +2,11 @@
 
 **Purpose:** how LyriX is built, type-checked, bundled, and secured at the window/CSP level.
 
-**Owning source paths:** `package.json`, `electron.vite.config.ts`, `tsconfig.json`,
-`tsconfig.node.json`, `tsconfig.web.json`, `src/renderer/index.html`, `src/main/window.ts`,
-`forge.config.js`.
+**Owning source paths:** `package.json`, `eslint.config.mjs`, `electron.vite.config.ts`,
+`tsconfig.json`, `tsconfig.node.json`, `tsconfig.web.json`, `src/renderer/index.html`,
+`src/main/window.ts`, `forge.config.js`.
 
-**Last verified:** 2026-11-07 against LyriX 0.1.0.
+**Last verified:** 2026-11-10 against LyriX 0.1.0.
 
 **Related:** [TechnicalSpecs.md](TechnicalSpecs.md), [architecture.md](architecture.md),
 [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md), [security-and-robustness.md](security-and-robustness.md).
@@ -18,6 +18,8 @@
 | `npm run dev` | electron-vite dev server + Electron. |
 | `npm run build` | Production bundle into `build/`. |
 | `npm start` | Preview the production bundle. |
+| `npm run lint` | ESLint over TypeScript, JavaScript, and the E2E harness. |
+| `npm run lint:fix` | ESLint with automatic fixes. |
 | `npm run typecheck` | `typecheck:node` then `typecheck:web`. |
 | `npm run typecheck:node` | `tsc` over main, preload, shared, config. |
 | `npm run typecheck:web` | `tsc` over renderer, preload `.d.ts`, shared. |
@@ -33,6 +35,28 @@ UNVERIFIED/POSSIBLY STALE: the original §5 script table listed only the first s
 `package.json` also defines `package` and `make`, and `forge.config.js` configures an asar package
 with a Squirrel maker for Windows. The original §18 claim that there is “no packaging/distribution
 configuration” is therefore stale; see [known-limitations.md](known-limitations.md).
+
+## Linting
+
+`eslint.config.mjs` uses the flat config format with `@eslint/js`,
+`typescript-eslint`, and `globals`. `npm run lint` lints the repository and fails on errors or
+warnings; generated output (`build/`, `out/`, `.vite/`, `graphify-out/`) and binary E2E fixtures
+are ignored.
+
+- `src/**/*.ts` and `electron.vite.config.ts` run the typescript-eslint
+  `recommendedTypeChecked` rules using the `tsconfig.node.json` and `tsconfig.web.json`
+  projects. Node globals apply to main, preload, and shared; browser globals apply to the
+  renderer.
+- `tests/**/*.ts` use the non-type-checked `recommended` rules because the unit tests are not
+  part of either runtime project.
+- JavaScript files (`forge.config.js`, the E2E harness) use `@eslint/js` recommended rules with
+  Node globals.
+
+Two rules are tuned rather than followed blindly. `@typescript-eslint/unbound-method` is off
+because the codebase passes callback properties between modules and the rule cannot distinguish
+them from unbound class methods. `prefer-const` is off in the `src/renderer/src/main.ts`
+composition root, which declares late-bound service singletons before assigning them in
+dependency order.
 
 ## TypeScript projects
 

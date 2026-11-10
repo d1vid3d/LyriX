@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { delay } from '../lib/cdp.mjs'
-import { clickAlbum, clickSelector, clickTrack, readState } from '../lib/dom.mjs'
+import { clickAlbum, clickSelector, readState } from '../lib/dom.mjs'
 import { copyRepeated } from '../lib/app.mjs'
 
 /** Startup, album detail, transport wiring, back navigation, and volume persistence. */
