@@ -200,9 +200,7 @@ export class QueuePanel {
     this.scrollRowIntoView(rowIndex)
     this.virtualList.refresh()
 
-    const element = this.elements.scroll.querySelector<HTMLElement>(
-      `[data-entry-id="${entryId}"]`
-    )
+    const element = this.elements.scroll.querySelector<HTMLElement>(`[data-entry-id="${entryId}"]`)
     element?.focus({ preventScroll: true })
   }
 
@@ -235,9 +233,7 @@ export class QueuePanel {
     return this.createEntryRow(row)
   }
 
-  private createSectionRow(
-    row: Extract<QueuePanelRow, { kind: 'section' }>
-  ): HTMLElement {
+  private createSectionRow(row: Extract<QueuePanelRow, { kind: 'section' }>): HTMLElement {
     if (row.collapsible) {
       const button = document.createElement('button')
       button.type = 'button'
@@ -401,11 +397,7 @@ export class QueuePanel {
     }
   }
 
-  private startDrag(
-    event: PointerEvent,
-    row: QueuePanelEntryRow,
-    element: HTMLElement
-  ): void {
+  private startDrag(event: PointerEvent, row: QueuePanelEntryRow, element: HTMLElement): void {
     if (event.button !== 0 || !row.canDrag || !this.model) return
 
     event.preventDefault()
@@ -459,10 +451,7 @@ export class QueuePanel {
     if (!drag) return
 
     drag.ghost.style.setProperty('--queue-panel-drag-x', `${drag.left}px`)
-    drag.ghost.style.setProperty(
-      '--queue-panel-drag-y',
-      `${drag.pointerY - drag.grabOffsetY}px`
-    )
+    drag.ghost.style.setProperty('--queue-panel-drag-y', `${drag.pointerY - drag.grabOffsetY}px`)
   }
 
   private readonly handleDragEnd = (): void => {
@@ -518,11 +507,7 @@ export class QueuePanel {
       rowCount: model.rows.length
     })
 
-    drag.slot = upcomingSlotFromGap(
-      gap,
-      model.upcomingStartRow,
-      model.upcomingRowCount
-    )
+    drag.slot = upcomingSlotFromGap(gap, model.upcomingStartRow, model.upcomingRowCount)
     this.applyRowShifts()
     this.renderInsertionIndicator()
   }
@@ -538,9 +523,7 @@ export class QueuePanel {
     if (sourceSlot < 0) return
 
     const slots = new Map(upcoming.map((id, index) => [id, index]))
-    for (const element of this.elements.scroll.querySelectorAll<HTMLElement>(
-      '.queue-entry'
-    )) {
+    for (const element of this.elements.scroll.querySelectorAll<HTMLElement>('.queue-entry')) {
       const entryId = element.dataset.entryId
       if (!entryId || entryId === drag.entryId) continue
 
@@ -563,10 +546,7 @@ export class QueuePanel {
       return
     }
 
-    element.style.setProperty(
-      '--queue-panel-row-shift',
-      `${shift * QUEUE_PANEL_ROW_HEIGHT}px`
-    )
+    element.style.setProperty('--queue-panel-row-shift', `${shift * QUEUE_PANEL_ROW_HEIGHT}px`)
     element.classList.add('queue-entry--shifted')
   }
 
@@ -594,8 +574,7 @@ export class QueuePanel {
     if (!model || !drag) return
 
     const sourceSlot = model.upcomingEntryIds.indexOf(drag.entryId)
-    const visualSlot =
-      sourceSlot < 0 ? drag.slot : dropHoleSlot(sourceSlot, drag.slot)
+    const visualSlot = sourceSlot < 0 ? drag.slot : dropHoleSlot(sourceSlot, drag.slot)
     const rowGap = model.upcomingStartRow + visualSlot
     this.insertion.style.setProperty(
       '--queue-insert-top',

@@ -303,8 +303,5 @@ export function isLibraryView(value: unknown): value is LibraryView {
 }
 
 export function isSortKey(view: LibraryView, value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    Object.prototype.hasOwnProperty.call(VIEWS[view].sorts, value)
-  )
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(VIEWS[view].sorts, value)
 }

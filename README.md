@@ -23,9 +23,11 @@ npm run dev
 Other scripts:
 
 ```bash
-npm run lint        # lint with ESLint
-npm run lint:fix    # lint and apply automatic fixes
-npm run typecheck   # type-check main/preload and renderer
+npm run format       # format code and configs with Prettier
+npm run format:check # verify formatting without writing
+npm run lint         # lint with ESLint
+npm run lint:fix     # lint and apply automatic fixes
+npm run typecheck    # type-check main/preload and renderer
 npm run build       # bundle into build/
 npm start           # preview the production bundle
 npm run package     # package the app without creating an installer
@@ -41,6 +43,8 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | Path | Description |
 | --- | --- |
 | `package.json` | Scripts, Electron entry point and dependencies. |
+| `.prettierrc.json` | Prettier formatting options matching the existing code style. |
+| `.prettierignore` | Keeps generated output, dependencies, and Markdown out of formatting. |
 | `eslint.config.mjs` | ESLint flat config: type-aware rules for `src`, plain JS rules for tooling and E2E scripts. |
 | `electron.vite.config.ts` | electron-vite build configuration; bundles `music-metadata` into the main process. |
 | `tsconfig.json` | Root project references for editor tooling. |

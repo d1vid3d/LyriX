@@ -1,9 +1,5 @@
 import { chordMatches, isModifierChord, matchShortcut } from './shortcutRegistry'
-import type {
-  KeyDescriptor,
-  ShortcutContext,
-  ShortcutDefinition
-} from './shortcutRegistry'
+import type { KeyDescriptor, ShortcutContext, ShortcutDefinition } from './shortcutRegistry'
 import { shouldIgnoreShortcut } from './typingGuard'
 import type { FocusDescriptor } from './typingGuard'
 import type { EscapeLayerStack } from './layerStack'
@@ -63,9 +59,7 @@ export class ShortcutController {
     )
     if (!chord) return
 
-    if (
-      shouldIgnoreShortcut(chord, focusDescriptor(event.target), this.deps.isMac)
-    ) {
+    if (shouldIgnoreShortcut(chord, focusDescriptor(event.target), this.deps.isMac)) {
       return
     }
 

@@ -74,11 +74,7 @@ export class TransportController {
     return this.deps.queue.getSnapshot().current?.track ?? null
   }
 
-  playQueue(
-    tracks: readonly Track[],
-    index: number,
-    context: QueueContext | null = null
-  ): void {
+  playQueue(tracks: readonly Track[], index: number, context: QueueContext | null = null): void {
     const track = tracks[index]
     if (!track) return
 
@@ -133,9 +129,7 @@ export class TransportController {
   playVisibleTrack(index: number): void {
     const search = this.deps.getSearchText()
     const context: QueueContext =
-      search.trim() === ''
-        ? { kind: 'tracks', label: 'Tracks' }
-        : { kind: 'search', label: search }
+      search.trim() === '' ? { kind: 'tracks', label: 'Tracks' } : { kind: 'search', label: search }
     this.playQueue(this.deps.getVisibleTracks(), index, context)
   }
 
@@ -172,9 +166,7 @@ export class TransportController {
     this.deps.updateControls()
 
     if (autoplay) {
-      void this.deps.engine
-        .play()
-        .catch((error) => this.handlePlaybackFailure(attempt, error))
+      void this.deps.engine.play().catch((error) => this.handlePlaybackFailure(attempt, error))
     }
   }
 
@@ -204,9 +196,7 @@ export class TransportController {
    * metadata arrives; nothing autoplays.
    */
   restoreSession(state: SessionQueueState, position: SessionPositionState | null): boolean {
-    const current = this.deps.queue.importState(state, (trackId) =>
-      this.findTrackById(trackId)
-    )
+    const current = this.deps.queue.importState(state, (trackId) => this.findTrackById(trackId))
 
     this.consecutiveFailures = 0
     this.activeAttempt = null
@@ -439,9 +429,7 @@ export class TransportController {
     this.activeAttempt = attempt
     this.deps.engine.seek(0)
     this.deps.syncTime(0)
-    void this.deps.engine
-      .play()
-      .catch((error) => this.handlePlaybackFailure(attempt, error))
+    void this.deps.engine.play().catch((error) => this.handlePlaybackFailure(attempt, error))
   }
 
   private handlePlaybackFailure(attempt: PlaybackAttempt, error: unknown): void {
@@ -457,10 +445,7 @@ export class TransportController {
     console.error(`[renderer] Could not play ${track?.title ?? 'track'}`, error)
     this.deps.setStatus(track ? `Could not play ${track.title}.` : 'Could not play this file.')
 
-    const decision = decideFailureAction(
-      snapshot.entries.length,
-      this.consecutiveFailures
-    )
+    const decision = decideFailureAction(snapshot.entries.length, this.consecutiveFailures)
     this.consecutiveFailures = decision.failures
 
     if (decision.action === 'skip') {

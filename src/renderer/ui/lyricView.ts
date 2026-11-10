@@ -10,11 +10,7 @@ import { groupSegments } from '../lyrics/segmentGroups'
 import { isLanguageTag } from '../lyrics/translationLabels'
 import { translationTextForLine } from '../lyrics/translationText'
 
-const SEGMENT_CLASSES = [
-  'lyric-seg--sung',
-  'lyric-seg--active',
-  'lyric-seg--upcoming'
-] as const
+const SEGMENT_CLASSES = ['lyric-seg--sung', 'lyric-seg--active', 'lyric-seg--upcoming'] as const
 
 const MANUAL_SCROLL_PAUSE_MS = 4000
 
@@ -238,7 +234,10 @@ export class LyricView {
     this.previousActiveLines.clear()
 
     for (const [lineIndex, elements] of this.segmentElements) {
-      this.segmentFlags.set(lineIndex, elements.map(() => null))
+      this.segmentFlags.set(
+        lineIndex,
+        elements.map(() => null)
+      )
     }
 
     this.lastPrimary = -1
@@ -412,7 +411,10 @@ export class LyricView {
       element.style.removeProperty('--progress')
     }
 
-    this.segmentFlags.set(lineIndex, elements.map(() => null))
+    this.segmentFlags.set(
+      lineIndex,
+      elements.map(() => null)
+    )
     this.activeSegmentElements.set(lineIndex, null)
     this.activeSegmentProgress.delete(lineIndex)
   }

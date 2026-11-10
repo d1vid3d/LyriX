@@ -1,9 +1,5 @@
 import { basename, extname } from 'node:path'
-import type {
-  LyricPreference,
-  LyricSourceOption,
-  LyricSources
-} from '../../shared/lyrics/sources'
+import type { LyricPreference, LyricSourceOption, LyricSources } from '../../shared/lyrics/sources'
 import { readEmbeddedLyrics } from './embedded'
 import { findSidecars } from './sidecar'
 

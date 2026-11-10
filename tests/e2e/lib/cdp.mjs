@@ -73,10 +73,7 @@ export class Cdp {
       this.pending.delete(message.id)
       if (message.error) {
         pending.reject(
-          new CdpError(
-            `${message.error.message} (${message.error.code})`,
-            pending.method
-          )
+          new CdpError(`${message.error.message} (${message.error.code})`, pending.method)
         )
       } else {
         pending.resolve(message.result)
@@ -148,7 +145,11 @@ export class Cdp {
     )
   }
 
-  async waitFor(label, expression, { timeoutMs = DEFAULT_WAIT_MS, intervalMs = DEFAULT_INTERVAL_MS } = {}) {
+  async waitFor(
+    label,
+    expression,
+    { timeoutMs = DEFAULT_WAIT_MS, intervalMs = DEFAULT_INTERVAL_MS } = {}
+  ) {
     const deadline = Date.now() + timeoutMs
     let last
     while (Date.now() < deadline) {

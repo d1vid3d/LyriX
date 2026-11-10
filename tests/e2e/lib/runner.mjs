@@ -31,7 +31,11 @@ export class Runner {
   equal(name, actual, expected) {
     const actualJson = JSON.stringify(actual)
     const expectedJson = JSON.stringify(expected)
-    return this.check(name, actualJson === expectedJson, `actual=${actualJson} expected=${expectedJson}`)
+    return this.check(
+      name,
+      actualJson === expectedJson,
+      `actual=${actualJson} expected=${expectedJson}`
+    )
   }
 
   summary() {
@@ -99,7 +103,16 @@ export async function writeFailureArtifacts({ app, cdp, directory, runner, state
 }
 
 /** Runs `main`, captures artifacts before teardown, and maps failures to an exit code. */
-export async function runSuite({ title, main, app, cdp, tempRoot, stateExpression, stopAll, getTargets }) {
+export async function runSuite({
+  title,
+  main,
+  app,
+  cdp,
+  tempRoot,
+  stateExpression,
+  stopAll,
+  getTargets
+}) {
   const runner = new Runner(title)
   const keep = process.env.LYRIX_E2E_KEEP === '1'
   const shouldKeep = () => runner.failures.length > 0 || keep

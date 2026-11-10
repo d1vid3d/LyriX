@@ -2,11 +2,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  readJsonFile,
-  writeFileAtomic,
-  writeJsonAtomic
-} from '../src/main/json-file'
+import { readJsonFile, writeFileAtomic, writeJsonAtomic } from '../src/main/json-file'
 
 let directory = ''
 
@@ -57,7 +53,7 @@ describe('writeFileAtomic', () => {
 
     await writeFileAtomic(filePath(), bytes)
 
-    expect([...await readFile(filePath())]).toEqual([0, 1, 2, 255])
+    expect([...(await readFile(filePath()))]).toEqual([0, 1, 2, 255])
   })
 
   it('creates missing parent directories', async () => {

@@ -1,10 +1,6 @@
 import type { LyricParser } from '../types'
 import { hasLineTimestamps, readLeadingTimestamps } from '../time'
-import {
-  buildTimedDocument,
-  describeLine,
-  extractHeaders
-} from './shared'
+import { buildTimedDocument, describeLine, extractHeaders } from './shared'
 import type { DraftLine } from './shared'
 
 export const lrcParser: LyricParser = {

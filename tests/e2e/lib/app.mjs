@@ -48,7 +48,12 @@ export async function copyFixtureTree(name, destination) {
 }
 
 /** Copies one file many times; used for the virtualization/rescan fixture without committing it. */
-export async function copyRepeated(source, destinationDir, count, nameFor = (index) => `bulk-${String(index).padStart(3, '0')}.flac`) {
+export async function copyRepeated(
+  source,
+  destinationDir,
+  count,
+  nameFor = (index) => `bulk-${String(index).padStart(3, '0')}.flac`
+) {
   await fs.mkdir(destinationDir, { recursive: true })
   let next = 0
   const worker = async () => {

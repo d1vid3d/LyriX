@@ -10,10 +10,7 @@ export interface ArtistListOptions {
   onOpenArtistMenu?(artist: ArtistItem, position: MenuPosition): void
 }
 
-export function renderArtistList(
-  options: ArtistListOptions,
-  items: readonly ArtistItem[]
-): void {
+export function renderArtistList(options: ArtistListOptions, items: readonly ArtistItem[]): void {
   options.list.replaceChildren()
 
   if (items.length === 0) {

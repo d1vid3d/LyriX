@@ -90,8 +90,7 @@ export class DataDisclaimer {
     this.setBusy(false)
 
     if (!this.openState) {
-      this.opener =
-        document.activeElement instanceof HTMLElement ? document.activeElement : null
+      this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
       this.openState = true
       this.root.hidden = false
       this.root.classList.add('data-disclaimer--open')

@@ -11,11 +11,7 @@ import {
   validateLibraryFile
 } from './formats'
 import type { FavoritesFile, FavoritesFileItem, LibraryFile } from './formats'
-import {
-  findLyrixDataDirName,
-  LYRIXDATA_DIR_NAME,
-  README_CONTENT
-} from './paths'
+import { findLyrixDataDirName, LYRIXDATA_DIR_NAME, README_CONTENT } from './paths'
 import { VersionedStore } from './versionedStore'
 
 export interface LyrixDataStoreOptions {
@@ -26,8 +22,7 @@ export interface LyrixDataStoreOptions {
 }
 
 export type FavoritesFileWriteResult =
-  | { ok: true }
-  | { ok: false; reason: FsFailureReason | 'newer-version' }
+  { ok: true } | { ok: false; reason: FsFailureReason | 'newer-version' }
 
 const README_NAME = 'README.txt'
 const LIBRARY_NAME = 'library.json'
@@ -371,7 +366,7 @@ export class LyrixDataStore {
       state: reason,
       writable: false,
       libraryId: this.libraryId,
-      message: reason === 'unavailable' ? message ?? null : null
+      message: reason === 'unavailable' ? (message ?? null) : null
     })
   }
 
@@ -381,11 +376,7 @@ export class LyrixDataStore {
       writable: false,
       libraryId: this.libraryId,
       message:
-        reason === 'unavailable'
-          ? error instanceof Error
-            ? error.message
-            : String(error)
-          : null
+        reason === 'unavailable' ? (error instanceof Error ? error.message : String(error)) : null
     })
   }
 

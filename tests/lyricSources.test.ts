@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { selectLyricSource, selectTranslationSource } from '../src/shared/lyrics/sources'
-import type {
-  LyricPreference,
-  LyricSourceOption
-} from '../src/shared/lyrics/sources'
+import type { LyricPreference, LyricSourceOption } from '../src/shared/lyrics/sources'
 
 function option(
   id: string,
@@ -88,9 +85,11 @@ describe('selectLyricSource', () => {
   })
 
   it('uses the exact sidecar before variants when the embedded tag is unusable', () => {
-    expect(select([embedded, exactSidecar, english], null, 'embedded', (candidate) => {
-      return candidate.kind !== 'embedded'
-    })).toEqual({ option: exactSidecar, mode: 'auto' })
+    expect(
+      select([embedded, exactSidecar, english], null, 'embedded', (candidate) => {
+        return candidate.kind !== 'embedded'
+      })
+    ).toEqual({ option: exactSidecar, mode: 'auto' })
   })
 
   it('uses variant sidecars in canonical order when earlier sources are missing', () => {

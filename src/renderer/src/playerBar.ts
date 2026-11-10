@@ -32,9 +32,7 @@ export class PlayerBar {
     this.deps = deps
     deps.elements.shuffleButton.addEventListener('click', () => this.deps.toggleShuffle())
     deps.elements.repeatButton.addEventListener('click', () => this.deps.cycleRepeat())
-    deps.elements.queueToggleButton.addEventListener('click', () =>
-      this.deps.toggleQueuePanel()
-    )
+    deps.elements.queueToggleButton.addEventListener('click', () => this.deps.toggleQueuePanel())
   }
 
   updateControls(): void {

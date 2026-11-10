@@ -137,17 +137,13 @@ export function finalizeTimedLines(
     if (draft.agent !== undefined) line.agent = draft.agent
 
     if (draft.segments !== undefined && draft.segments.length > 0) {
-      line.segments = draft.segments.map(
-        (segment, segmentIndex): LyricSegment => ({
-          text: segment.text,
-          start: segment.start,
-          end:
-            segmentIndex + 1 < draft.segments!.length
-              ? draft.segments![segmentIndex + 1].start
-              : end,
-          spaceAfter: segment.spaceAfter
-        })
-      )
+      line.segments = draft.segments.map((segment, segmentIndex): LyricSegment => ({
+        text: segment.text,
+        start: segment.start,
+        end:
+          segmentIndex + 1 < draft.segments!.length ? draft.segments![segmentIndex + 1].start : end,
+        spaceAfter: segment.spaceAfter
+      }))
     }
 
     lines.push(line)

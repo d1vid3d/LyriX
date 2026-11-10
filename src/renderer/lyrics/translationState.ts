@@ -84,7 +84,7 @@ export function buildTranslation(input: TranslationInput): TranslationComputatio
       language: input.language,
       selectedId,
       mode: selection?.mode ?? null,
-      key: attached ? selectedEntry?.option.id ?? null : null,
+      key: attached ? (selectedEntry?.option.id ?? null) : null,
       available: options.some((option) => option.eligible),
       options
     },

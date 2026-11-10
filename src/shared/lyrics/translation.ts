@@ -47,10 +47,7 @@ export function alignTranslation(
   const minRatio = resolveRatio(options.minTimeMatchRatio)
   const total = primary.lines.filter((line) => !isBlankLyricText(line.text)).length
 
-  const timeLines: Array<string | null> = Array.from(
-    { length: primary.lines.length },
-    () => null
-  )
+  const timeLines: Array<string | null> = Array.from({ length: primary.lines.length }, () => null)
   const usedTranslation = new Set<number>()
   let timeMatched = 0
 
@@ -59,12 +56,18 @@ export function alignTranslation(
       const primaryLine = primary.lines[primaryIndex]
       if (!primaryLine || isBlankLyricText(primaryLine.text)) continue
 
-      const matchIndex = findClosestTranslation(primaryLine.start, translation, usedTranslation, tolerance)
+      const matchIndex = findClosestTranslation(
+        primaryLine.start,
+        translation,
+        usedTranslation,
+        tolerance
+      )
       if (matchIndex === -1) continue
 
       usedTranslation.add(matchIndex)
       const translationLine = translation.lines[matchIndex]
-      const text = translationLine && !isBlankLyricText(translationLine.text) ? translationLine.text : null
+      const text =
+        translationLine && !isBlankLyricText(translationLine.text) ? translationLine.text : null
       timeLines[primaryIndex] = text
       if (text !== null) timeMatched += 1
     }

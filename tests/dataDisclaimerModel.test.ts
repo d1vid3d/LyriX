@@ -24,9 +24,7 @@ describe('dataDisclaimerModel', () => {
     expect(buildDataDisclaimerModel('unavailable').message).toBe(
       "This library's location isn't available right now (is the drive connected?). Nothing was changed."
     )
-    expect(buildDataDisclaimerModel('newer-version').message).toContain(
-      "won't modify it"
-    )
+    expect(buildDataDisclaimerModel('newer-version').message).toContain("won't modify it")
   })
 
   it('maps failures and rejects invalid', () => {

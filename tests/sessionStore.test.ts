@@ -29,14 +29,8 @@ async function makeFiles(folder: string | null) {
   roots.push(root)
   const queueFile = join(root, 'session-queue.json')
   const positionFile = join(root, 'session-position.json')
-  await fs.writeFile(
-    queueFile,
-    JSON.stringify({ version: 1, folder, queue: queueState })
-  )
-  await fs.writeFile(
-    positionFile,
-    JSON.stringify({ version: 1, folder, position: positionState })
-  )
+  await fs.writeFile(queueFile, JSON.stringify({ version: 1, folder, queue: queueState }))
+  await fs.writeFile(positionFile, JSON.stringify({ version: 1, folder, position: positionState }))
   return { root, queueFile, positionFile }
 }
 
@@ -67,7 +61,10 @@ describe('SessionStore', () => {
     await fs.writeFile(queueFile, 'not json')
     expect(await new SessionStore(queueFile, positionFile, () => '/music/a').load()).toBeNull()
 
-    await fs.writeFile(queueFile, JSON.stringify({ version: 9, folder: '/music/a', queue: queueState }))
+    await fs.writeFile(
+      queueFile,
+      JSON.stringify({ version: 9, folder: '/music/a', queue: queueState })
+    )
     expect(await new SessionStore(queueFile, positionFile, () => '/music/a').load()).toBeNull()
   })
 

@@ -15,12 +15,7 @@ export interface TracksListOptions {
   onPlayTrack(index: number): void
   isFavorite?(trackId: string): boolean
   onToggleFavorite?(trackId: string): void
-  onOpenTrackMenu?(
-    item: TrackItem,
-    index: number,
-    play: () => void,
-    position: MenuPosition
-  ): void
+  onOpenTrackMenu?(item: TrackItem, index: number, play: () => void, position: MenuPosition): void
 }
 
 export class TracksList {

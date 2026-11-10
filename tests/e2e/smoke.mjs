@@ -27,7 +27,10 @@ async function main(runner, ctx) {
   const { cdp } = ctx
 
   runner.step('startup and scan')
-  await cdp.waitFor('one album card', `document.querySelectorAll('#album-grid .album-card').length === 1`)
+  await cdp.waitFor(
+    'one album card',
+    `document.querySelectorAll('#album-grid .album-card').length === 1`
+  )
   let ui = await readState(cdp)
   runner.equal('window title', ui.title, 'LyriX')
   runner.equal('one library album', ui.albums.length, 1)
@@ -81,7 +84,10 @@ async function main(runner, ctx) {
   runner.equal('repeat starts with an off label', ui.repeatLabel, 'Repeat: off')
 
   await clickSelector(cdp, '#shuffle')
-  await cdp.waitFor('shuffle on', `document.querySelector('#shuffle').getAttribute('aria-pressed') === 'true'`)
+  await cdp.waitFor(
+    'shuffle on',
+    `document.querySelector('#shuffle').getAttribute('aria-pressed') === 'true'`
+  )
   ui = await readState(cdp)
   runner.equal('shuffle label turns on', ui.shuffleLabel, 'Shuffle: on')
 
@@ -97,9 +103,15 @@ async function main(runner, ctx) {
   runner.check('repeat one shows its badge', ui.repeatBadgeVisible)
 
   await clickSelector(cdp, '#repeat')
-  await cdp.waitFor('repeat off again', `document.querySelector('#repeat').dataset.repeat === 'off'`)
+  await cdp.waitFor(
+    'repeat off again',
+    `document.querySelector('#repeat').dataset.repeat === 'off'`
+  )
   await clickSelector(cdp, '#shuffle')
-  await cdp.waitFor('shuffle off again', `document.querySelector('#shuffle').getAttribute('aria-pressed') === 'false'`)
+  await cdp.waitFor(
+    'shuffle off again',
+    `document.querySelector('#shuffle').getAttribute('aria-pressed') === 'false'`
+  )
   ui = await readState(cdp)
   runner.equal('repeat returns to off', ui.repeatLabel, 'Repeat: off')
   runner.equal('shuffle returns to off', ui.shuffleLabel, 'Shuffle: off')
@@ -253,11 +265,7 @@ async function main(runner, ctx) {
       shiftTransform: shifted[0] ? getComputedStyle(shifted[0]).transform : ''
     }
   })()`)
-  runner.equal(
-    'drag ghost mirrors the dragged row',
-    dragVisuals.ghostTitle,
-    dragStart?.sourceTitle
-  )
+  runner.equal('drag ghost mirrors the dragged row', dragVisuals.ghostTitle, dragStart?.sourceTitle)
   runner.equal('drag ghost is decorative', dragVisuals.ghostHidden, 'true')
   runner.check('dragged row leaves its slot', dragVisuals.hasSource)
   runner.check(
@@ -290,8 +298,7 @@ async function main(runner, ctx) {
   })()`)
   runner.check(
     'dropping commits the one-slot move',
-    dragResult.titles[2] === dragStart?.titles[3] &&
-      dragResult.titles[3] === dragStart?.titles[2],
+    dragResult.titles[2] === dragStart?.titles[3] && dragResult.titles[3] === dragStart?.titles[2],
     JSON.stringify({ before: dragStart?.titles, after: dragResult.titles })
   )
   runner.equal('drag classes are cleared after the drop', dragResult.leftovers, 0)
@@ -319,7 +326,9 @@ async function main(runner, ctx) {
     'Q opens the queue panel',
     `document.querySelector('#queue-panel').hidden === false`
   )
-  const qOpened = await cdp.evaluate(`document.querySelector('#queue-toggle').getAttribute('aria-pressed') === 'true'`)
+  const qOpened = await cdp.evaluate(
+    `document.querySelector('#queue-toggle').getAttribute('aria-pressed') === 'true'`
+  )
   runner.check('Q toggles the queue panel open', qOpened)
   await pressKey(cdp, 'q')
   await cdp.waitFor(
@@ -390,12 +399,18 @@ async function main(runner, ctx) {
   )
   const albumReopened = await clickAlbum(cdp, 'Lyric Album', 'Lyric Artist')
   runner.check('album reopened after menu navigation', albumReopened)
-  await cdp.waitFor('detail view after reopen', `document.querySelector('#detail-view').hidden === false`)
+  await cdp.waitFor(
+    'detail view after reopen',
+    `document.querySelector('#detail-view').hidden === false`
+  )
 
   runner.step('open Now Playing and read line-timed lyrics')
   const openedNowPlaying = await clickSelector(cdp, '#now-playing')
   runner.check('bottom bar opens Now Playing', openedNowPlaying)
-  await cdp.waitFor('Now Playing visible', `document.querySelector('#now-playing-view').hidden === false`)
+  await cdp.waitFor(
+    'Now Playing visible',
+    `document.querySelector('#now-playing-view').hidden === false`
+  )
   await cdp.waitFor(
     'line lyric DOM',
     `document.querySelectorAll('#lyric-lines .lyric-line').length === 3`
@@ -412,8 +427,14 @@ async function main(runner, ctx) {
     now.lines.map((line) => line.text).join('|') === EXPECTED_LINE_TEXT,
     JSON.stringify(now.lines.map((line) => line.text))
   )
-  runner.check('line data-index', now.lines.every((line, index) => line.index === String(index)))
-  runner.check('line data-agent absent', now.lines.every((line) => line.agent === ''))
+  runner.check(
+    'line data-index',
+    now.lines.every((line, index) => line.index === String(index))
+  )
+  runner.check(
+    'line data-agent absent',
+    now.lines.every((line) => line.agent === '')
+  )
 
   runner.step('line timing and line seeking')
   await cdp.waitFor(
@@ -446,13 +467,19 @@ async function main(runner, ctx) {
   runner.step('close and reopen Now Playing')
   const closed = await clickSelector(cdp, '#now-playing-close')
   runner.check('close button clicked', closed)
-  await cdp.waitFor('Now Playing closed', `document.querySelector('#now-playing-view').hidden === true`)
+  await cdp.waitFor(
+    'Now Playing closed',
+    `document.querySelector('#now-playing-view').hidden === true`
+  )
   now = await readNowPlaying(cdp)
   runner.check('close restores the detail view', !now.detailHidden)
   runner.equal('close keeps the selected view', now.activeView, 'albums')
 
   await clickSelector(cdp, '#now-playing')
-  await cdp.waitFor('Now Playing reopened', `document.querySelector('#now-playing-view').hidden === false`)
+  await cdp.waitFor(
+    'Now Playing reopened',
+    `document.querySelector('#now-playing-view').hidden === false`
+  )
 
   runner.step('live track change: word-timed lyrics')
   const nextToWord = await cdp.evaluate(`(() => {
@@ -462,7 +489,10 @@ async function main(runner, ctx) {
     return true
   })()`)
   runner.check('next track while Now Playing is open', nextToWord)
-  await cdp.waitFor('word track title', `document.querySelector('#now-playing-title').textContent === 'Word Test'`)
+  await cdp.waitFor(
+    'word track title',
+    `document.querySelector('#now-playing-title').textContent === 'Word Test'`
+  )
   await cdp.waitFor(
     'word lyric DOM',
     `document.querySelectorAll('#lyric-lines .lyric-line').length === 2`
@@ -472,7 +502,10 @@ async function main(runner, ctx) {
   runner.equal('word line has 4 word containers', now.lines[0].words, 4)
   runner.equal('word line has 5 segments', now.lines[0].segments, 5)
   runner.equal('word line text', now.lines[0].text, 'To the uptight tempo')
-  runner.check('word data-agent absent', now.lines.every((line) => line.agent === ''))
+  runner.check(
+    'word data-agent absent',
+    now.lines.every((line) => line.agent === '')
+  )
 
   await cdp.waitFor(
     'active segment progress',
@@ -496,7 +529,10 @@ async function main(runner, ctx) {
     return true
   })()`)
   runner.check('next to plain track', nextToPlain)
-  await cdp.waitFor('plain title', `document.querySelector('#now-playing-title').textContent === 'Plain Test'`)
+  await cdp.waitFor(
+    'plain title',
+    `document.querySelector('#now-playing-title').textContent === 'Plain Test'`
+  )
   await cdp.waitFor(
     'plain lyric DOM',
     `document.querySelectorAll('#lyric-lines .lyric-line').length === 3`
@@ -508,7 +544,10 @@ async function main(runner, ctx) {
   await delay(600)
   now = await readNowPlaying(cdp)
   runner.check('plain lyrics are static', now.staticLines)
-  runner.check('plain lyrics have no current line', now.lines.every((line) => !line.current && !line.active))
+  runner.check(
+    'plain lyrics have no current line',
+    now.lines.every((line) => !line.current && !line.active)
+  )
 
   const paused = await cdp.evaluate(`(() => {
     const audio = document.querySelector('#audio')
@@ -534,7 +573,10 @@ async function main(runner, ctx) {
     return true
   })()`)
   runner.check('next to no-lyrics track', nextToMissing)
-  await cdp.waitFor('no-lyrics title', `document.querySelector('#now-playing-title').textContent === 'No Lyrics'`)
+  await cdp.waitFor(
+    'no-lyrics title',
+    `document.querySelector('#now-playing-title').textContent === 'No Lyrics'`
+  )
   await cdp.waitFor(
     'no lyrics status',
     `(() => {
@@ -552,20 +594,32 @@ async function main(runner, ctx) {
 
   runner.step('Escape closes Now Playing')
   await pressKey(cdp, 'Escape')
-  await cdp.waitFor('Escape closes Now Playing', `document.querySelector('#now-playing-view').hidden === true`)
+  await cdp.waitFor(
+    'Escape closes Now Playing',
+    `document.querySelector('#now-playing-view').hidden === true`
+  )
 
   runner.step('tracks view, search, and scroll survive Now Playing')
   const tracksViewClicked = await clickView(cdp, 'tracks')
   runner.check('tracks view clicked', tracksViewClicked)
-  await cdp.waitFor('tracks view rows', `document.querySelectorAll('#track-scroll .track-row').length > 10`)
+  await cdp.waitFor(
+    'tracks view rows',
+    `document.querySelectorAll('#track-scroll .track-row').length > 10`
+  )
 
   await setSearch(cdp, 'Plain')
-  await cdp.waitFor('search filtered', `document.querySelectorAll('#track-scroll .track-row').length === 1`)
+  await cdp.waitFor(
+    'search filtered',
+    `document.querySelectorAll('#track-scroll .track-row').length === 1`
+  )
   ui = await readState(cdp)
   runner.equal('search finds the plain track', ui.trackRows[0]?.title, 'Plain Test')
 
   await setSearch(cdp, '')
-  await cdp.waitFor('search cleared', `document.querySelectorAll('#track-scroll .track-row').length > 10`)
+  await cdp.waitFor(
+    'search cleared',
+    `document.querySelectorAll('#track-scroll .track-row').length > 10`
+  )
   await cdp.evaluate(
     `document.querySelector('#track-scroll').scrollTop = document.querySelector('#track-scroll').scrollHeight`
   )
@@ -579,9 +633,15 @@ async function main(runner, ctx) {
   runner.check('tracks view actually scrolled', scrollBefore > 0, String(scrollBefore))
 
   await clickSelector(cdp, '#now-playing')
-  await cdp.waitFor('Now Playing from tracks view', `document.querySelector('#now-playing-view').hidden === false`)
+  await cdp.waitFor(
+    'Now Playing from tracks view',
+    `document.querySelector('#now-playing-view').hidden === false`
+  )
   await clickSelector(cdp, '#now-playing-close')
-  await cdp.waitFor('Now Playing closed to tracks', `document.querySelector('#now-playing-view').hidden === true`)
+  await cdp.waitFor(
+    'Now Playing closed to tracks',
+    `document.querySelector('#now-playing-view').hidden === true`
+  )
   // Closing re-shows the preserved tracks view; its virtual row window is laid out on the next
   // frame, so wait for it before snapshotting or the row count is transiently zero.
   await cdp.waitFor(
@@ -650,9 +710,18 @@ async function main(runner, ctx) {
   let created = [false, false, false]
   while (Date.now() < createdDeadline) {
     created = await Promise.all([
-      fs.stat(favoritesFile).then(() => true).catch(() => false),
-      fs.stat(libraryFile).then(() => true).catch(() => false),
-      fs.stat(readmeFile).then(() => true).catch(() => false)
+      fs
+        .stat(favoritesFile)
+        .then(() => true)
+        .catch(() => false),
+      fs
+        .stat(libraryFile)
+        .then(() => true)
+        .catch(() => false),
+      fs
+        .stat(readmeFile)
+        .then(() => true)
+        .catch(() => false)
     ])
     if (created.every(Boolean)) break
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -694,10 +763,12 @@ async function main(runner, ctx) {
     'favorites empty state returns',
     `document.querySelector('#favorites-empty').hidden === false`
   )
-  const emptyText = await cdp.evaluate(
-    `document.querySelector('#favorites-empty').textContent`
+  const emptyText = await cdp.evaluate(`document.querySelector('#favorites-empty').textContent`)
+  runner.equal(
+    'favorites empty state is exact',
+    emptyText,
+    'No favorites yet. Press the heart on any track.'
   )
-  runner.equal('favorites empty state is exact', emptyText, 'No favorites yet. Press the heart on any track.')
 
   await pressKey(cdp, 'f')
   await cdp.waitFor(
@@ -740,9 +811,7 @@ async function main(runner, ctx) {
     `document.querySelector('#shuffle').getAttribute('aria-pressed') === ${JSON.stringify(shuffleBefore)}`
   )
 
-  const playingBefore = await cdp.evaluate(
-    `document.querySelector('#play-pause').dataset.playing`
-  )
+  const playingBefore = await cdp.evaluate(`document.querySelector('#play-pause').dataset.playing`)
   await pressKey(cdp, ' ')
   await cdp.waitFor(
     'Space toggles play/pause',
@@ -781,8 +850,7 @@ async function main(runner, ctx) {
   runner.check('overlay groups shortcuts by category', overlay.groups >= 5, String(overlay.groups))
   runner.check(
     'overlay lists playback and help shortcuts',
-    overlay.labels.includes('Play / pause') &&
-      overlay.labels.includes('Show keyboard shortcuts'),
+    overlay.labels.includes('Play / pause') && overlay.labels.includes('Show keyboard shortcuts'),
     overlay.labels.join('|')
   )
   runner.check('overlay takes focus', overlay.focusedInside)

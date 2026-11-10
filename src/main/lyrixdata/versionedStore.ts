@@ -14,8 +14,7 @@ export interface VersionedRead<T> {
 }
 
 export type VersionedWriteResult =
-  | { ok: true }
-  | { ok: false; reason: FsFailureReason | 'newer-version'; message?: string }
+  { ok: true } | { ok: false; reason: FsFailureReason | 'newer-version'; message?: string }
 
 export interface VersionedStoreOptions<T extends VersionedValue> {
   filePath: string

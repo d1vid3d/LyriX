@@ -30,8 +30,6 @@ describe('translationTextForLine', () => {
 
   it('returns the matching plain translation text', () => {
     expect(translationTextForLine(line({ en: 'hello there' }), 'en')).toBe('hello there')
-    expect(translationTextForLine(line({ en: 'hello', ja: 'こんにちは' }), 'ja')).toBe(
-      'こんにちは'
-    )
+    expect(translationTextForLine(line({ en: 'hello', ja: 'こんにちは' }), 'ja')).toBe('こんにちは')
   })
 })

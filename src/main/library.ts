@@ -42,10 +42,7 @@ function createState(): LibraryState {
 }
 
 /** Rebuild the library from cached tags without reading any audio files. */
-export function restoreLibrary(
-  folder: string | null,
-  cache: LibraryCache | null
-): LibrarySnapshot {
+export function restoreLibrary(folder: string | null, cache: LibraryCache | null): LibrarySnapshot {
   state = createState()
   state.root = folder
   state.folderName = folder ? folderLabel(folder) : null
@@ -55,7 +52,10 @@ export function restoreLibrary(
 }
 
 /** Set the active folder and make the scanned entries the current library. */
-export function applyLibrary(folder: string, entries: Record<string, CachedTrack>): LibrarySnapshot {
+export function applyLibrary(
+  folder: string,
+  entries: Record<string, CachedTrack>
+): LibrarySnapshot {
   state.root = folder
   state.folderName = folderLabel(folder)
   return applyEntries(entries)

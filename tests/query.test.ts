@@ -110,9 +110,7 @@ const alpha2 = album({
 const index = buildLibraryIndex([zebra, alpha, alpha10, alpha2])
 
 function albumTitles(sort: string): string[] {
-  return queryLibrary(index, { view: 'albums', search: '', sort }).map(
-    (item) => item.album.title
-  )
+  return queryLibrary(index, { view: 'albums', search: '', sort }).map((item) => item.album.title)
 }
 
 function artistNames(sort: string): string[] {
@@ -120,9 +118,7 @@ function artistNames(sort: string): string[] {
 }
 
 function trackTitles(sort: string): string[] {
-  return queryLibrary(index, { view: 'tracks', search: '', sort }).map(
-    (item) => item.track.title
-  )
+  return queryLibrary(index, { view: 'tracks', search: '', sort }).map((item) => item.track.title)
 }
 
 describe('normalizeText', () => {
@@ -222,33 +218,25 @@ describe('artist grouping', () => {
       id: 'a1',
       title: 'First',
       artist: 'A',
-      tracks: [
-        track({ id: 'a1-t1', title: 'One', album: 'First', albumArtist: 'A' })
-      ]
+      tracks: [track({ id: 'a1-t1', title: 'One', album: 'First', albumArtist: 'A' })]
     }),
     album({
       id: 'a2',
       title: 'Second',
       artist: 'A',
-      tracks: [
-        track({ id: 'a2-t1', title: 'Two', album: 'Second', albumArtist: 'A' })
-      ]
+      tracks: [track({ id: 'a2-t1', title: 'Two', album: 'Second', albumArtist: 'A' })]
     }),
     album({
       id: 'a3',
       title: 'Together',
       artist: 'A, B',
-      tracks: [
-        track({ id: 'a3-t1', title: 'Three', album: 'Together', albumArtist: 'A, B' })
-      ]
+      tracks: [track({ id: 'a3-t1', title: 'Three', album: 'Together', albumArtist: 'A, B' })]
     }),
     album({
       id: 'a4',
       title: 'Other',
       artist: 'B',
-      tracks: [
-        track({ id: 'a4-t1', title: 'Four', album: 'Other', albumArtist: 'B' })
-      ]
+      tracks: [track({ id: 'a4-t1', title: 'Four', album: 'Other', albumArtist: 'B' })]
     })
   ])
 

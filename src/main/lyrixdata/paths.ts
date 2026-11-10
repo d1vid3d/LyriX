@@ -29,10 +29,7 @@ export function isAllowedLyrixDataFile(name: string): boolean {
  * Normalizes an absolute path to the portable reference form: relative to the library root,
  * forward slashes, Unicode NFC. Returns `null` for paths outside the root.
  */
-export function toPortableLibraryPath(
-  root: string,
-  filePath: string
-): string | null {
+export function toPortableLibraryPath(root: string, filePath: string): string | null {
   const rel = relative(root, filePath)
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null
   return rel.split(sep).join('/').normalize('NFC')

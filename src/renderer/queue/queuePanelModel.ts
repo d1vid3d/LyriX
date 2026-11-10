@@ -41,10 +41,7 @@ export interface QueuePanelEmptyRow {
   label: string
 }
 
-export type QueuePanelRow =
-  | QueuePanelEntryRow
-  | QueuePanelSectionRow
-  | QueuePanelEmptyRow
+export type QueuePanelRow = QueuePanelEntryRow | QueuePanelSectionRow | QueuePanelEmptyRow
 
 export interface QueuePanelModel {
   rows: QueuePanelRow[]
@@ -138,9 +135,7 @@ export function buildQueuePanelModel(input: QueuePanelModelInput): QueuePanelMod
     upcomingStartRow = rows.length
     for (let offset = 0; offset < upcoming.length; offset += 1) {
       const entry = upcoming[offset]
-      rows.push(
-        entryRow(entry, currentIndex + 1 + offset, 'upcoming', findAlbum(entry.track))
-      )
+      rows.push(entryRow(entry, currentIndex + 1 + offset, 'upcoming', findAlbum(entry.track)))
     }
   }
 

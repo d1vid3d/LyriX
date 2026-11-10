@@ -1,10 +1,7 @@
 import type { SessionPositionState, SessionQueueState } from '../../shared/types'
 import type { PlaybackEngine } from '../player/engine'
 import type { PlaybackQueue } from '../player/queue'
-import {
-  SESSION_QUEUE_DEBOUNCE_MS,
-  shouldSendPosition
-} from './sessionTiming'
+import { SESSION_QUEUE_DEBOUNCE_MS, shouldSendPosition } from './sessionTiming'
 import type { PositionUpdateReason } from './sessionTiming'
 
 export interface SessionControllerDeps {

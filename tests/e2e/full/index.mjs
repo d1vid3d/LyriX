@@ -59,13 +59,15 @@ async function run() {
           ...viewsHealth.consoleErrors,
           ...ctx.cdp.consoleErrors
         ]
-        const exceptions = [
-          ...session.exceptions,
-          ...viewsHealth.exceptions,
-          ...ctx.cdp.exceptions
-        ]
-        const unexpected = consoleErrors.filter((message) => !message.includes('Could not play broken'))
-        runner.check('no unexpected renderer console errors', unexpected.length === 0, unexpected.join(' | '))
+        const exceptions = [...session.exceptions, ...viewsHealth.exceptions, ...ctx.cdp.exceptions]
+        const unexpected = consoleErrors.filter(
+          (message) => !message.includes('Could not play broken')
+        )
+        runner.check(
+          'no unexpected renderer console errors',
+          unexpected.length === 0,
+          unexpected.join(' | ')
+        )
         runner.check('no renderer exceptions', exceptions.length === 0, exceptions.join(' | '))
         runner.check('app is still running', ctx.app.running)
       },

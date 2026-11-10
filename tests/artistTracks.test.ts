@@ -93,7 +93,10 @@ describe('getArtistTracks', () => {
   })
 
   it('does not reorder the input albums or tracks', () => {
-    const first = album('first', { year: 2001, tracks: [track('b', { trackNumber: 2 }), track('a', { trackNumber: 1 })] })
+    const first = album('first', {
+      year: 2001,
+      tracks: [track('b', { trackNumber: 2 }), track('a', { trackNumber: 1 })]
+    })
     const second = album('second', { year: 1999, tracks: [track('c')] })
     const item = artist([first, second])
 

@@ -59,7 +59,9 @@ class MemoryFs implements FsAdapter {
     return { ...stats, isSymbolicLink: () => false, isDirectory: () => false }
   }
 
-  async readdir(): Promise<Array<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }>> {
+  async readdir(): Promise<
+    Array<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }>
+  > {
     return []
   }
 

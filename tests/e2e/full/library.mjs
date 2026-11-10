@@ -15,16 +15,19 @@ export async function runStartup(ctx) {
   runner.equal('album cards', ui.albums.length, 5)
   runner.equal('status counts', ui.status, 'ui-music · 5 albums · 7 tracks')
   runner.equal('volume restored from settings', ui.volume, 0.35)
-  runner.check('audio volume restored', Math.abs(ui.audioVolume - 0.35) < 1e-9, String(ui.audioVolume))
+  runner.check(
+    'audio volume restored',
+    Math.abs(ui.audioVolume - 0.35) < 1e-9,
+    String(ui.audioVolume)
+  )
   runner.equal('rescan enabled after load', ui.rescanDisabled, false)
 
   const shared = ui.albums.filter((album) => album.title === 'Shared Album')
   runner.equal('shared album appears twice', shared.length, 2)
-  runner.equal(
-    'shared album artists',
-    shared.map((album) => album.artist).sort(),
-    ['Album Artist A', 'Album Artist B']
-  )
+  runner.equal('shared album artists', shared.map((album) => album.artist).sort(), [
+    'Album Artist A',
+    'Album Artist B'
+  ])
   runner.equal(
     'album titles sorted',
     ui.albums.map((album) => album.title),
@@ -35,10 +38,16 @@ export async function runStartup(ctx) {
     `(() => { const img = document.querySelector('.album-card img'); return !!img && img.complete && img.naturalWidth > 0 })()`
   )
   ui = await readState(cdp)
-  runner.check('grid cover loaded', ui.albums.some((album) => album.coverLoaded))
+  runner.check(
+    'grid cover loaded',
+    ui.albums.some((album) => album.coverLoaded)
+  )
 
   runner.step('full: album detail')
-  runner.check('album card found: Shared Album / Album Artist A', await clickAlbum(cdp, 'Shared Album', 'Album Artist A'))
+  runner.check(
+    'album card found: Shared Album / Album Artist A',
+    await clickAlbum(cdp, 'Shared Album', 'Album Artist A')
+  )
   await cdp.waitFor('detail view', `document.querySelector('#detail-view').hidden === false`)
   await cdp.waitFor(
     'detail cover loaded',
@@ -50,7 +59,11 @@ export async function runStartup(ctx) {
   runner.equal('detail track count', ui.tracks.length, 2)
   runner.equal(
     'detail track order',
-    ui.tracks.map((track) => ({ title: track.title, number: track.number, duration: track.duration })),
+    ui.tracks.map((track) => ({
+      title: track.title,
+      number: track.number,
+      duration: track.duration
+    })),
     [
       { title: 'First Song', number: '1', duration: '0:02' },
       { title: 'Second Song', number: '2', duration: '0:05' }
@@ -76,7 +89,11 @@ export async function runStartup(ctx) {
   runner.equal('next enabled mid-album', ui.nextDisabled, false)
   runner.equal('previous enabled with current track', ui.previousDisabled, false)
   runner.equal('seek enabled', ui.seek.disabled, false)
-  runner.check('seek duration loaded', ui.seek.max >= 1.9 && ui.seek.max <= 2.1, String(ui.seek.max))
+  runner.check(
+    'seek duration loaded',
+    ui.seek.max >= 1.9 && ui.seek.max <= 2.1,
+    String(ui.seek.max)
+  )
   await cdp.waitFor(
     'now cover loaded',
     `(() => { const img = document.querySelector('#now-cover'); return !!img && img.complete && img.naturalWidth > 0 })()`
@@ -115,7 +132,9 @@ export async function runStartup(ctx) {
 
   let savedSettings = null
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    await cdp.evaluate(`document.querySelector('#volume').dispatchEvent(new Event('change', { bubbles: true }))`)
+    await cdp.evaluate(
+      `document.querySelector('#volume').dispatchEvent(new Event('change', { bubbles: true }))`
+    )
     const settingsDeadline = Date.now() + 1200
     while (Date.now() < settingsDeadline) {
       try {

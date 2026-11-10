@@ -101,9 +101,7 @@ describe('normalizeSessionPosition', () => {
 
   it('rejects invalid positions', () => {
     for (const position of [-1, Number.NaN, Number.POSITIVE_INFINITY, '12', null]) {
-      expect(
-        normalizeSessionPosition({ entryId: 'entry-1', trackId: trackA, position })
-      ).toBeNull()
+      expect(normalizeSessionPosition({ entryId: 'entry-1', trackId: trackA, position })).toBeNull()
     }
     expect(normalizeSessionPosition({ entryId: '', trackId: trackA, position: 1 })).toBeNull()
     expect(normalizeSessionPosition({ entryId: 'entry-1', trackId: 'bad', position: 1 })).toBeNull()

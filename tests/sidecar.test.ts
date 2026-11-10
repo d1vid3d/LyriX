@@ -60,7 +60,9 @@ describe('findSidecars', () => {
 
     const sidecars = await findSidecars(trackPath())
 
-    expect(Object.fromEntries(sidecars.map((sidecar) => [sidecar.fileName, sidecar.variant]))).toEqual({
+    expect(
+      Object.fromEntries(sidecars.map((sidecar) => [sidecar.fileName, sidecar.variant]))
+    ).toEqual({
       'Song.lrc': null,
       'Song.EN.lrc': 'EN',
       'Song.en-US.lrc': 'en-US'

@@ -1,9 +1,5 @@
 import type { LyricPreference } from '../../shared/lyrics/sources'
-import {
-  firstEnabledIndex,
-  lastEnabledIndex,
-  nextEnabledIndex
-} from '../lyrics/sourceMenuModel'
+import { firstEnabledIndex, lastEnabledIndex, nextEnabledIndex } from '../lyrics/sourceMenuModel'
 import type { SourceMenuModel } from '../lyrics/sourceMenuModel'
 import { buildPopoverContent } from './lyricSourceMenuView'
 

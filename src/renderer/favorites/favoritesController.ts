@@ -1,8 +1,4 @@
-import type {
-  FavoritesSetResult,
-  FavoritesState,
-  FavoriteMissing
-} from '../../shared/types'
+import type { FavoritesSetResult, FavoritesState, FavoriteMissing } from '../../shared/types'
 import type { FavoritesWriteFailure } from '../../shared/types'
 import { disclaimerReasonFromFailure } from './dataDisclaimerModel'
 import type { DisclaimerReason } from './dataDisclaimerModel'
@@ -138,10 +134,7 @@ export class FavoritesController {
     return this.deps.api.onFavoritesChanged((state) => this.apply(state))
   }
 
-  private async request(
-    ids: readonly string[],
-    favorite: boolean
-  ): Promise<FavoritesSetResult> {
+  private async request(ids: readonly string[], favorite: boolean): Promise<FavoritesSetResult> {
     try {
       return await this.deps.api.setFavorite([...ids], favorite)
     } catch (error) {

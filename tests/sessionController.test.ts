@@ -108,11 +108,9 @@ describe('SessionController', () => {
 
     vi.advanceTimersByTime(1)
     expect(saveQueue).toHaveBeenCalledTimes(1)
-    expect(saveQueue.mock.calls[0][0].entries.map((entry: { trackId: string }) => entry.trackId)).toEqual([
-      'a',
-      'b',
-      'd'
-    ])
+    expect(
+      saveQueue.mock.calls[0][0].entries.map((entry: { trackId: string }) => entry.trackId)
+    ).toEqual(['a', 'b', 'd'])
     controller.dispose()
   })
 

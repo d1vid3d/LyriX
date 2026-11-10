@@ -6,10 +6,7 @@ export const REASON_EMBEDDED_MISSING = "No lyrics in this file's tags"
 export const REASON_SIDECAR_MISSING = 'No sidecar file next to this track'
 
 /** Disabled reason shared by source and translation rows for an unusable option. */
-export function unavailableReason(
-  expectedSidecarName: string,
-  option: LyricSourceOption
-): string {
+export function unavailableReason(expectedSidecarName: string, option: LyricSourceOption): string {
   if (!option.available) {
     if (option.kind === 'embedded') return REASON_EMBEDDED_MISSING
 

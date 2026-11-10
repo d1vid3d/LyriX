@@ -65,9 +65,7 @@ export const DEFAULT_SHORTCUTS: readonly ShortcutDefinition[] = [
     category: 'Queue',
     keys: [{ key: 'q' }],
     when: (context) =>
-      !context.contextMenuOpen &&
-      !context.sourceMenuOpen &&
-      !context.shortcutsOverlayOpen
+      !context.contextMenuOpen && !context.sourceMenuOpen && !context.shortcutsOverlayOpen
   },
   {
     id: 'focusSearch',

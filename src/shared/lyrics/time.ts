@@ -3,11 +3,7 @@ export const INLINE_TIMESTAMP_RE = /<(\d+):(\d{1,2})(?:\.(\d+))?>/g
 const INLINE_TIMESTAMP_DETECT_RE = /<\d+:\d{1,2}(?:\.\d+)?>/
 
 /** Seconds for one parsed clock value; the fractional part is a decimal fraction. */
-export function parseTimestampParts(
-  minutes: string,
-  seconds: string,
-  fraction?: string
-): number {
+export function parseTimestampParts(minutes: string, seconds: string, fraction?: string): number {
   return Number(minutes) * 60 + Number(seconds) + (fraction ? Number(`0.${fraction}`) : 0)
 }
 
@@ -40,10 +36,7 @@ export function hasLineTimestamps(text: string): boolean {
 export function hasEnhancedTimestamps(text: string): boolean {
   return text
     .split('\n')
-    .some(
-      (line) =>
-        LINE_TIMESTAMP_START_RE.test(line) && INLINE_TIMESTAMP_DETECT_RE.test(line)
-    )
+    .some((line) => LINE_TIMESTAMP_START_RE.test(line) && INLINE_TIMESTAMP_DETECT_RE.test(line))
 }
 
 export function parseOffsetMs(value: string): number | null {

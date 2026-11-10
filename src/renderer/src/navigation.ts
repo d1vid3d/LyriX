@@ -1,6 +1,12 @@
 import type { LibraryView } from '../library/query'
 import type { AppElements } from './dom'
-import { backLabel as routeBackLabel, popRoute, pruneRoutes, pushRoute, topRoute } from './routeStack'
+import {
+  backLabel as routeBackLabel,
+  popRoute,
+  pruneRoutes,
+  pushRoute,
+  topRoute
+} from './routeStack'
 import type { DetailRoute } from './routeStack'
 
 export interface NavigationDeps {

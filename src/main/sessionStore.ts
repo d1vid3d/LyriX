@@ -1,8 +1,4 @@
-import type {
-  RestoredSession,
-  SessionPositionState,
-  SessionQueueState
-} from '../shared/types'
+import type { RestoredSession, SessionPositionState, SessionQueueState } from '../shared/types'
 import { readJsonFile, writeJsonAtomic } from './json-file'
 import {
   normalizeRestoredSession,
@@ -51,11 +47,7 @@ export class SessionStore {
   private lastPositionWriteAt = 0
   private writeChain: Promise<void> = Promise.resolve()
 
-  constructor(
-    queueFile: string,
-    positionFile: string,
-    getFolder: () => string | null
-  ) {
+  constructor(queueFile: string, positionFile: string, getFolder: () => string | null) {
     this.queueFile = queueFile
     this.positionFile = positionFile
     this.getFolder = getFolder

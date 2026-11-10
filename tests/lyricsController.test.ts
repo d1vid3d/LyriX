@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LyricsController } from '../src/renderer/lyrics/lyricsController'
 import type { LyricsState } from '../src/renderer/lyrics/lyricsController'
-import type {
-  LyricPreference,
-  LyricSourceOption,
-  LyricSources
-} from '../src/shared/lyrics/sources'
+import type { LyricPreference, LyricSourceOption, LyricSources } from '../src/shared/lyrics/sources'
 
 interface Deferred<T> {
   promise: Promise<T>
@@ -612,9 +608,7 @@ describe('LyricsController translation layer', () => {
   })
 
   it('keeps an ineligible saved translation and restores it when it becomes eligible again', async () => {
-    const fetchSources = vi.fn(async (trackId: string) =>
-      translationSources(trackId, 'embedded')
-    )
+    const fetchSources = vi.fn(async (trackId: string) => translationSources(trackId, 'embedded'))
     const { controller } = createController(fetchSources, 'sidecar', undefined, {
       enabled: true,
       language: 'en'

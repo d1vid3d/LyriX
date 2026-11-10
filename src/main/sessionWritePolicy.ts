@@ -24,8 +24,7 @@ export interface SessionWriteDecision {
  * writes immediately. Callers force both through an explicit flush on quit/close.
  */
 export function decideSessionWrites(input: SessionWriteInput): SessionWriteDecision {
-  const queueChanged =
-    input.lastQueueKey === null || input.lastQueueKey !== input.nextQueueKey
+  const queueChanged = input.lastQueueKey === null || input.lastQueueKey !== input.nextQueueKey
   const positionChanged =
     input.lastPositionKey === null || input.lastPositionKey !== input.nextPositionKey
   const intervalElapsed =

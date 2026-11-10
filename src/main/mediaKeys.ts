@@ -12,9 +12,7 @@ const ACCELERATORS: ReadonlyArray<{ accelerator: string; action: MediaKeyAction 
  * Fallback media-key route. Only used when `MEDIA_KEY_MODE` is `global-shortcuts`; the primary
  * route relies on Chromium's Media Session service. Registering both would double-fire keys.
  */
-export function registerGlobalMediaKeys(
-  send: (action: MediaKeyAction) => void
-): void {
+export function registerGlobalMediaKeys(send: (action: MediaKeyAction) => void): void {
   for (const { accelerator, action } of ACCELERATORS) {
     try {
       const registered = globalShortcut.register(accelerator, () => send(action))

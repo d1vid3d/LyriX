@@ -5,11 +5,7 @@ import {
   parseTimestampParts,
   readLeadingTimestamps
 } from '../time'
-import {
-  buildTimedDocument,
-  describeLine,
-  extractHeaders
-} from './shared'
+import { buildTimedDocument, describeLine, extractHeaders } from './shared'
 import type { DraftLine, DraftSegment } from './shared'
 
 const AGENT_RE = /^(v\d+):\s*/
@@ -73,7 +69,10 @@ export const enhancedLrcParser: LyricParser = {
 
       const lineText =
         markers.length > 0
-          ? segments.map((segment) => segment.text + (segment.spaceAfter ? ' ' : '')).join('').trim()
+          ? segments
+              .map((segment) => segment.text + (segment.spaceAfter ? ' ' : ''))
+              .join('')
+              .trim()
           : bodyText.trim()
 
       const firstTime = times[0]

@@ -98,13 +98,23 @@ describe('track refs', () => {
 
   it('accepts duration within one second but not beyond it', () => {
     const index = buildRefIndex(
-      [{ track: track('a'.repeat(40), { duration: 10.9 }), filePath: join(root, 'New', 'Song.flac') }],
+      [
+        {
+          track: track('a'.repeat(40), { duration: 10.9 }),
+          filePath: join(root, 'New', 'Song.flac')
+        }
+      ],
       root
     )
     expect(resolveTrackRef(refFor('Old/Song.flac'), index).status).toBe('relinked')
 
     const far = buildRefIndex(
-      [{ track: track('a'.repeat(40), { duration: 11.1 }), filePath: join(root, 'New', 'Song.flac') }],
+      [
+        {
+          track: track('a'.repeat(40), { duration: 11.1 }),
+          filePath: join(root, 'New', 'Song.flac')
+        }
+      ],
       root
     )
     expect(resolveTrackRef(refFor('Old/Song.flac'), far).status).toBe('missing')

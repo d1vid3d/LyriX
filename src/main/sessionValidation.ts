@@ -116,8 +116,7 @@ export function normalizeRestoredSession(
     normalizedPosition !== null &&
     normalizedQueue.entries.some(
       (entry) =>
-        entry.entryId === normalizedPosition.entryId &&
-        entry.trackId === normalizedPosition.trackId
+        entry.entryId === normalizedPosition.entryId && entry.trackId === normalizedPosition.trackId
     )
 
   return {

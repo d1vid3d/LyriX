@@ -2,12 +2,7 @@ import type { Track } from '../../../shared/types'
 import type { QueueContext, SessionQueueState } from '../../../shared/types'
 import { shuffleArray, shuffleEntriesAvoidingTrack } from './shuffle'
 import type { QueueRandom } from './shuffle'
-import type {
-  QueueEntry,
-  QueueOrigin,
-  QueueSnapshot,
-  RepeatMode
-} from './types'
+import type { QueueEntry, QueueOrigin, QueueSnapshot, RepeatMode } from './types'
 
 export interface SetQueueOptions {
   context?: QueueContext | null
@@ -55,7 +50,7 @@ export class PlaybackQueue {
   private readonly random: QueueRandom
 
   constructor(options: QueueOptions | QueueRandom = {}) {
-    this.random = typeof options === 'function' ? options : options.random ?? Math.random
+    this.random = typeof options === 'function' ? options : (options.random ?? Math.random)
   }
 
   getSnapshot(): QueueSnapshot {
@@ -68,7 +63,7 @@ export class PlaybackQueue {
         origin: entry.origin
       })
     )
-    const current = this.index >= 0 ? entries[this.index] ?? null : null
+    const current = this.index >= 0 ? (entries[this.index] ?? null) : null
 
     this.cachedSnapshot = Object.freeze({
       entries: Object.freeze(entries),
@@ -191,8 +186,7 @@ export class PlaybackQueue {
   canGoNext(): boolean {
     if (this.index < 0) return false
     return (
-      this.index < this.entries.length - 1 ||
-      (this.repeat === 'all' && this.entries.length > 0)
+      this.index < this.entries.length - 1 || (this.repeat === 'all' && this.entries.length > 0)
     )
   }
 
@@ -223,11 +217,7 @@ export class PlaybackQueue {
         inserted.map((entry) => entry.entryId)
       )
     } else {
-      this.originalOrder.splice(
-        insertAt,
-        0,
-        ...inserted.map((entry) => entry.entryId)
-      )
+      this.originalOrder.splice(insertAt, 0, ...inserted.map((entry) => entry.entryId))
     }
 
     this.commit()
@@ -300,11 +290,7 @@ export class PlaybackQueue {
   }
 
   clear(): number {
-    if (
-      this.entries.length === 0 &&
-      this.index === -1 &&
-      this.context === null
-    ) {
+    if (this.entries.length === 0 && this.index === -1 && this.context === null) {
       return 0
     }
 
@@ -369,9 +355,7 @@ export class PlaybackQueue {
     this.commit()
   }
 
-  reconcile(
-    trackLookup: (trackId: string) => Track | null | undefined
-  ): QueueEntry | null {
+  reconcile(trackLookup: (trackId: string) => Track | null | undefined): QueueEntry | null {
     const current = this.currentEntry()
     if (!current) return null
 

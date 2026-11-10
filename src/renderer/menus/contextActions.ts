@@ -1,16 +1,8 @@
 import type { Album, Track } from '../../shared/types'
 import type { ArtistItem } from '../library/query'
 import type { QueueContext, QueueSnapshot } from '../player/queue'
-import type {
-  ContextActionId,
-  ContextActionPayload,
-  ContextMenuItem
-} from './contextMenuModels'
-import {
-  addedToQueueMessage,
-  playingNextMessage,
-  TOAST_MESSAGES
-} from './toastMessages'
+import type { ContextActionId, ContextActionPayload, ContextMenuItem } from './contextMenuModels'
+import { addedToQueueMessage, playingNextMessage, TOAST_MESSAGES } from './toastMessages'
 
 /** The queue surface the action dispatcher needs; the real `PlaybackQueue` satisfies it. */
 export interface ContextActionQueue {
@@ -29,11 +21,7 @@ export interface ContextActionQueue {
 
 /** Transport calls used by menu actions. */
 export interface ContextActionTransport {
-  playQueue(
-    tracks: readonly Track[],
-    index: number,
-    context?: QueueContext | null
-  ): void
+  playQueue(tracks: readonly Track[], index: number, context?: QueueContext | null): void
   shuffleAlbum(album: Album): void
   shuffleArtist(artist: ArtistItem): void
   startCurrentTrack(autoplay: boolean): void
@@ -202,8 +190,7 @@ export class ContextActions {
     if (!entryId) return
 
     const snapshot = this.deps.queue.getSnapshot()
-    const target =
-      snapshot.currentIndex >= 0 ? snapshot.currentIndex + 1 : 0
+    const target = snapshot.currentIndex >= 0 ? snapshot.currentIndex + 1 : 0
     this.deps.queue.move(entryId, target)
   }
 
@@ -212,8 +199,7 @@ export class ContextActions {
     if (!entryId) return
 
     const snapshot = this.deps.queue.getSnapshot()
-    const target =
-      snapshot.currentIndex >= 0 ? snapshot.currentIndex + 1 : 0
+    const target = snapshot.currentIndex >= 0 ? snapshot.currentIndex + 1 : 0
     this.deps.queue.move(entryId, target)
   }
 

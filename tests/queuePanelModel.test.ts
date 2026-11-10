@@ -35,10 +35,7 @@ function albumFor(value: Track): Album {
   }
 }
 
-function model(
-  snapshot: ReturnType<PlaybackQueue['getSnapshot']>,
-  historyCollapsed = true
-) {
+function model(snapshot: ReturnType<PlaybackQueue['getSnapshot']>, historyCollapsed = true) {
   return buildQueuePanelModel({
     snapshot,
     historyCollapsed,
@@ -52,9 +49,7 @@ describe('buildQueuePanelModel', () => {
     const result = model(queue.getSnapshot())
 
     expect(result.empty).toBe(true)
-    expect(result.rows).toEqual([
-      { kind: 'empty', id: 'empty', label: QUEUE_EMPTY_TEXT }
-    ])
+    expect(result.rows).toEqual([{ kind: 'empty', id: 'empty', label: QUEUE_EMPTY_TEXT }])
     expect(result.contextLabel).toBe('Queue')
     expect(result.countLabel).toBe('0 tracks')
     expect(result.durationLabel).toBe('0:00')
@@ -134,12 +129,11 @@ describe('buildQueuePanelModel', () => {
       (row) => row.kind === 'entry' && row.section === 'history'
     )
     expect(historyRows).toHaveLength(2)
-    expect(
-      historyRows.map((row) => (row.kind === 'entry' ? row.entryIndex : -1))
-    ).toEqual([0, 1])
-    expect(
-      historyRows.map((row) => (row.kind === 'entry' ? row.entryId : ''))
-    ).toEqual(['entry-1', 'entry-2'])
+    expect(historyRows.map((row) => (row.kind === 'entry' ? row.entryIndex : -1))).toEqual([0, 1])
+    expect(historyRows.map((row) => (row.kind === 'entry' ? row.entryId : ''))).toEqual([
+      'entry-1',
+      'entry-2'
+    ])
   })
 
   it('treats all entries as upcoming when there is no current entry', () => {
@@ -154,11 +148,7 @@ describe('buildQueuePanelModel', () => {
     expect(result.historyCount).toBe(0)
     expect(result.upcomingRowCount).toBe(2)
     expect(result.upcomingEntryIds).toEqual(['entry-1', 'entry-2'])
-    expect(result.rows.map((row) => row.kind)).toEqual([
-      'section',
-      'entry',
-      'entry'
-    ])
+    expect(result.rows.map((row) => row.kind)).toEqual(['section', 'entry', 'entry'])
     expect(result.upcomingStartRow).toBe(1)
     expect(result.clearDisabled).toBe(false)
   })

@@ -13,10 +13,7 @@ export interface MediaMetadataModel {
 }
 
 /** Pure Media Session metadata; artwork uses the existing full and small cover URLs. */
-export function buildMediaMetadata(
-  track: Track,
-  coverUrl: string | null
-): MediaMetadataModel {
+export function buildMediaMetadata(track: Track, coverUrl: string | null): MediaMetadataModel {
   return {
     title: track.title,
     artist: track.artist,
@@ -26,14 +23,7 @@ export function buildMediaMetadata(
 }
 
 export type MediaActionCommandId =
-  | 'play'
-  | 'pause'
-  | 'previous'
-  | 'next'
-  | 'seekBackward'
-  | 'seekForward'
-  | 'seekTo'
-  | 'stop'
+  'play' | 'pause' | 'previous' | 'next' | 'seekBackward' | 'seekForward' | 'seekTo' | 'stop'
 
 export interface MediaActionCommand {
   command: MediaActionCommandId

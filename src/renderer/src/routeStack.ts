@@ -1,17 +1,13 @@
 import type { LibraryView } from '../library/query'
 
 export type DetailRoute =
-  | { kind: 'album'; albumId: string }
-  | { kind: 'artist'; artistName: string }
+  { kind: 'album'; albumId: string } | { kind: 'artist'; artistName: string }
 
 export function topRoute(stack: readonly DetailRoute[]): DetailRoute | null {
   return stack.length > 0 ? stack[stack.length - 1] : null
 }
 
-export function pushRoute(
-  stack: readonly DetailRoute[],
-  route: DetailRoute
-): DetailRoute[] {
+export function pushRoute(stack: readonly DetailRoute[], route: DetailRoute): DetailRoute[] {
   return [...stack, route]
 }
 

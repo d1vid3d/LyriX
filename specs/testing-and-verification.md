@@ -14,6 +14,7 @@ This is the **only** file where volatile verification numbers (test counts, file
 
 | Command | Result |
 | --- | --- |
+| `npm run format:check` | Passes (Prettier, code and configuration only). |
 | `npm run lint` | Passes (ESLint flat config, including type-aware TypeScript rules). |
 | `npm run typecheck` | Passes (main/preload and renderer projects). |
 | `npm test` | 602 tests pass across 49 files. |
@@ -152,6 +153,18 @@ Run the unit/integration suite with:
 npm test
 ```
 
+Format code and configuration with:
+
+```bash
+npm run format
+```
+
+Check formatting without writing with:
+
+```bash
+npm run format:check
+```
+
 Lint the repository with:
 
 ```bash
@@ -183,6 +196,7 @@ npm run fixtures:e2e
 Before merging a change:
 
 ```bash
+npm run format:check
 npm run lint
 npm run typecheck
 npm test
@@ -197,6 +211,7 @@ npm run dev        # manual smoke: open a folder, play tracks, open Now Playing
 
 Expected:
 
+- Prettier reports no code or configuration changes.
 - ESLint passes with no errors or warnings.
 - Type-check passes for both projects.
 - All Vitest files pass (current count in the verification-status table above).

@@ -1,9 +1,4 @@
-import type {
-  LibrarySnapshot,
-  ScanProgress,
-  Settings,
-  Track
-} from '../../shared/types'
+import type { LibrarySnapshot, ScanProgress, Settings, Track } from '../../shared/types'
 import type { LibraryApi } from '../../shared/types'
 import { buildLibraryIndex } from '../library/query'
 import type { FavoritesQueryInput, LibraryIndex } from '../library/query'

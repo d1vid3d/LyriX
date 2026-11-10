@@ -91,12 +91,7 @@ export type MediaKeyAction = 'playpause' | 'next' | 'previous' | 'stop'
 
 /** Machine-local vs library-resident LyrixData state exposed to the renderer. */
 export type LyrixDataState =
-  | 'unbound'
-  | 'not-created'
-  | 'ready'
-  | 'read-only'
-  | 'unavailable'
-  | 'newer-version'
+  'unbound' | 'not-created' | 'ready' | 'read-only' | 'unavailable' | 'newer-version'
 
 export interface LyrixDataStatus {
   state: LyrixDataState
@@ -123,16 +118,10 @@ export interface FavoritesState {
   missing: FavoriteMissing[]
 }
 
-export type FavoritesWriteFailure =
-  | 'read-only'
-  | 'unavailable'
-  | 'newer-version'
-  | 'invalid'
+export type FavoritesWriteFailure = 'read-only' | 'unavailable' | 'newer-version' | 'invalid'
 
 export type FavoritesSetResult =
-  | { ok: true; state: FavoritesState }
-  | { ok: false; reason: FavoritesWriteFailure }
-
+  { ok: true; state: FavoritesState } | { ok: false; reason: FavoritesWriteFailure }
 
 /** Playback preferences persisted between launches. */
 export interface PlaybackSettingsInput {

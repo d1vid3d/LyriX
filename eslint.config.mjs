@@ -1,4 +1,5 @@
 import js from '@eslint/js'
+import eslintConfigPrettier from 'eslint-config-prettier/flat'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
@@ -68,5 +69,8 @@ export default tseslint.config(
     rules: {
       'prefer-const': 'off'
     }
-  }
+  },
+
+  // Keep ESLint focused on correctness; Prettier owns layout.
+  eslintConfigPrettier
 )

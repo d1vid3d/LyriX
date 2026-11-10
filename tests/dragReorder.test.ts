@@ -28,9 +28,7 @@ describe('rowGapAtPointer', () => {
   })
 
   it('accounts for scroll offset', () => {
-    expect(
-      rowGapAtPointer({ ...base, pointerY: 100, scrollTop: 56 * 2 })
-    ).toBe(2)
+    expect(rowGapAtPointer({ ...base, pointerY: 100, scrollTop: 56 * 2 })).toBe(2)
   })
 
   it('returns zero for an empty list', () => {

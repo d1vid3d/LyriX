@@ -170,9 +170,7 @@ export function createShellFeatures(deps: ShellFeatureDeps): ShellFeatures {
     savePosition: (state) => {
       void window.library
         .saveSessionPosition(state)
-        .catch((error) =>
-          console.error('[renderer] Could not save the playback position', error)
-        )
+        .catch((error) => console.error('[renderer] Could not save the playback position', error))
     }
   })
 

@@ -76,9 +76,7 @@ export class MediaSessionController {
     if (MEDIA_KEY_MODE === 'media-session') {
       this.registerSessionActions()
     } else {
-      this.unsubscribers.push(
-        this.deps.subscribeMediaKey((action) => this.handleGlobalKey(action))
-      )
+      this.unsubscribers.push(this.deps.subscribeMediaKey((action) => this.handleGlobalKey(action)))
     }
 
     this.syncMetadata()

@@ -31,7 +31,7 @@ export function buildDataDisclaimerModel(
     case 'unavailable':
       return {
         reason,
-        title: "Library location unavailable",
+        title: 'Library location unavailable',
         message:
           "This library's location isn't available right now (is the drive connected?). Nothing was changed.",
         featureList,

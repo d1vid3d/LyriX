@@ -100,7 +100,9 @@ export class NowPlayingController {
 
   /** True when Now Playing is open and the translation toggle is enabled for the lyrics. */
   isTranslationAvailable(): boolean {
-    return this.open && this.translationToggleModel !== null && !this.translationToggleModel.disabled
+    return (
+      this.open && this.translationToggleModel !== null && !this.translationToggleModel.disabled
+    )
   }
 
   toggleTranslation(): void {
@@ -215,9 +217,7 @@ export class NowPlayingController {
   private renderLyricsState(state: LyricsState, model: SourceMenuModel): void {
     if (state.status === 'ready' && state.doc) {
       const selected = state.translation.key
-        ? state.translation.options.find(
-            (option) => option.option.id === state.translation.key
-          )
+        ? state.translation.options.find((option) => option.option.id === state.translation.key)
         : undefined
 
       this.deps.lyricView.setDocument(

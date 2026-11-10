@@ -38,17 +38,32 @@ describe('resolveWindowBounds', () => {
   })
 
   it('clamps a saved size below the minimum', () => {
-    const result = resolveWindowBounds(saved({ x: 100, y: 100, width: 400, height: 300 }), [primary], defaults, minSize)
+    const result = resolveWindowBounds(
+      saved({ x: 100, y: 100, width: 400, height: 300 }),
+      [primary],
+      defaults,
+      minSize
+    )
     expect(result.bounds).toEqual({ x: 100, y: 100, width: 620, height: 440 })
   })
 
   it('keeps bounds that intersect a work area enough', () => {
-    const result = resolveWindowBounds(saved({ x: 1800, y: 100, width: 400, height: 300 }), [primary], defaults, minSize)
+    const result = resolveWindowBounds(
+      saved({ x: 1800, y: 100, width: 400, height: 300 }),
+      [primary],
+      defaults,
+      minSize
+    )
     expect(result.bounds).toEqual({ x: 1800, y: 100, width: 620, height: 440 })
   })
 
   it('recenters off-screen bounds on the primary display', () => {
-    const result = resolveWindowBounds(saved({ x: 5000, y: 2000 }), [primary, secondary], defaults, minSize)
+    const result = resolveWindowBounds(
+      saved({ x: 5000, y: 2000 }),
+      [primary, secondary],
+      defaults,
+      minSize
+    )
     expect(result.bounds).toEqual({ x: 440, y: 140, width: 1040, height: 760 })
   })
 
@@ -69,7 +84,12 @@ describe('resolveWindowBounds', () => {
   })
 
   it('passes the maximized flag through', () => {
-    const result = resolveWindowBounds(saved({ x: 100, y: 100 }, true), [primary], defaults, minSize)
+    const result = resolveWindowBounds(
+      saved({ x: 100, y: 100 }, true),
+      [primary],
+      defaults,
+      minSize
+    )
     expect(result.maximized).toBe(true)
   })
 })

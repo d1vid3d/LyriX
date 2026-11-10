@@ -188,9 +188,7 @@ describe('groupTracks', () => {
   })
 
   it('builds deterministic 40-character hex ids from the group key', () => {
-    const input = [
-      track({ id: '1', title: 'One', album: 'Shared', albumArtist: 'A' })
-    ]
+    const input = [track({ id: '1', title: 'One', album: 'Shared', albumArtist: 'A' })]
 
     const first = groupTracks(input)[0]
     const second = groupTracks(input)[0]

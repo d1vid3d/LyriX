@@ -1,8 +1,4 @@
-import {
-  firstEnabledIndex,
-  lastEnabledIndex,
-  nextEnabledIndex
-} from '../lyrics/sourceMenuModel'
+import { firstEnabledIndex, lastEnabledIndex, nextEnabledIndex } from '../lyrics/sourceMenuModel'
 
 /** Base item shape for every menu. `submenu` is reserved for a later submenu feature. */
 export interface MenuItem {
@@ -61,11 +57,7 @@ export class ContextMenu<Item extends MenuItem = MenuItem> {
     document.addEventListener('pointerdown', this.handleDocumentPointerDown, true)
   }
 
-  show(
-    items: readonly Item[],
-    position: MenuPosition,
-    options: MenuShowOptions = {}
-  ): void {
+  show(items: readonly Item[], position: MenuPosition, options: MenuShowOptions = {}): void {
     if (this.openState) this.close(false)
 
     this.options.onOpen?.()
@@ -197,8 +189,7 @@ export class ContextMenu<Item extends MenuItem = MenuItem> {
     window.addEventListener('resize', this.handleWindowResize)
 
     const anchor = 'anchor' in position ? position.anchor : null
-    this.scrollTarget =
-      options.scrollTarget ?? (anchor ? findScrollParent(anchor) : null)
+    this.scrollTarget = options.scrollTarget ?? (anchor ? findScrollParent(anchor) : null)
     this.scrollTarget?.addEventListener('scroll', this.handleOriginScroll, {
       passive: true
     })
@@ -212,9 +203,7 @@ export class ContextMenu<Item extends MenuItem = MenuItem> {
   }
 
   private getItemButtons(): HTMLButtonElement[] {
-    return Array.from(
-      this.element.querySelectorAll<HTMLButtonElement>('[data-menu-item]')
-    )
+    return Array.from(this.element.querySelectorAll<HTMLButtonElement>('[data-menu-item]'))
   }
 
   private moveFocus(step: 1 | -1): void {

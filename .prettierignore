@@ -1,0 +1,14 @@
+# Documentation stays hand-formatted; only code and configuration are formatted.
+*.md
+
+# Generated output, dependencies, and agent tooling.
+.opencode/
+.vite/
+build/
+graphify-out/
+node_modules/
+out/
+
+# Generated lockfile and binary E2E fixtures.
+package-lock.json
+tests/e2e/fixtures/

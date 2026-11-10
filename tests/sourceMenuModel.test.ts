@@ -24,11 +24,7 @@ function line(index: number, agent?: string): LyricLine {
   }
 }
 
-function document(
-  format: LyricFormat,
-  lines: LyricLine[],
-  warnings: string[] = []
-): LyricDocument {
+function document(format: LyricFormat, lines: LyricLine[], warnings: string[] = []): LyricDocument {
   return {
     format,
     timed: format !== 'plain',
@@ -82,9 +78,7 @@ function state(overrides: Partial<LyricsState> = {}): LyricsState {
   }
 }
 
-function translationState(
-  overrides: Partial<TranslationState> = {}
-): TranslationState {
+function translationState(overrides: Partial<TranslationState> = {}): TranslationState {
   return {
     enabled: false,
     language: null,
@@ -225,8 +219,7 @@ describe('buildSourceMenuModel', () => {
     expect(model.emptyState).toEqual({
       message: 'No lyrics found',
       hint: 'Add a lyrics file named "Song.lrc" next to the track, then choose Reload sources.',
-      text:
-        'No lyrics found\nAdd a lyrics file named "Song.lrc" next to the track, then choose Reload sources.'
+      text: 'No lyrics found\nAdd a lyrics file named "Song.lrc" next to the track, then choose Reload sources.'
     })
   })
 
@@ -361,9 +354,7 @@ describe('buildSourceMenuModel', () => {
 })
 
 describe('buildSourceMenuModel translation section', () => {
-  function primaryState(
-    translation: Partial<TranslationState>
-  ): LyricsState {
+  function primaryState(translation: Partial<TranslationState>): LyricsState {
     return state({
       sources: [
         entry(embeddedOption, document('lrc', [line(0)])),
@@ -378,7 +369,11 @@ describe('buildSourceMenuModel translation section', () => {
   it.each([
     ['off', { enabled: false, available: true, selectedId: 'sidecar:Song.en.lrc' }, 'off'],
     ['active', { enabled: true, available: true, selectedId: 'sidecar:Song.en.lrc' }, 'active'],
-    ['unavailable while off', { enabled: false, available: false, selectedId: null }, 'unavailable'],
+    [
+      'unavailable while off',
+      { enabled: false, available: false, selectedId: null },
+      'unavailable'
+    ],
     ['unavailable while on', { enabled: true, available: false, selectedId: null }, 'unavailable'],
     ['needs a choice', { enabled: true, available: true, selectedId: null }, 'needs-choice']
   ] as const)('reports translation status %s', (_name, translation, expected) => {
@@ -564,9 +559,7 @@ describe('buildSourceMenuModel translation section', () => {
   })
 
   it('disables the quick toggle when no translation file exists while off', () => {
-    const model = buildSourceMenuModel(
-      primaryState({ enabled: false, available: false })
-    )
+    const model = buildSourceMenuModel(primaryState({ enabled: false, available: false }))
 
     expect(model.translationToggle).toMatchObject({
       pressed: false,
@@ -604,9 +597,7 @@ describe('buildSourceMenuModel translation section', () => {
   })
 
   it('keeps the quick toggle operable when off with an eligible option', () => {
-    const model = buildSourceMenuModel(
-      primaryState({ enabled: false, available: true })
-    )
+    const model = buildSourceMenuModel(primaryState({ enabled: false, available: true }))
 
     expect(model.translationToggle).toMatchObject({ pressed: false, disabled: false })
   })

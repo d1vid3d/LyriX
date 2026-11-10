@@ -1,10 +1,6 @@
 import { parseLyrics, selectLyricSource } from '../../shared/lyrics'
 import type { LyricDocument, LyricFormat } from '../../shared/lyrics'
-import type {
-  LyricPreference,
-  LyricSourceOption,
-  LyricSources
-} from '../../shared/lyrics/sources'
+import type { LyricPreference, LyricSourceOption, LyricSources } from '../../shared/lyrics/sources'
 import type { TranslationSettingsInput } from '../../shared/types'
 import { buildTranslation, sameTranslation } from './translationState'
 import type { TranslationState } from './translationState'
@@ -162,10 +158,7 @@ export class LyricsController {
 
   /** Toggle the translation layer and persist the new value. */
   setTranslationEnabled(enabled: boolean, options: SetPreferenceOptions = {}): void {
-    this.applyTranslationSettings(
-      { enabled, language: this.translationLanguage },
-      options
-    )
+    this.applyTranslationSettings({ enabled, language: this.translationLanguage }, options)
   }
 
   /** Apply toggle and sticky language together, e.g. at startup with `{ persist: false }`. */

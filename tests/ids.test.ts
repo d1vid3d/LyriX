@@ -11,14 +11,12 @@ describe('hashId', () => {
     expect(hashId('C:\\Music\\song.flac')).toBe(hashId('C:\\Music\\song.flac'))
   })
 
-  it.each([
-    'a',
-    'C:\\Music\\song.flac',
-    'Beyoncé — 歌',
-    ''
-  ])('returns 40 lowercase hex characters for %j', (value) => {
-    expect(hashId(value)).toMatch(/^[a-f0-9]{40}$/)
-  })
+  it.each(['a', 'C:\\Music\\song.flac', 'Beyoncé — 歌', ''])(
+    'returns 40 lowercase hex characters for %j',
+    (value) => {
+      expect(hashId(value)).toMatch(/^[a-f0-9]{40}$/)
+    }
+  )
 
   it('differs for different inputs', () => {
     expect(hashId('a')).not.toBe(hashId('b'))

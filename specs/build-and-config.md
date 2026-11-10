@@ -1,10 +1,11 @@
 # Build, Tooling, and Configuration
 
-**Purpose:** how LyriX is built, type-checked, bundled, and secured at the window/CSP level.
+**Purpose:** how LyriX is formatted, built, type-checked, bundled, and secured at the window/CSP
+level.
 
-**Owning source paths:** `package.json`, `eslint.config.mjs`, `electron.vite.config.ts`,
-`tsconfig.json`, `tsconfig.node.json`, `tsconfig.web.json`, `src/renderer/index.html`,
-`src/main/window.ts`, `forge.config.js`.
+**Owning source paths:** `package.json`, `.prettierrc.json`, `.prettierignore`,
+`eslint.config.mjs`, `electron.vite.config.ts`, `tsconfig.json`, `tsconfig.node.json`,
+`tsconfig.web.json`, `src/renderer/index.html`, `src/main/window.ts`, `forge.config.js`.
 
 **Last verified:** 2026-11-10 against LyriX 0.1.0.
 
@@ -18,6 +19,8 @@
 | `npm run dev` | electron-vite dev server + Electron. |
 | `npm run build` | Production bundle into `build/`. |
 | `npm start` | Preview the production bundle. |
+| `npm run format` | Prettier over code and configuration files. |
+| `npm run format:check` | Fail when code or configuration is not Prettier-formatted. |
 | `npm run lint` | ESLint over TypeScript, JavaScript, and the E2E harness. |
 | `npm run lint:fix` | ESLint with automatic fixes. |
 | `npm run typecheck` | `typecheck:node` then `typecheck:web`. |
@@ -56,7 +59,20 @@ Two rules are tuned rather than followed blindly. `@typescript-eslint/unbound-me
 because the codebase passes callback properties between modules and the rule cannot distinguish
 them from unbound class methods. `prefer-const` is off in the `src/renderer/src/main.ts`
 composition root, which declares late-bound service singletons before assigning them in
-dependency order.
+dependency order. `eslint-config-prettier` is appended last so ESLint correctness rules never
+fight the formatter.
+
+## Formatting
+
+`prettier --check .` (also `npm run format:check`) enforces layout. Prettier owns quotes,
+semicolons, wrapping, and indentation; ESLint owns correctness. `.prettierrc.json` matches the
+existing style: no semicolons, single quotes, 100-column lines, no trailing commas, and
+`endOfLine: "auto"` so the repository works with Git's Windows line-ending conversion.
+
+`.prettierignore` scopes formatting to code and configuration. It excludes Markdown (`*.md`),
+generated output (`build/`, `out/`, `.vite/`, `graphify-out/`), dependencies, agent tooling
+(`.opencode/`), the lockfile, and binary E2E fixtures. `specs/`, `README.md`, and `AGENTS.md` stay
+hand-formatted.
 
 ## TypeScript projects
 

@@ -162,9 +162,9 @@ describe('album and artist menus', () => {
     expect(favorite.find((item) => item.action === 'track.toggleFavorite')?.label).toBe(
       'Remove from Favorites'
     )
-    expect(
-      notFavorite.find((item) => item.action === 'track.toggleFavorite')?.label
-    ).toBe('Add to Favorites')
+    expect(notFavorite.find((item) => item.action === 'track.toggleFavorite')?.label).toBe(
+      'Add to Favorites'
+    )
   })
 })
 
@@ -188,9 +188,7 @@ describe('queue row menu', () => {
       expect(item?.disabled).toBe(true)
     }
 
-    expect(items.find((value) => value.action === 'queueRow.playNow')?.disabled).toBe(
-      false
-    )
+    expect(items.find((value) => value.action === 'queueRow.playNow')?.disabled).toBe(false)
     expect(labels(items)).toEqual([
       'Play now',
       'Play next',
@@ -235,8 +233,8 @@ describe('current track menu', () => {
     ])
     expect(items[0].action).toBe('currentTrack.toggleFavorite')
     expect(items[2].action).toBe('currentTrack.goToAlbum')
-    expect(
-      items.find((item) => item.action === 'currentTrack.reveal')?.action
-    ).toBe('currentTrack.reveal')
+    expect(items.find((item) => item.action === 'currentTrack.reveal')?.action).toBe(
+      'currentTrack.reveal'
+    )
   })
 })

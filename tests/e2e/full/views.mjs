@@ -28,8 +28,16 @@ export async function run(ctx) {
   let ui = await readState(cdp)
   runner.equal('cached relaunch album count', ui.albums.length, 5)
   runner.equal('cached relaunch volume', ui.volume, 0.42)
-  runner.check('cached relaunch audio volume', Math.abs(ui.audioVolume - 0.42) < 1e-9, String(ui.audioVolume))
-  runner.check('cached relaunch has no exceptions', cdp.exceptions.length === 0, cdp.exceptions.join('; '))
+  runner.check(
+    'cached relaunch audio volume',
+    Math.abs(ui.audioVolume - 0.42) < 1e-9,
+    String(ui.audioVolume)
+  )
+  runner.check(
+    'cached relaunch has no exceptions',
+    cdp.exceptions.length === 0,
+    cdp.exceptions.join('; ')
+  )
 
   runner.step('full: view defaults and artists')
   runner.equal('default library view', ui.activeView, 'albums')
@@ -37,7 +45,10 @@ export async function run(ctx) {
   runner.equal('albums sorted by title by default', ui.sort, 'title')
 
   runner.check('artists view clicked', await clickView(cdp, 'artists'))
-  await cdp.waitFor('artist list rendered', `document.querySelectorAll('#artist-list .artist-row').length === 5`)
+  await cdp.waitFor(
+    'artist list rendered',
+    `document.querySelectorAll('#artist-list .artist-row').length === 5`
+  )
   ui = await readState(cdp)
   runner.equal('artists view active', ui.activeView, 'artists')
   runner.equal('artists view visible', ui.artistsViewHidden, false)
@@ -68,7 +79,10 @@ export async function run(ctx) {
 
   runner.step('full: search and keyboard shortcuts')
   await setSearch(cdp, 'shared')
-  await cdp.waitFor('artist search filtered', `document.querySelectorAll('#artist-list .artist-row').length === 2`)
+  await cdp.waitFor(
+    'artist search filtered',
+    `document.querySelectorAll('#artist-list .artist-row').length === 2`
+  )
   ui = await readState(cdp)
   runner.equal(
     'artist search matches album titles',
@@ -96,7 +110,10 @@ export async function run(ctx) {
   runner.step('full: artist navigation keeps search')
   await setSearch(cdp, 'shared')
   runner.check('artist row clicked', await clickArtist(cdp, 'Album Artist A'))
-  await cdp.waitFor('artist detail visible', `document.querySelector('#artist-detail-view').hidden === false`)
+  await cdp.waitFor(
+    'artist detail visible',
+    `document.querySelector('#artist-detail-view').hidden === false`
+  )
   ui = await readState(cdp)
   runner.equal('artist detail name', ui.artistName, 'Album Artist A')
   runner.equal('artist detail counts', ui.artistMeta, '1 album · 2 tracks')
@@ -121,7 +138,10 @@ export async function run(ctx) {
   )
 
   runner.check('artist detail album clicked', await clickArtistAlbum(cdp, 'Shared Album'))
-  await cdp.waitFor('album detail from artist', `document.querySelector('#detail-view').hidden === false`)
+  await cdp.waitFor(
+    'album detail from artist',
+    `document.querySelector('#detail-view').hidden === false`
+  )
   ui = await readState(cdp)
   runner.equal('album detail opened from artist', ui.detailTitle, 'Shared Album')
   const detailCoverSrc = await cdp.evaluate(
@@ -134,31 +154,49 @@ export async function run(ctx) {
   )
 
   await clickSelector(cdp, '#back')
-  await cdp.waitFor('back to artist detail', `document.querySelector('#artist-detail-view').hidden === false`)
+  await cdp.waitFor(
+    'back to artist detail',
+    `document.querySelector('#artist-detail-view').hidden === false`
+  )
   ui = await readState(cdp)
   runner.equal('back restores artist detail', ui.artistName, 'Album Artist A')
 
   await clickSelector(cdp, '#artist-back')
-  await cdp.waitFor('back to artist list', `document.querySelector('#artists-view').hidden === false`)
+  await cdp.waitFor(
+    'back to artist list',
+    `document.querySelector('#artists-view').hidden === false`
+  )
   ui = await readState(cdp)
   runner.equal('back keeps search text', ui.search, 'shared')
   runner.equal('back keeps filtered artist list', ui.artists.length, 2)
 
   runner.step('full: album search, sort, and year ordering')
   runner.check('albums view clicked', await clickView(cdp, 'albums'))
-  await cdp.waitFor('album search still applied', `document.querySelectorAll('#album-grid .album-card').length === 2`)
+  await cdp.waitFor(
+    'album search still applied',
+    `document.querySelectorAll('#album-grid .album-card').length === 2`
+  )
   ui = await readState(cdp)
   runner.equal('switching views keeps search', ui.search, 'shared')
   runner.check('album opened from search', await clickAlbum(cdp, 'Shared Album', 'Album Artist A'))
-  await cdp.waitFor('album detail from search', `document.querySelector('#detail-view').hidden === false`)
+  await cdp.waitFor(
+    'album detail from search',
+    `document.querySelector('#detail-view').hidden === false`
+  )
   await clickSelector(cdp, '#back')
-  await cdp.waitFor('back to filtered album grid', `document.querySelector('#grid-view').hidden === false`)
+  await cdp.waitFor(
+    'back to filtered album grid',
+    `document.querySelector('#grid-view').hidden === false`
+  )
   ui = await readState(cdp)
   runner.equal('album back keeps search', ui.search, 'shared')
   runner.equal('album back keeps filtered grid', ui.albums.length, 2)
 
   await pressKey(cdp, 'Escape')
-  await cdp.waitFor('album search cleared', `document.querySelectorAll('#album-grid .album-card').length === 5`)
+  await cdp.waitFor(
+    'album search cleared',
+    `document.querySelectorAll('#album-grid .album-card').length === 5`
+  )
   runner.check('sort changed to year', await setSort(cdp, 'year'))
   ui = await readState(cdp)
   runner.equal(
@@ -169,7 +207,10 @@ export async function run(ctx) {
 
   runner.step('full: virtualized tracks view')
   runner.check('tracks view clicked', await clickView(cdp, 'tracks'))
-  await cdp.waitFor('virtual track rows rendered', `document.querySelectorAll('#track-scroll .track-row').length > 0`)
+  await cdp.waitFor(
+    'virtual track rows rendered',
+    `document.querySelectorAll('#track-scroll .track-row').length > 0`
+  )
   ui = await readState(cdp)
   runner.equal('tracks view active', ui.activeView, 'tracks')
   runner.equal('tracks view visible', ui.tracksViewHidden, false)
@@ -186,7 +227,9 @@ export async function run(ctx) {
   runner.equal('track row album', ui.trackRows[0]?.album, 'Unknown Album')
   runner.equal('track row duration', ui.trackRows[0]?.duration, '0:00')
 
-  await cdp.evaluate(`document.querySelector('#track-scroll').scrollTop = document.querySelector('#track-scroll').scrollHeight`)
+  await cdp.evaluate(
+    `document.querySelector('#track-scroll').scrollTop = document.querySelector('#track-scroll').scrollHeight`
+  )
   await cdp.waitFor(
     'track list scrolls to the final row',
     `[...document.querySelectorAll('#track-scroll .track-row')].some((row) => row.querySelector('.track-row-title')?.textContent === 'Untagged')`
@@ -247,11 +290,17 @@ export async function run(ctx) {
   runner.equal('no results message', ui.tracksEmpty.text, 'No results.')
   runner.equal('no result rows', ui.trackRowCount, 0)
   await pressKey(cdp, 'Escape')
-  await cdp.waitFor('escape restores track rows', `document.querySelectorAll('#track-scroll .track-row').length > 0`)
+  await cdp.waitFor(
+    'escape restores track rows',
+    `document.querySelectorAll('#track-scroll .track-row').length > 0`
+  )
 
   runner.step('full: UI state persistence')
   runner.check('artists view restored for persistence', await clickView(cdp, 'artists'))
-  await cdp.waitFor('artist view visible for persistence', `document.querySelector('#artists-view').hidden === false`)
+  await cdp.waitFor(
+    'artist view visible for persistence',
+    `document.querySelector('#artists-view').hidden === false`
+  )
   runner.check('artist sort tracks for persistence', await setSort(cdp, 'tracks'))
   await setSearch(cdp, 'shared')
   const settingsDeadline = Date.now() + 5000

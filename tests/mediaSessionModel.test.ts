@@ -25,10 +25,7 @@ describe('buildMediaMetadata', () => {
       title: 'Song',
       artist: 'Artist',
       album: 'Album',
-      artwork: [
-        { src: 'media://cover/album-1' },
-        { src: 'media://cover/album-1?size=small' }
-      ]
+      artwork: [{ src: 'media://cover/album-1' }, { src: 'media://cover/album-1?size=small' }]
     })
   })
 

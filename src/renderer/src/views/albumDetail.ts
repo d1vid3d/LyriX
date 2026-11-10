@@ -18,12 +18,7 @@ export interface AlbumDetailOptions {
   isFavorite?(trackId: string): boolean
   onToggleFavorite?(trackId: string): void
   onPlayTrack(album: Album, track: Track): void
-  onOpenTrackMenu?(
-    album: Album,
-    track: Track,
-    play: () => void,
-    position: MenuPosition
-  ): void
+  onOpenTrackMenu?(album: Album, track: Track, play: () => void, position: MenuPosition): void
   onPlayAlbum(album: Album): void
   onShuffleAlbum(album: Album): void
 }
@@ -88,11 +83,7 @@ function renderTrackList(options: AlbumDetailOptions, album: Album): void {
     item.append(button)
     if (options.isFavorite && options.onToggleFavorite) {
       item.append(
-        createFavoriteButton(
-          track.id,
-          options.isFavorite(track.id),
-          options.onToggleFavorite
-        )
+        createFavoriteButton(track.id, options.isFavorite(track.id), options.onToggleFavorite)
       )
     }
     fragment.append(item)

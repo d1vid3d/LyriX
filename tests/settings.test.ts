@@ -137,22 +137,28 @@ describe('loadSettings', () => {
     [2, 1],
     [null, 1],
     ['0.5', 1]
-  ] as Array<[unknown, number]>)('normalizes persisted volume %j to %j', async (volume, expected) => {
-    await writeJson({ volume })
+  ] as Array<[unknown, number]>)(
+    'normalizes persisted volume %j to %j',
+    async (volume, expected) => {
+      await writeJson({ volume })
 
-    expect((await loadSettings(settingsPath())).volume).toBe(expected)
-  })
+      expect((await loadSettings(settingsPath())).volume).toBe(expected)
+    }
+  )
 
   it.each([
     ['   ', null],
     [42, null],
     ['/music', '/music'],
     [null, null]
-  ] as Array<[unknown, string | null]>)('normalizes lastFolder %j to %j', async (folder, expected) => {
-    await writeJson({ lastFolder: folder })
+  ] as Array<[unknown, string | null]>)(
+    'normalizes lastFolder %j to %j',
+    async (folder, expected) => {
+      await writeJson({ lastFolder: folder })
 
-    expect((await loadSettings(settingsPath())).lastFolder).toBe(expected)
-  })
+      expect((await loadSettings(settingsPath())).lastFolder).toBe(expected)
+    }
+  )
 
   it('keeps unknown view and sort keys at this layer', async () => {
     await writeJson({ lastView: 'genres', sortByView: { albums: 'bogus', genres: 'title' } })
@@ -191,11 +197,14 @@ describe('loadSettings', () => {
     ['true', false],
     [1, false],
     [null, false]
-  ] as Array<[unknown, boolean]>)('normalizes translationEnabled %j to %j', async (enabled, expected) => {
-    await writeJson({ translationEnabled: enabled })
+  ] as Array<[unknown, boolean]>)(
+    'normalizes translationEnabled %j to %j',
+    async (enabled, expected) => {
+      await writeJson({ translationEnabled: enabled })
 
-    expect((await loadSettings(settingsPath())).translationEnabled).toBe(expected)
-  })
+      expect((await loadSettings(settingsPath())).translationEnabled).toBe(expected)
+    }
+  )
 
   it('falls back to defaults for an empty object', async () => {
     await writeJson({})

@@ -25,9 +25,7 @@ export class ScanCoordinator {
   constructor(
     private readonly store: AppStore,
     private readonly window: ScanWindow,
-    private readonly onLibraryApplied?: (
-      snapshot: LibrarySnapshot
-    ) => Promise<void> | void
+    private readonly onLibraryApplied?: (snapshot: LibrarySnapshot) => Promise<void> | void
   ) {}
 
   async runScan(folder: string, persistFolder: boolean): Promise<ScanOutcome> {

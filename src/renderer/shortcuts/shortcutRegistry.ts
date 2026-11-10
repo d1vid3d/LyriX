@@ -71,11 +71,7 @@ export function isModifierChord(chord: KeyChord, isMac: boolean): boolean {
 }
 
 /** Exact modifier matching: Ctrl+ArrowRight never matches a plain ArrowRight. */
-export function chordMatches(
-  chord: KeyChord,
-  descriptor: KeyDescriptor,
-  isMac: boolean
-): boolean {
+export function chordMatches(chord: KeyChord, descriptor: KeyDescriptor, isMac: boolean): boolean {
   if (normalizeKey(chord.key) !== normalizeKey(descriptor.key)) return false
 
   const expected = expectedModifiers(chord, isMac)

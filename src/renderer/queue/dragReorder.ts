@@ -96,11 +96,7 @@ export function dropHoleSlot(sourceSlot: number, targetSlot: number): number {
  * How far (in rows) an upcoming row moves to make room: -1 up, 1 down, 0 stays. Rows outside the
  * range between the source and target slots never move.
  */
-export function dragRowShift(
-  index: number,
-  sourceSlot: number,
-  targetSlot: number
-): -1 | 0 | 1 {
+export function dragRowShift(index: number, sourceSlot: number, targetSlot: number): -1 | 0 | 1 {
   if (sourceSlot < targetSlot && index > sourceSlot && index < targetSlot) return -1
   if (targetSlot < sourceSlot && index >= targetSlot && index < sourceSlot) return 1
   return 0

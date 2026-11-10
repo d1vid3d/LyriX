@@ -33,9 +33,7 @@ export interface ContextMenuOpeners {
 }
 
 /** Builds every menu from the composition root's library/queue state. */
-export function createContextMenuOpeners(
-  deps: ContextMenuOpenersDeps
-): ContextMenuOpeners {
+export function createContextMenuOpeners(deps: ContextMenuOpenersDeps): ContextMenuOpeners {
   return {
     openTrackMenu(item, play, position) {
       deps.menu.show(

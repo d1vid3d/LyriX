@@ -47,18 +47,8 @@ export interface ScreenDeps {
   onShuffleArtist(artist: ArtistItem): void
   onOpenAlbumMenu(album: Album, position: MenuPosition): void
   onOpenArtistMenu(artist: ArtistItem, position: MenuPosition): void
-  onOpenTrackRowMenu(
-    item: TrackItem,
-    index: number,
-    play: () => void,
-    position: MenuPosition
-  ): void
-  onOpenAlbumTrackMenu(
-    album: Album,
-    track: Track,
-    play: () => void,
-    position: MenuPosition
-  ): void
+  onOpenTrackRowMenu(item: TrackItem, index: number, play: () => void, position: MenuPosition): void
+  onOpenAlbumTrackMenu(album: Album, track: Track, play: () => void, position: MenuPosition): void
   syncViewControls(): void
 }
 
@@ -119,8 +109,7 @@ export class ScreenController {
           emptyState: this.deps.elements.emptyState,
           emptyMessage: () => this.deps.emptyMessage(),
           onOpenAlbum: (albumId) => this.deps.onOpenAlbum(albumId),
-          onOpenAlbumMenu: (album, position) =>
-            this.deps.onOpenAlbumMenu(album, position)
+          onOpenAlbumMenu: (album, position) => this.deps.onOpenAlbumMenu(album, position)
         },
         queryLibrary(index, { view: 'albums', search, sort: this.deps.getSort('albums') })
       )
@@ -134,8 +123,7 @@ export class ScreenController {
           empty: this.deps.elements.artistsEmpty,
           emptyMessage: () => this.deps.emptyMessage(),
           onOpenArtist: (artistName) => this.deps.onOpenArtist(artistName),
-          onOpenArtistMenu: (artist, position) =>
-            this.deps.onOpenArtistMenu(artist, position)
+          onOpenArtistMenu: (artist, position) => this.deps.onOpenArtistMenu(artist, position)
         },
         queryLibrary(index, { view: 'artists', search, sort: this.deps.getSort('artists') })
       )
@@ -166,7 +154,9 @@ export class ScreenController {
   updateTrackHighlight(): void {
     const currentId = this.deps.getCurrentTrackId()
 
-    for (const button of this.deps.elements.trackList.querySelectorAll<HTMLButtonElement>('.track')) {
+    for (const button of this.deps.elements.trackList.querySelectorAll<HTMLButtonElement>(
+      '.track'
+    )) {
       const isCurrent = button.dataset.trackId === currentId
       button.classList.toggle('playing', isCurrent)
       if (isCurrent) {
@@ -229,8 +219,7 @@ export class ScreenController {
         shuffleButton: this.deps.elements.artistShuffleButton,
         albumGrid: this.deps.elements.artistAlbumGrid,
         onOpenAlbum: (albumId) => this.deps.onOpenAlbum(albumId),
-        onOpenAlbumMenu: (albumItem, position) =>
-          this.deps.onOpenAlbumMenu(albumItem, position),
+        onOpenAlbumMenu: (albumItem, position) => this.deps.onOpenAlbumMenu(albumItem, position),
         onPlayArtist: (artistItem) => this.deps.onPlayArtist(artistItem),
         onShuffleArtist: (artistItem) => this.deps.onShuffleArtist(artistItem)
       },

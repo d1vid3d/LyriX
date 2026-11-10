@@ -2,14 +2,8 @@ import type { LyricDocument, LyricFormat } from '../../shared/lyrics'
 import type { LyricPreference } from '../../shared/lyrics/sources'
 import type { LyricsSourceEntry, LyricsState } from './lyricsController'
 import { unavailableReason } from './lyricMenuText'
-import {
-  buildTranslationMenu,
-  buildTranslationToggle
-} from './translationMenuModel'
-import type {
-  TranslationMenuModel,
-  TranslationToggleModel
-} from './translationMenuModel'
+import { buildTranslationMenu, buildTranslationToggle } from './translationMenuModel'
+import type { TranslationMenuModel, TranslationToggleModel } from './translationMenuModel'
 
 export type SourceMenuBadgeTone = 'muted' | 'warning'
 

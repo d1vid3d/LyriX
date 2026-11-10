@@ -11,9 +11,7 @@ export interface FavoritesStatusModel {
 }
 
 /** Pure status-line model for the Favorites header; never a global nag. */
-export function buildFavoritesStatusModel(
-  status: LyrixDataStatus
-): FavoritesStatusModel {
+export function buildFavoritesStatusModel(status: LyrixDataStatus): FavoritesStatusModel {
   switch (status.state) {
     case 'ready':
       return {

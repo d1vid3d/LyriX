@@ -36,10 +36,7 @@ if (!primaryInstance) {
 
   if (MEDIA_KEY_MODE === 'media-session') {
     // Chromium's Media Session service wires hardware keys and the Windows media overlay.
-    app.commandLine.appendSwitch(
-      'enable-features',
-      'HardwareMediaKeyHandling,MediaSessionService'
-    )
+    app.commandLine.appendSwitch('enable-features', 'HardwareMediaKeyHandling,MediaSessionService')
   }
 
   app

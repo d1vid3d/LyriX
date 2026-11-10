@@ -66,8 +66,7 @@ export class ShortcutOverlay {
   open(): void {
     if (this.openState) return
 
-    this.opener =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     this.openState = true
     this.root.hidden = false
     this.root.classList.add('shortcut-overlay--open')

@@ -85,8 +85,7 @@ export function buildTranslationToggle(state: LyricsState): TranslationToggleMod
   return {
     label: TRANSLATION,
     pressed: state.translation.enabled,
-    disabled:
-      loading || noLyrics || (!state.translation.enabled && status === 'unavailable'),
+    disabled: loading || noLyrics || (!state.translation.enabled && status === 'unavailable'),
     tooltip: toggleTooltip(state, status, loading, noLyrics)
   }
 }
@@ -98,10 +97,7 @@ export function translationStatus(translation: TranslationState): TranslationMen
   return 'needs-choice'
 }
 
-function buildTranslationRow(
-  state: LyricsState,
-  option: TranslationOptionState
-): SourceMenuRow {
+function buildTranslationRow(state: LyricsState, option: TranslationOptionState): SourceMenuRow {
   const disabled = !option.eligible
 
   return {
@@ -109,8 +105,7 @@ function buildTranslationRow(
     label: option.option.label,
     detail: option.option.detail,
     checked:
-      state.translation.mode === 'saved' &&
-      state.translation.selectedId === option.option.id,
+      state.translation.mode === 'saved' && state.translation.selectedId === option.option.id,
     inUse: state.translation.selectedId === option.option.id,
     disabled,
     reason: disabled ? reasonFor(state, option) : null,
@@ -183,10 +178,7 @@ function alignmentBadge(report: AlignmentReport): SourceMenuBadge {
 
 function switchHint(state: LyricsState, status: TranslationMenuStatus): string {
   if (status === 'unavailable') {
-    const example = translationSidecarExample(
-      state.expectedSidecarName,
-      state.translation.language
-    )
+    const example = translationSidecarExample(state.expectedSidecarName, state.translation.language)
     return `No translation files found. Add a file such as "${example}" next to the track, then choose Reload sources.`
   }
 
@@ -215,9 +207,5 @@ function toggleTooltip(
 
 function selectedOption(translation: TranslationState): TranslationOptionState | null {
   if (!translation.selectedId) return null
-  return (
-    translation.options.find(
-      (option) => option.option.id === translation.selectedId
-    ) ?? null
-  )
+  return translation.options.find((option) => option.option.id === translation.selectedId) ?? null
 }

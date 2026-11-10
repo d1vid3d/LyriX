@@ -4,12 +4,7 @@ export const SESSION_QUEUE_DEBOUNCE_MS = 1000
 export const SESSION_POSITION_INTERVAL_MS = 5000
 
 export type PositionUpdateReason =
-  | 'timeupdate'
-  | 'pause'
-  | 'ended'
-  | 'seek'
-  | 'trackChange'
-  | 'flush'
+  'timeupdate' | 'pause' | 'ended' | 'seek' | 'trackChange' | 'flush'
 
 /**
  * Playback position is sent at most every ~5 s while playing. Pause, seek end, track change, and

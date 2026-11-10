@@ -1,13 +1,9 @@
 import type { QueueEntry, RepeatMode } from './queue'
 
 export type EndedAction =
-  | { type: 'play'; entry: QueueEntry }
-  | { type: 'restart'; entry: QueueEntry }
-  | { type: 'stop' }
+  { type: 'play'; entry: QueueEntry } | { type: 'restart'; entry: QueueEntry } | { type: 'stop' }
 
-export type PreviousAction =
-  | { type: 'restart' }
-  | { type: 'play'; entry: QueueEntry }
+export type PreviousAction = { type: 'restart' } | { type: 'play'; entry: QueueEntry }
 
 export interface FailureDecision {
   action: 'skip' | 'stop'
@@ -42,9 +38,7 @@ export function decideFailureAction(
   consecutiveFailures: number
 ): FailureDecision {
   const failures =
-    (Number.isFinite(consecutiveFailures)
-      ? Math.max(0, Math.trunc(consecutiveFailures))
-      : 0) + 1
+    (Number.isFinite(consecutiveFailures) ? Math.max(0, Math.trunc(consecutiveFailures)) : 0) + 1
 
   if (entryCount > 0 && failures >= entryCount) return { action: 'stop', failures }
   return { action: 'skip', failures }

@@ -63,10 +63,7 @@ async function setup() {
   return { root, album, paths, lyrixData, favorites, states }
 }
 
-async function writeFavoritesFile(
-  root: string,
-  items: unknown[]
-): Promise<void> {
+async function writeFavoritesFile(root: string, items: unknown[]): Promise<void> {
   const dir = join(root, 'LyrixData')
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(
@@ -105,9 +102,7 @@ describe('FavoritesStore', () => {
     await favorites.remove([trackA.id])
     expect(favorites.getState().items).toEqual([])
 
-    const saved = JSON.parse(
-      await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8')
-    )
+    const saved = JSON.parse(await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8'))
     expect(saved.items).toEqual([])
   })
 
@@ -120,15 +115,11 @@ describe('FavoritesStore', () => {
       fp: { title: 'Beta', artist: 'Artist', album: 'Album', durationSec: 10 },
       note: 'keep me'
     }
-    const current = JSON.parse(
-      await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8')
-    )
+    const current = JSON.parse(await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8'))
     await writeFavoritesFile(root, [...current.items, { ref: refB, addedAt: 5 }])
 
     await favorites.add([trackB.id])
-    const saved = JSON.parse(
-      await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8')
-    )
+    const saved = JSON.parse(await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8'))
     expect(saved.items.map((item: { ref: { path: string } }) => item.ref.path)).toEqual([
       'Album/Alpha.flac',
       'Album/Beta.flac'
@@ -138,16 +129,11 @@ describe('FavoritesStore', () => {
 
   it('serializes concurrent mutations without losing either change', async () => {
     const { root, favorites } = await setup()
-    const [a, b] = await Promise.all([
-      favorites.add([trackA.id]),
-      favorites.add([trackB.id])
-    ])
+    const [a, b] = await Promise.all([favorites.add([trackA.id]), favorites.add([trackB.id])])
     expect(a.ok).toBe(true)
     expect(b.ok).toBe(true)
 
-    const saved = JSON.parse(
-      await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8')
-    )
+    const saved = JSON.parse(await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8'))
     expect(saved.items.map((item: { ref: { path: string } }) => item.ref.path).sort()).toEqual([
       'Album/Alpha.flac',
       'Album/Beta.flac'
@@ -177,15 +163,11 @@ describe('FavoritesStore', () => {
     ])
     expect(favorites.getState().items[0]?.trackId).toBe(trackA.id)
 
-    const before = JSON.parse(
-      await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8')
-    )
+    const before = JSON.parse(await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8'))
     expect(before.items[0].ref.path).toBe('Old/Alpha.flac')
 
     await favorites.add([trackB.id])
-    const after = JSON.parse(
-      await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8')
-    )
+    const after = JSON.parse(await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8'))
     expect(after.items.map((item: { ref: { path: string } }) => item.ref.path)).toEqual([
       'Album/Alpha.flac',
       'Album/Beta.flac'
@@ -204,9 +186,7 @@ describe('FavoritesStore', () => {
 
     await favorites.removeAllMissing()
     expect(favorites.getState().missing).toHaveLength(0)
-    const saved = JSON.parse(
-      await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8')
-    )
+    const saved = JSON.parse(await fs.readFile(join(root, 'LyrixData', 'favorites.json'), 'utf8'))
     expect(saved.items).toHaveLength(1)
   })
 })

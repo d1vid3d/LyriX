@@ -41,8 +41,12 @@ function target(overrides: Partial<FocusDescriptor> = {}): FocusDescriptor {
 
 describe('chord matching', () => {
   it('requires exact modifiers', () => {
-    expect(chordMatches({ key: 'ArrowRight', mod: true }, key('ArrowRight', { ctrlKey: true }), false)).toBe(true)
-    expect(chordMatches({ key: 'ArrowRight' }, key('ArrowRight', { ctrlKey: true }), false)).toBe(false)
+    expect(
+      chordMatches({ key: 'ArrowRight', mod: true }, key('ArrowRight', { ctrlKey: true }), false)
+    ).toBe(true)
+    expect(chordMatches({ key: 'ArrowRight' }, key('ArrowRight', { ctrlKey: true }), false)).toBe(
+      false
+    )
     expect(chordMatches({ key: 'ArrowRight', mod: true }, key('ArrowRight'), false)).toBe(false)
     expect(chordMatches({ key: 'f', mod: true }, key('f', { shiftKey: true }), false)).toBe(false)
   })
@@ -95,17 +99,17 @@ describe('matchShortcut', () => {
 
     expect(matchShortcut(scoped, key('g'), context, { isMac: false })?.id).toBe('global')
     expect(matchShortcut(scoped, key('x'), context, { isMac: false })).toBeNull()
-    expect(
-      matchShortcut(scoped, key('x'), context, { isMac: false, scope: 'queue' })?.id
-    ).toBe('onlyQueue')
+    expect(matchShortcut(scoped, key('x'), context, { isMac: false, scope: 'queue' })?.id).toBe(
+      'onlyQueue'
+    )
   })
 
   it('keeps the default table conflict-free on both platforms', () => {
     expect(findShortcutConflicts(DEFAULT_SHORTCUTS, false)).toEqual([])
     expect(findShortcutConflicts(DEFAULT_SHORTCUTS, true)).toEqual([])
-    expect(
-      matchShortcut(DEFAULT_SHORTCUTS, key('f'), context, { isMac: false })?.id
-    ).toBe('toggleCurrentFavorite')
+    expect(matchShortcut(DEFAULT_SHORTCUTS, key('f'), context, { isMac: false })?.id).toBe(
+      'toggleCurrentFavorite'
+    )
   })
 
   it('detects conflicts within a scope and allows the same chord in another scope', () => {
@@ -152,9 +156,7 @@ describe('typing guard', () => {
 
   it('lets native Space/Enter activation win on buttons and menu roles', () => {
     expect(shouldIgnoreShortcut({ key: 'Space' }, target({ tagName: 'BUTTON' }), false)).toBe(true)
-    expect(
-      shouldIgnoreShortcut({ key: 'Space' }, target({ role: 'menuitem' }), false)
-    ).toBe(true)
+    expect(shouldIgnoreShortcut({ key: 'Space' }, target({ role: 'menuitem' }), false)).toBe(true)
     expect(shouldIgnoreShortcut({ key: 'Enter' }, target({ tagName: 'A' }), false)).toBe(true)
     expect(shouldIgnoreShortcut({ key: 'n' }, target({ tagName: 'BUTTON' }), false)).toBe(false)
   })

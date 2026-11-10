@@ -110,8 +110,6 @@ export async function run(ctx) {
   runner.equal('resume restores the queue context', queue.context, 'Album · Shared Album')
   runner.equal('resume restores the current queue entry', queue.current, 'First Song')
 
-  const autoplay = await cdp.evaluate(
-    `document.querySelector('#play-pause').dataset.playing`
-  )
+  const autoplay = await cdp.evaluate(`document.querySelector('#play-pause').dataset.playing`)
   runner.equal('resume never autoplays', autoplay, 'false')
 }

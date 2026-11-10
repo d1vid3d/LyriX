@@ -105,12 +105,7 @@ export function buildTrackMenu(target: TrackMenuTarget): ContextMenuItem[] {
     action('play', 'Play', 'track.play', base),
     action('play-next', 'Play next', 'track.playNext', base),
     action('add-to-queue', 'Add to queue', 'track.addToQueue', base),
-    action(
-      'toggle-favorite',
-      favoriteLabel(target.isFavorite),
-      'track.toggleFavorite',
-      base
-    ),
+    action('toggle-favorite', favoriteLabel(target.isFavorite), 'track.toggleFavorite', base),
     separator('track-main'),
     action('go-to-album', 'Go to album', 'track.goToAlbum', base),
     action('go-to-artist', 'Go to artist', 'track.goToArtist', base),
@@ -178,12 +173,7 @@ export function buildQueueRowMenu(target: QueueRowMenuTarget): ContextMenuItem[]
     action('move-top', 'Move to top of Next up', 'queueRow.moveTop', base, movingDisabled),
     action('move-bottom', 'Move to bottom', 'queueRow.moveBottom', base, movingDisabled),
     action('remove', 'Remove', 'queueRow.remove', base, movingDisabled),
-    action(
-      'toggle-favorite',
-      favoriteLabel(target.isFavorite),
-      'queueRow.toggleFavorite',
-      base
-    ),
+    action('toggle-favorite', favoriteLabel(target.isFavorite), 'queueRow.toggleFavorite', base),
     separator('queue-row-main'),
     action('go-to-album', 'Go to album', 'queueRow.goToAlbum', base),
     action('go-to-artist', 'Go to artist', 'queueRow.goToArtist', base),

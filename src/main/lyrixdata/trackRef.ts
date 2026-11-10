@@ -103,10 +103,7 @@ function sameFingerprint(a: TrackFingerprint, b: TrackFingerprint): boolean {
  * Exact (case-insensitive) path match wins. Otherwise a unique fingerprint match marks the ref as
  * relinked and returns a healed ref. Zero or ambiguous matches are missing; refs are never deleted.
  */
-export function resolveTrackRef(
-  ref: TrackRef,
-  index: TrackRefIndex
-): TrackRefResolution {
+export function resolveTrackRef(ref: TrackRef, index: TrackRefIndex): TrackRefResolution {
   const exact = index.byPath.get(refPathKey(ref.path))
   if (exact) {
     return {
@@ -116,9 +113,7 @@ export function resolveTrackRef(
   }
 
   const candidates = index.byFingerprint.get(fingerprintKey(ref.fp)) ?? []
-  const matches = candidates.filter((candidate) =>
-    sameFingerprint(candidate.ref.fp, ref.fp)
-  )
+  const matches = candidates.filter((candidate) => sameFingerprint(candidate.ref.fp, ref.fp))
   if (matches.length !== 1) return { status: 'missing' }
 
   const match = matches[0]

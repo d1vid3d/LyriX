@@ -55,9 +55,7 @@ export class HtmlAudioEngine implements PlaybackEngine {
     })
     audio.addEventListener('play', () => this.emit('play', undefined))
     audio.addEventListener('pause', () => this.emit('pause', undefined))
-    audio.addEventListener('loadedmetadata', () =>
-      this.emit('loadedmetadata', this.getDuration())
-    )
+    audio.addEventListener('loadedmetadata', () => this.emit('loadedmetadata', this.getDuration()))
   }
 
   load(track: Track): void {

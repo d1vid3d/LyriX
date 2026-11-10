@@ -37,18 +37,15 @@ const library: LibraryApi = {
     ipcRenderer.invoke('session:save-queue', state),
   saveSessionPosition: (state: SessionPositionState): Promise<void> =>
     ipcRenderer.invoke('session:save-position', state),
-  getLyrixDataStatus: (): Promise<LyrixDataStatus> =>
-    ipcRenderer.invoke('lyrixdata:get-status'),
+  getLyrixDataStatus: (): Promise<LyrixDataStatus> => ipcRenderer.invoke('lyrixdata:get-status'),
   retryLyrixData: (): Promise<LyrixDataStatus> => ipcRenderer.invoke('lyrixdata:retry'),
   getFavorites: (): Promise<FavoritesState> => ipcRenderer.invoke('favorites:get'),
   setFavorite: (trackIds: string[], favorite: boolean): Promise<FavoritesSetResult> =>
     ipcRenderer.invoke('favorites:set', { trackIds, favorite }),
   removeMissingFavorites: (): Promise<FavoritesSetResult> =>
     ipcRenderer.invoke('favorites:remove-missing'),
-  saveVolume: (volume: number): Promise<void> =>
-    ipcRenderer.invoke('settings:set-volume', volume),
-  saveUiState: (state: UiState): Promise<void> =>
-    ipcRenderer.invoke('settings:set-ui', state),
+  saveVolume: (volume: number): Promise<void> => ipcRenderer.invoke('settings:set-volume', volume),
+  saveUiState: (state: UiState): Promise<void> => ipcRenderer.invoke('settings:set-ui', state),
   savePlaybackSettings: (settings: PlaybackSettingsInput): Promise<void> =>
     ipcRenderer.invoke('settings:set-playback', settings),
   getLyricSources: (trackId: string): Promise<LyricSources | null> =>

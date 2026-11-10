@@ -1,20 +1,11 @@
-import type {
-  Album,
-  FavoritesSetResult,
-  FavoritesState,
-  FavoriteMissing
-} from '../../shared/types'
+import type { Album, FavoritesSetResult, FavoritesState, FavoriteMissing } from '../../shared/types'
 import type { Track } from '../../shared/types'
 import { validateFavoritesFile } from './formats'
 import type { FavoritesFileItem } from './formats'
 import { isValidFavoriteItem } from './formats'
 import { isSafeRefPath, refPathKey } from './paths'
 import type { LyrixDataStore } from './lyrixDataStore'
-import {
-  buildRefIndex,
-  createTrackRef,
-  resolveTrackRef
-} from './trackRef'
+import { buildRefIndex, createTrackRef, resolveTrackRef } from './trackRef'
 import type { TrackRefIndex, TrackRefSource } from './trackRef'
 
 export const MAX_FAVORITES = 100_000
@@ -151,9 +142,7 @@ export class FavoritesStore {
     return result
   }
 
-  private async runMutation(
-    apply: (map: Map<string, FavoritesFileItem>, now: number) => boolean
-  ) {
+  private async runMutation(apply: (map: Map<string, FavoritesFileItem>, now: number) => boolean) {
     if (!this.root || !this.index) return { ok: false, reason: 'unavailable' } as const
 
     const read = await this.options.store.readFavorites()

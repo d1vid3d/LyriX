@@ -192,10 +192,11 @@ describe('PlaybackQueue', () => {
     queue.addToQueue([track('x'), track('y')])
 
     expect(ids(queue)).toEqual(['a', 'b', 'c', 'x', 'y'])
-    expect(snapshot(queue).entries.slice(-2).map((entry) => entry.origin)).toEqual([
-      'added',
-      'added'
-    ])
+    expect(
+      snapshot(queue)
+        .entries.slice(-2)
+        .map((entry) => entry.origin)
+    ).toEqual(['added', 'added'])
   })
 
   it('removes entries, adjusts the current index, and refuses to remove the current entry', () => {

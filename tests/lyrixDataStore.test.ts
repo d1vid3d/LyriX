@@ -79,9 +79,7 @@ class FakeFs implements FsAdapter {
     return { size: Buffer.byteLength(value), isFile: () => true }
   }
 
-  async lstat(
-    path: string
-  ): Promise<{
+  async lstat(path: string): Promise<{
     size: number
     isFile(): boolean
     isSymbolicLink(): boolean
@@ -203,7 +201,12 @@ describe('LyrixDataStore', () => {
     expect(store.getStatus().state).toBe('ready')
 
     fs.failWrites.set(join(dir, 'favorites.json'), 'EIO')
-    const unavailable = await store.writeFavorites([{ ref: { path: 'x.flac', fp: { title: 'X', artist: 'A', album: 'B', durationSec: 1 } }, addedAt: 1 }])
+    const unavailable = await store.writeFavorites([
+      {
+        ref: { path: 'x.flac', fp: { title: 'X', artist: 'A', album: 'B', durationSec: 1 } },
+        addedAt: 1
+      }
+    ])
     expect(unavailable).toEqual({ ok: false, reason: 'unavailable' })
     expect(store.getStatus().state).toBe('unavailable')
     expect(store.getStatus().message).toBeTruthy()

@@ -272,8 +272,6 @@ describe('LyricChoiceStore', () => {
     expect(store.getTranslation('track-new')).toBe('sidecar:Song.en.lrc')
 
     const raw = await readJson()
-    expect(Object.keys(raw.translations as Record<string, string>)).toHaveLength(
-      MAX_LYRIC_CHOICES
-    )
+    expect(Object.keys(raw.translations as Record<string, string>)).toHaveLength(MAX_LYRIC_CHOICES)
   })
 })

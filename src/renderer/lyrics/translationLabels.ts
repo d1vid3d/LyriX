@@ -31,9 +31,7 @@ export function translationSidecarExample(
   const suffix = language ?? FALLBACK_LANGUAGE
   const name = expectedSidecarName.trim() || FALLBACK_SIDECAR
 
-  return /\.lrc$/i.test(name)
-    ? name.replace(/\.lrc$/i, `.${suffix}.lrc`)
-    : `${name}.${suffix}.lrc`
+  return /\.lrc$/i.test(name) ? name.replace(/\.lrc$/i, `.${suffix}.lrc`) : `${name}.${suffix}.lrc`
 }
 
 function getDisplayNames(): Intl.DisplayNames | null {

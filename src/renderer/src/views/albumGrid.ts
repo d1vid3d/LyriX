@@ -11,10 +11,7 @@ export interface AlbumGridOptions {
   onOpenAlbumMenu?(album: Album, position: MenuPosition): void
 }
 
-export function renderAlbumGrid(
-  options: AlbumGridOptions,
-  items: readonly AlbumItem[]
-): void {
+export function renderAlbumGrid(options: AlbumGridOptions, items: readonly AlbumItem[]): void {
   if (items.length === 0) {
     options.container.replaceChildren()
     options.container.hidden = true

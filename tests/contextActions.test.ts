@@ -189,11 +189,10 @@ describe('ContextActions playback', () => {
     const { actions, transport } = setup()
 
     actions.run(buildAlbumMenu({ album: album() })[0])
-    expect(transport.playQueue).toHaveBeenCalledWith(
-      values,
-      0,
-      { kind: 'album', label: 'Test Album' }
-    )
+    expect(transport.playQueue).toHaveBeenCalledWith(values, 0, {
+      kind: 'album',
+      label: 'Test Album'
+    })
 
     actions.run(buildAlbumMenu({ album: album() })[1])
     expect(transport.shuffleAlbum).toHaveBeenCalledTimes(1)

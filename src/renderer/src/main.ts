@@ -135,10 +135,8 @@ const queuePanel = new QueuePanel(
     onToggleHistory: () => queuePanelController.handleToggleHistory(),
     onPlayEntry: (entryId) => queuePanelController.handlePlayEntry(entryId),
     onRemoveEntry: (entryId) => queuePanelController.handleRemoveEntry(entryId),
-    onReorderEntry: (entryId, slot) =>
-      queuePanelController.handleReorderEntry(entryId, slot),
-    onMoveEntry: (entryId, direction) =>
-      queuePanelController.handleMoveEntry(entryId, direction),
+    onReorderEntry: (entryId, slot) => queuePanelController.handleReorderEntry(entryId, slot),
+    onMoveEntry: (entryId, direction) => queuePanelController.handleMoveEntry(entryId, direction),
     onOpenMenu: (row, position) => openers.openQueueRowMenu(row, position),
     isFavorite: (trackId) => favoritesController.isFavorite(trackId),
     onToggleFavorite: (trackId) => void favoritesController.toggle(trackId)
@@ -154,8 +152,7 @@ const tracksList = new TracksList({
   onPlayTrack: (index) => transport.playVisibleTrack(index),
   isFavorite: (trackId) => favoritesController.isFavorite(trackId),
   onToggleFavorite: (trackId) => void favoritesController.toggle(trackId),
-  onOpenTrackMenu: (item, _index, play, position) =>
-    openers.openTrackMenu(item, play, position)
+  onOpenTrackMenu: (item, _index, play, position) => openers.openTrackMenu(item, play, position)
 })
 
 const favoritesList = new TracksList({
@@ -174,8 +171,7 @@ const favoritesList = new TracksList({
     }),
   isFavorite: (trackId) => favoritesController.isFavorite(trackId),
   onToggleFavorite: (trackId) => void favoritesController.toggle(trackId),
-  onOpenTrackMenu: (item, _index, play, position) =>
-    openers.openTrackMenu(item, play, position)
+  onOpenTrackMenu: (item, _index, play, position) => openers.openTrackMenu(item, play, position)
 })
 
 const favoritesView = new FavoritesView({
@@ -216,9 +212,7 @@ const playerBar = new PlayerBar({
   onToggleFavorite: (trackId) => void favoritesController.toggle(trackId)
 })
 
-attachMenuTrigger(elements.nowPlayingTarget, (position) =>
-  openers.openCurrentTrackMenu(position)
-)
+attachMenuTrigger(elements.nowPlayingTarget, (position) => openers.openCurrentTrackMenu(position))
 
 function renderNowPlaying(): void {
   playerBar.updateNowPlaying()
@@ -323,8 +317,7 @@ screen = new ScreenController({
   onShuffleArtist: (artist) => transport.shuffleArtist(artist),
   onOpenAlbumMenu: (album, position) => openers.openAlbumMenu(album, position),
   onOpenArtistMenu: (artist, position) => openers.openArtistMenu(artist, position),
-  onOpenTrackRowMenu: (item, _index, play, position) =>
-    openers.openTrackMenu(item, play, position),
+  onOpenTrackRowMenu: (item, _index, play, position) => openers.openTrackMenu(item, play, position),
   onOpenAlbumTrackMenu: (album, track, play, position) =>
     openers.openAlbumTrackMenu(album, track, play, position),
   syncViewControls: () => toolbar.syncViewControls()
@@ -369,8 +362,7 @@ contextActions = new ContextActions({
   transport,
   findAlbum: (albumId) => library.getAlbums().find((album) => album.id === albumId) ?? null,
   findArtist: (artistName) =>
-    library.getLibraryIndex().items.artists.find((artist) => artist.name === artistName) ??
-    null,
+    library.getLibraryIndex().items.artists.find((artist) => artist.name === artistName) ?? null,
   openAlbum: (albumId) => navigation.openAlbum(albumId),
   openArtist: (artistName) => navigation.openArtist(artistName),
   toast: (message) => toast.show(message),

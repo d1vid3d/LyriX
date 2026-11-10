@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { alignTranslation, attachTranslation, isBlankLyricText } from '../src/shared/lyrics/translation'
+import {
+  alignTranslation,
+  attachTranslation,
+  isBlankLyricText
+} from '../src/shared/lyrics/translation'
 import type { LyricDocument, LyricLine } from '../src/shared/lyrics/types'
 
 interface LineInput {
@@ -177,14 +181,20 @@ describe('alignTranslation', () => {
   })
 
   it('falls back to index for untimed primary lyrics', () => {
-    const primary = document([
-      { text: 'one', start: 0 },
-      { text: 'two', start: 0 }
-    ], false)
-    const translation = document([
-      { text: 'uno', start: 0 },
-      { text: 'dos', start: 0 }
-    ], false)
+    const primary = document(
+      [
+        { text: 'one', start: 0 },
+        { text: 'two', start: 0 }
+      ],
+      false
+    )
+    const translation = document(
+      [
+        { text: 'uno', start: 0 },
+        { text: 'dos', start: 0 }
+      ],
+      false
+    )
 
     const result = alignTranslation(primary, translation)
 
@@ -229,9 +239,7 @@ describe('alignTranslation', () => {
 describe('attachTranslation', () => {
   it('returns a new document and leaves the input untouched', () => {
     const primary = document([{ text: 'one', start: 0 }])
-    primary.lines[0].segments = [
-      { text: 'one', start: 0, end: 1, spaceAfter: false }
-    ]
+    primary.lines[0].segments = [{ text: 'one', start: 0, end: 1, spaceAfter: false }]
     primary.lines[0].agent = 'v1'
 
     const attached = attachTranslation(primary, 'sidecar:Song.en.lrc', ['uno'])

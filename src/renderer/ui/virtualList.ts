@@ -100,10 +100,7 @@ export class VirtualList<T> {
     const visibleCount = Math.ceil(height / this.rowHeight)
     const start = Math.max(
       0,
-      Math.min(
-        total - 1,
-        Math.floor(this.container.scrollTop / this.rowHeight) - this.overscan
-      )
+      Math.min(total - 1, Math.floor(this.container.scrollTop / this.rowHeight) - this.overscan)
     )
     const end = Math.min(total, start + visibleCount + this.overscan * 2)
 

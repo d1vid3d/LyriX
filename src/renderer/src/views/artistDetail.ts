@@ -16,10 +16,7 @@ export interface ArtistDetailOptions {
   onShuffleArtist(artist: ArtistItem): void
 }
 
-export function renderArtistDetail(
-  options: ArtistDetailOptions,
-  artist: ArtistItem
-): void {
+export function renderArtistDetail(options: ArtistDetailOptions, artist: ArtistItem): void {
   options.backButton.textContent = '← Artists'
   options.name.textContent = artist.name
   options.playButton.onclick = () => options.onPlayArtist(artist)
@@ -29,10 +26,5 @@ export function renderArtistDetail(
   const trackLabel = artist.trackCount === 1 ? '1 track' : `${artist.trackCount} tracks`
   options.meta.textContent = `${albumLabel} · ${trackLabel}`
 
-  renderAlbumCards(
-    options.albumGrid,
-    artist.albums,
-    options.onOpenAlbum,
-    options.onOpenAlbumMenu
-  )
+  renderAlbumCards(options.albumGrid, artist.albums, options.onOpenAlbum, options.onOpenAlbumMenu)
 }

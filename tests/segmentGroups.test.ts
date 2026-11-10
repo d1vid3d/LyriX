@@ -25,7 +25,11 @@ describe('groupSegments', () => {
   })
 
   it('keeps segments without a trailing space in one word container', () => {
-    const groups = groupSegments([segment('un', false), segment('break', false), segment('able', true)])
+    const groups = groupSegments([
+      segment('un', false),
+      segment('break', false),
+      segment('able', true)
+    ])
 
     expect(words(groups)).toEqual([['un', 'break', 'able']])
   })

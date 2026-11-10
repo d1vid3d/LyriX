@@ -12,10 +12,7 @@
   --lyric-translation-color-active: #c9c9d2;
   --lyric-translation-gap: 4px;
   --lyric-transition:
-    color 180ms ease,
-    opacity 180ms ease,
-    font-size 180ms ease,
-    transform 180ms ease;
+    color 180ms ease, opacity 180ms ease, font-size 180ms ease, transform 180ms ease;
   --lyric-transition-fast: color 120ms linear;
 }
 
