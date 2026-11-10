@@ -34,6 +34,9 @@ A separate in-repo CDP suite (`tests/e2e/`) drives the built Electron app. It co
 unit tests pin pure logic, while the E2E tiers verify the real main/preload/renderer wiring,
 filesystem scanning, audio playback, and DOM behavior. The E2E tiers are not part of `npm test`.
 
+The non-E2E checks also run in CI on every pull request and on pushes to `main` and `dev`; the
+workflow scope is owned by [build-and-config.md](build-and-config.md).
+
 ## Coverage map
 
 | File | Coverage |

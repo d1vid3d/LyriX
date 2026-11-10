@@ -45,6 +45,7 @@ npm run test:e2e:visual # CSS/visual CDP suite
 | `package.json` | Scripts, Electron entry point and dependencies. |
 | `.prettierrc.json` | Prettier formatting options matching the existing code style. |
 | `.prettierignore` | Keeps generated output, dependencies, and Markdown out of formatting. |
+| `.github/workflows/ci.yml` | GitHub Actions checks: formatting, lint, typecheck, unit tests, and build. |
 | `eslint.config.mjs` | ESLint flat config: type-aware rules for `src`, plain JS rules for tooling and E2E scripts. |
 | `electron.vite.config.ts` | electron-vite build configuration; bundles `music-metadata` into the main process. |
 | `tsconfig.json` | Root project references for editor tooling. |

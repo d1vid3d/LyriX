@@ -4,8 +4,9 @@
 level.
 
 **Owning source paths:** `package.json`, `.prettierrc.json`, `.prettierignore`,
-`eslint.config.mjs`, `electron.vite.config.ts`, `tsconfig.json`, `tsconfig.node.json`,
-`tsconfig.web.json`, `src/renderer/index.html`, `src/main/window.ts`, `forge.config.js`.
+`eslint.config.mjs`, `.github/workflows/ci.yml`, `electron.vite.config.ts`, `tsconfig.json`,
+`tsconfig.node.json`, `tsconfig.web.json`, `src/renderer/index.html`, `src/main/window.ts`,
+`forge.config.js`.
 
 **Last verified:** 2026-11-10 against LyriX 0.1.0.
 
@@ -73,6 +74,17 @@ existing style: no semicolons, single quotes, 100-column lines, no trailing comm
 generated output (`build/`, `out/`, `.vite/`, `graphify-out/`), dependencies, agent tooling
 (`.opencode/`), the lockfile, and binary E2E fixtures. `specs/`, `README.md`, and `AGENTS.md` stay
 hand-formatted.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on pushes to `main` and `dev`, on pull requests, and on manual
+dispatch. The `checks` job uses `windows-latest` with Node 22 and runs, in order: `npm ci`,
+`npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`.
+Superseded runs on the same ref are cancelled.
+
+The E2E tiers and packaging are intentionally excluded. The E2E suites need a graphical desktop
+session, launch Electron, and play audio, so they remain local until they are proven on a hosted
+runner. Packaging and installer generation are separate from the verification workflow.
 
 ## TypeScript projects
 

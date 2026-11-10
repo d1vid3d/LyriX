@@ -63,7 +63,7 @@ them.
 | If you are changing… | Read |
 | --- | --- |
 | Process boundaries, design goals, module responsibilities | [architecture.md](architecture.md) |
-| Prettier/ESLint config, build scripts, TypeScript projects, bundler, CSP/security flags | [build-and-config.md](build-and-config.md) |
+| Prettier/ESLint config, CI, build scripts, TypeScript projects, bundler, CSP/security flags | [build-and-config.md](build-and-config.md) |
 | Cross-process types, track/album ids, `LibraryApi` surface | [data-model.md](data-model.md) |
 | Settings, library cache, lyric choices, atomic JSON writes | [persistence.md](persistence.md) |
 | App startup, window, `AppStore`, IPC handlers, preload bridge | [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md) |
@@ -116,7 +116,7 @@ contracts that the graph cannot.
 | File | One-line description |
 | --- | --- |
 | [architecture.md](architecture.md) | Goals, capabilities, process diagram, process boundaries, reduced module responsibilities. |
-| [build-and-config.md](build-and-config.md) | Prettier/ESLint config, npm scripts, TypeScript projects, electron-vite behavior, renderer security settings. |
+| [build-and-config.md](build-and-config.md) | Prettier/ESLint config, CI workflow, npm scripts, TypeScript projects, electron-vite behavior, renderer security settings. |
 | [data-model.md](data-model.md) | Shared types, settings/snapshot shapes, SHA-1 id contract. |
 | [persistence.md](persistence.md) | On-disk layout, settings normalization, library cache, lyric-choice store, atomic JSON helpers. |
 | [main/lifecycle-and-ipc.md](main/lifecycle-and-ipc.md) | App startup, window, shared store, IPC channels, preload `window.library`. |
